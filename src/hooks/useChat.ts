@@ -119,6 +119,7 @@ function cleanForStorage(messages: UIChatMessage[]): UIChatMessage[] {
     toolProgress: undefined,
     isStreaming: undefined,
     uploadedImageUrl: undefined,
+    uploadedImageUrls: undefined,
   }));
 }
 

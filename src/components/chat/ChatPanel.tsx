@@ -335,12 +335,14 @@ export function ChatPanel({
           id: 'user-upload',
           role: 'user',
           content: '',
-          timestamp: Date.now(),
+          timestamp: 0,
           uploadedImageUrls: imageUrls,
         };
         // Insert after the welcome sentinel (index 0) so it appears first
         // when the welcome message is filtered out during rendering.
-        msgs = [msgs[0], uploadMsg, ...msgs.slice(1)];
+        msgs = msgs.length > 0
+          ? [msgs[0], uploadMsg, ...msgs.slice(1)]
+          : [uploadMsg];
       }
     }
 
