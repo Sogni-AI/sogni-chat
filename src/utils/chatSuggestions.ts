@@ -67,9 +67,10 @@ const SUGGESTIONS_BY_TOOL: Record<ChatToolName, Suggestion[]> = {
     { label: 'Start fresh with new settings', prompt: 'Start fresh with new settings' },
   ],
   animate_photo: [
-    { label: 'Try a different animation', prompt: 'Animate it differently' },
-    { label: 'View from another angle', prompt: 'Show me this from a different angle' },
-    { label: 'Restore the photo', prompt: 'Restore the original photo' },
+    { label: 'Try different motion', prompt: 'Animate it with different motion' },
+    { label: 'Add dialogue', prompt: 'Animate it again but have the subject speak' },
+    { label: 'Make it longer', prompt: 'Make a longer version of this video' },
+    { label: 'Try a different style', prompt: 'Animate it with a different visual style' },
   ],
   change_angle: [
     { label: 'Try another angle', prompt: 'Show me from another angle' },
@@ -77,9 +78,10 @@ const SUGGESTIONS_BY_TOOL: Record<ChatToolName, Suggestion[]> = {
     { label: 'Restore the photo', prompt: 'Restore the original photo' },
   ],
   generate_image: [
-    { label: 'Try a different style', prompt: 'Try a different art style' },
-    { label: 'Change the aspect ratio', prompt: 'Generate it with a different aspect ratio' },
-    { label: 'Animate this into a video', prompt: 'Animate this into a video' },
+    { label: 'Edit this image', prompt: 'Edit this image' },
+    { label: 'Generate variations', prompt: 'Generate a few variations of this' },
+    { label: 'Apply a style', prompt: 'Apply an artistic style to this' },
+    { label: 'Animate into a video', prompt: 'Animate this into a video' },
   ],
   edit_image: [
     { label: 'Edit it further', prompt: 'Make another edit to this result' },
@@ -88,8 +90,9 @@ const SUGGESTIONS_BY_TOOL: Record<ChatToolName, Suggestion[]> = {
   ],
   generate_video: [
     { label: 'Try different motion', prompt: 'Generate a new video with different motion' },
+    { label: 'Add dialogue', prompt: 'Regenerate with the subject speaking' },
+    { label: 'Make it longer', prompt: 'Generate a longer version of this video' },
     { label: 'Generate an image instead', prompt: 'Generate a still image of this scene' },
-    { label: 'Add music', prompt: 'Generate a soundtrack for this video' },
   ],
   sound_to_video: [
     { label: 'Try different visuals', prompt: 'Generate a new video with different visuals for the same audio' },
@@ -244,9 +247,9 @@ function getMidConversationSuggestions(messages: UIChatMessage[]): Suggestion[] 
     }
     if (topic === 'video') {
       return [
-        { label: 'Cinematic look', prompt: 'Make it cinematic' },
-        { label: 'Smooth motion', prompt: 'Use smooth, flowing motion' },
-        { label: 'Fast-paced', prompt: 'Make it fast-paced and dynamic' },
+        { label: 'Cinematic look', prompt: 'Make it cinematic with dramatic camera movement' },
+        { label: 'With dialogue', prompt: 'Have the subject speak with natural dialogue' },
+        { label: 'Smooth ambient motion', prompt: 'Use smooth, flowing motion with ambient sounds' },
         { label: 'Surprise me', prompt: 'Surprise me with something creative' },
       ];
     }
