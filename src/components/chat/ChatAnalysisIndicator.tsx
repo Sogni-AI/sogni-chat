@@ -4,16 +4,28 @@
  */
 import { useState, useEffect } from 'react';
 
-const ANALYSIS_STEPS = [
+const RESTORATION_STEPS = [
   'Examining your photo...',
   'Looking for damage...',
   'Checking colors and detail...',
   'Preparing suggestions...',
 ];
 
+const VIDEO_STEPS = [
+  'Examining your photo...',
+  'Analyzing movement potential...',
+  'Identifying cinematic elements...',
+  'Crafting animation ideas...',
+];
+
 const ROTATE_INTERVAL_MS = 2500;
 
-export function ChatAnalysisIndicator() {
+interface ChatAnalysisIndicatorProps {
+  intent?: 'edit' | 'video' | 'restore' | null;
+}
+
+export function ChatAnalysisIndicator({ intent }: ChatAnalysisIndicatorProps) {
+  const steps = intent === 'video' ? VIDEO_STEPS : RESTORATION_STEPS;
   const [stepIndex, setStepIndex] = useState(0);
   const [visible, setVisible] = useState(true);
 
@@ -23,12 +35,12 @@ export function ChatAnalysisIndicator() {
       setVisible(false);
       // After fade-out, swap text and fade back in
       setTimeout(() => {
-        setStepIndex((prev) => (prev + 1) % ANALYSIS_STEPS.length);
+        setStepIndex((prev) => (prev + 1) % steps.length);
         setVisible(true);
       }, 250);
     }, ROTATE_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, []);
+  }, [steps.length]);
 
   return (
     <div
@@ -79,7 +91,7 @@ export function ChatAnalysisIndicator() {
           }}
           aria-live="polite"
         >
-          {ANALYSIS_STEPS[stepIndex]}
+          {steps[stepIndex]}
         </span>
       </div>
     </div>

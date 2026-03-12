@@ -9,7 +9,8 @@ import type { TokenType, Balances } from '@/types/wallet';
 import type { UseChatResult } from '@/hooks/useChat';
 import type { UploadedFile } from '@/tools/types';
 import { QUALITY_PRESETS } from '@/config/qualityPresets';
-import { generateSuggestions, VIDEO_INTENT_SUGGESTIONS, EDIT_INTENT_SUGGESTIONS } from '@/utils/chatSuggestions';
+import { generateSuggestions, EDIT_INTENT_SUGGESTIONS } from '@/utils/chatSuggestions';
+import { VIDEO_VISION_ANALYSIS_SYSTEM_PROMPT } from '@/config/chat';
 import { FullscreenBeforeAfter } from '@/components/FullscreenBeforeAfter';
 import { useLayout } from '@/layouts/AppLayout';
 import { getVariantById } from '@/config/modelVariants';
@@ -221,7 +222,6 @@ export function ChatPanel({
   const isUserNearBottomRef = useRef(true);
   const analysisTriggeredRef = useRef(false);
   const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
-  const videoIntentSentRef = useRef(false);
 
   // Wrap acceptModelSwitch to also update the header model selector
   const handleAcceptModelSwitch = useCallback(() => {
@@ -232,19 +232,11 @@ export function ChatPanel({
     chat.acceptModelSwitch();
   }, [chat, selectedModelVariant, setSelectedModelVariant]);
 
-  // Reset video intent ref when chat is cleared
-  useEffect(() => {
-    if (messages.length === 1 && messages[0].id === 'welcome') {
-      videoIntentSentRef.current = false;
-    }
-  }, [messages]);
-
   // Auto-trigger vision analysis when image is available and chat is at welcome state.
-  // Skip for 'video' intent — no need to analyze damage when the user wants to animate.
+  // For 'video' intent, uses a video-focused analysis prompt instead of restoration.
   useEffect(() => {
     if (
       allowAutoAnalysis &&
-      uploadIntent !== 'video' &&
       imageData &&
       imageUrl &&
       sogniClient &&
@@ -261,6 +253,10 @@ export function ChatPanel({
         balances,
         onTokenSwitch,
         onInsufficientCredits,
+        ...(uploadIntent === 'video' && {
+          visionSystemPrompt: VIDEO_VISION_ANALYSIS_SYSTEM_PROMPT,
+          visionUserText: 'Analyze this photo for animation — what motion and cinematic ideas would bring it to life?',
+        }),
       });
     }
   }, [allowAutoAnalysis, uploadIntent, imageData, imageUrl, sogniClient, isLoading, messages, tokenType, balances, onTokenSwitch, onInsufficientCredits, analyzeImage]);
@@ -275,10 +271,13 @@ export function ChatPanel({
   const suggestions = useMemo(
     () => {
       if (isLoading) return [];
-      if (uploadIntent === 'video' && imageData) return VIDEO_INTENT_SUGGESTIONS;
       if (uploadIntent === 'restore' && imageData) return [];
       if (uploadIntent === 'edit' && imageData) return EDIT_INTENT_SUGGESTIONS;
-      return generateSuggestions(messages, uploadIntent === 'video' ? [] : analysisSuggestions, !!imageData);
+      // For video intent, use analysis suggestions directly (skip restoration preset chips)
+      if (uploadIntent === 'video' && imageData && analysisSuggestions && analysisSuggestions.length > 0) {
+        return analysisSuggestions;
+      }
+      return generateSuggestions(messages, analysisSuggestions, !!imageData);
     },
     [messages, isLoading, analysisSuggestions, imageData, uploadIntent],
   );
@@ -348,27 +347,6 @@ export function ChatPanel({
     },
     [sogniClient, imageData, width, height, tokenType, balances, qualityTier, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, onClearMediaFiles, selectedModelVariant],
   );
-
-  // Auto-send animate message when upload intent is 'video' and image is ready.
-  // Since we skip vision analysis for video intent, we only need to wait for
-  // imageData to be available and chat to not be loading.
-  useEffect(() => {
-    if (
-      uploadIntent === 'video' &&
-      imageData &&
-      sogniClient &&
-      !isLoading &&
-      !videoIntentSentRef.current
-    ) {
-      const hasUserTextMessage = messages.some(
-        (m) => m.role === 'user' && m.id !== 'user-upload' && m.content?.trim(),
-      );
-      if (!hasUserTextMessage) {
-        videoIntentSentRef.current = true;
-        handleSend('Animate this photo into a video');
-      }
-    }
-  }, [uploadIntent, imageData, sogniClient, isLoading, messages, handleSend]);
 
   const handleImageClick = useCallback((url: string, _index: number) => {
     const globalIndex = allResultUrls.indexOf(url);
@@ -690,7 +668,7 @@ export function ChatPanel({
             );
           })}
 
-          {isAnalyzing && <ChatAnalysisIndicator />}
+          {isAnalyzing && <ChatAnalysisIndicator intent={uploadIntent} />}
 
           {showIntentCapture && canSend && (
             <IntentCaptureCard onSubmit={handleSend} disabled={isLoading} />

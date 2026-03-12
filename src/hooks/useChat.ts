@@ -53,6 +53,8 @@ export interface UseChatResult {
     balances: Balances | null;
     onTokenSwitch?: (newType: TokenType) => void;
     onInsufficientCredits?: () => void;
+    visionSystemPrompt?: string;
+    visionUserText?: string;
   }) => Promise<void>;
   reset: (options?: { keepBackground?: boolean }) => void;
   /** Cancel the currently running tool execution (e.g. video generation) */
@@ -217,6 +219,8 @@ export function useChat(): UseChatResult {
       balances: Balances | null;
       onTokenSwitch?: (newType: TokenType) => void;
       onInsufficientCredits?: () => void;
+      visionSystemPrompt?: string;
+      visionUserText?: string;
     }) => {
       const thisRequest = { aborted: false };
       abortRef.current = thisRequest;
@@ -308,6 +312,9 @@ export function useChat(): UseChatResult {
               setUIMessages([{ ...WELCOME_MESSAGE, timestamp: Date.now() }]);
             },
           },
+          context.visionSystemPrompt || context.visionUserText
+            ? { systemPrompt: context.visionSystemPrompt, userText: context.visionUserText }
+            : undefined,
         );
 
         if (!thisRequest.aborted && isActiveSession() && conversation.length > 0) {

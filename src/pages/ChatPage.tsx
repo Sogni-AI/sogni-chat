@@ -705,7 +705,7 @@ export default function ChatPage() {
     return (
       <>
         <SEOHead
-          title="AI Creative Studio | Sogni Creative Agent"
+          title="Sogni Chat — Your Creative AI Agent"
           description="Chat with AI to generate images, create videos, compose music, restore photos, and more."
           path="/"
         />
@@ -739,7 +739,7 @@ export default function ChatPage() {
   return (
     <>
       <SEOHead
-        title="AI Creative Studio | Sogni Creative Agent"
+        title="Sogni Chat — Your Creative AI Agent"
         description="Chat with AI to generate images, create videos, compose music, restore photos, and more."
         path="/"
       />

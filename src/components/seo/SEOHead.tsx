@@ -9,18 +9,18 @@ interface SEOHeadProps {
   noIndex?: boolean;
 }
 
-const DEFAULT_IMAGE = 'https://chat.sogni.ai/og-banner.jpg';
-const DEFAULT_IMAGE_ALT = 'Sogni AI Creative Studio — generate images, create videos, compose music, and more with AI. 50 free credits daily.';
+const DEFAULT_IMAGE = 'https://chat.sogni.ai/og-banner.png';
+const DEFAULT_IMAGE_ALT = 'Sogni Chat — Your Creative AI Agent. Rainbow moon logo with video, image, and music model tools.';
 
 export function SEOHead({
-  title = 'AI Creative Studio — Generate, Create & Transform with AI | Sogni',
-  description = 'Chat with AI to generate images, create videos, compose music, restore photos, and more. Your all-in-one AI creative studio powered by Sogni. 50 free credits daily — no credit card required.',
+  title = 'Sogni Chat — Your Creative AI Agent',
+  description = 'Your creative AI agent for generative AI. Create video bangers with LTX-2.3 and the latest open-source video, image, and music models. 50 free credits daily.',
   path = '/',
   image = DEFAULT_IMAGE,
   imageAlt = DEFAULT_IMAGE_ALT,
   noIndex = false
 }: SEOHeadProps) {
-  const url = `https://chat.sogni.ai${path}${path.includes('?') ? '&' : '?'}v=2`;
+  const url = `https://chat.sogni.ai${path}`;
 
   return (
     <Helmet>

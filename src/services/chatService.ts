@@ -318,17 +318,21 @@ export async function sendVisionAnalysis(
   imageBase64DataUri: string,
   tokenType: TokenType,
   callbacks: Pick<ChatStreamCallbacks, 'onToken' | 'onComplete' | 'onError'>,
+  options?: {
+    systemPrompt?: string;
+    userText?: string;
+  },
 ): Promise<{ conversation: ChatMessage[]; fullContent: string }> {
   const userMessage: ChatMessage = {
     role: 'user',
     content: [
       { type: 'image_url', image_url: { url: imageBase64DataUri } },
-      { type: 'text', text: 'Analyze this photo for restoration.' },
+      { type: 'text', text: options?.userText ?? 'Analyze this photo for restoration.' },
     ],
   };
 
   const messages: ChatMessage[] = [
-    { role: 'system', content: VISION_ANALYSIS_SYSTEM_PROMPT },
+    { role: 'system', content: options?.systemPrompt ?? VISION_ANALYSIS_SYSTEM_PROMPT },
     userMessage,
   ];
 

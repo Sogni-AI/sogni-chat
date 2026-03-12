@@ -11,7 +11,7 @@ export const definition: ToolDefinition = {
   function: {
     name: 'generate_video',
     description:
-      'Generate a video from a text description — no source image needed. Creates entirely new video content from your prompt. Use this when the user wants to create a video from scratch without uploading a photo. For animating an existing photo, use animate_photo instead.',
+      'Generate a video from a text description — no source image needed. Creates entirely new video content from your prompt. Use this when the user wants to create a video from scratch without uploading a photo. For animating an existing photo, use animate_photo instead. CRITICAL: If the user\'s request is vague or lacks specific creative direction (e.g. just "create a video", "make a video"), do NOT call this tool yet. Instead, ask about their vision: subject matter, mood, camera style, and any specific actions or dialogue. If an image is available, analyze what is actually in it and suggest 2-3 creative directions tailored to the image content — never give generic ideas. Only call this tool once you have clear creative intent.',
     parameters: {
       type: 'object',
       properties: {

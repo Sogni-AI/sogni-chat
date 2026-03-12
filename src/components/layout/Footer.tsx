@@ -71,7 +71,7 @@ export function Footer() {
         {/* SEO footer text */}
         <div className="footer-seo mt-4 pt-3 text-center" style={{ borderTop: '1px solid var(--color-border-light)' }}>
           <p style={{ fontSize: '0.6875rem', color: 'var(--color-text-light)', lineHeight: 1.6 }}>
-            AI Creative Studio powered by Sogni. Generate images, create videos, compose music, restore photos, apply artistic styles, and more &mdash; all through a simple AI chat.
+            Sogni Creative Agent &mdash; your creative AI agent for generative AI. Create videos, images, music, restore photos, apply artistic styles, and more &mdash; all through a simple chat.
             50 free credits every day &mdash; no credit card required.
           </p>
           <div className="flex items-center justify-center gap-4 mt-2" style={{ fontSize: '0.6875rem', color: 'var(--color-text-light)' }}>
