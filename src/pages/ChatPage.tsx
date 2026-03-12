@@ -538,9 +538,11 @@ export default function ChatPage() {
 
   const handleFileSelect = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      await addMediaFile(file);
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+      for (const file of Array.from(files)) {
+        await addMediaFile(file);
+      }
     },
     [addMediaFile],
   );
@@ -777,6 +779,7 @@ export default function ChatPage() {
             ref={fileInputRef}
             type="file"
             accept="image/*"
+            multiple
             onChange={handleFileSelect}
             className="hidden"
           />

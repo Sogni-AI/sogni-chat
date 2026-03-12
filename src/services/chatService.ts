@@ -54,37 +54,50 @@ const MAX_TOOL_ROUNDS = 5;
 const VISION_IMAGE_TOKENS = 1_300;
 
 /**
- * Prepare a vision-ready data URI from the most relevant image source.
+ * Prepare vision-ready data URIs from all relevant image sources.
  * Uses resizeImageForVision (1024px max, JPEG 0.85) for compact payloads.
- * Returns null if no image is available or preparation fails.
+ * Returns an empty array if no images are available or preparation fails.
  */
-async function prepareVisionDataUri(context: ToolExecutionContext): Promise<string | null> {
+async function prepareVisionDataUris(context: ToolExecutionContext): Promise<string[]> {
+  const uris: string[] = [];
   try {
-    // Priority: latest result > original upload > attached image
+    // When a tool has produced results, try to show the latest result.
+    // resultUrls may contain non-image URLs (audio/video) so guard against
+    // resizeImageForVision failing on those.
     if (context.resultUrls.length > 0) {
-      return await resizeImageForVision(context.resultUrls[context.resultUrls.length - 1]);
-    }
-    if (context.imageData) {
-      const buf = context.imageData.buffer.slice(
-        context.imageData.byteOffset,
-        context.imageData.byteOffset + context.imageData.byteLength,
-      ) as ArrayBuffer;
-      const blobUrl = URL.createObjectURL(new Blob([buf], { type: 'image/jpeg' }));
       try {
-        return await resizeImageForVision(blobUrl);
-      } finally {
-        URL.revokeObjectURL(blobUrl);
+        const uri = await resizeImageForVision(context.resultUrls[context.resultUrls.length - 1]);
+        uris.push(uri);
+      } catch {
+        // Latest result is not an image (audio/video) — skip it
       }
     }
-    const imgFile = context.uploadedFiles.find(f => f.type === 'image');
-    if (imgFile) {
+    // Always include all uploaded images so the LLM retains context of user
+    // attachments even after tools produce results.
+    const imgFiles = context.uploadedFiles.filter(f => f.type === 'image');
+    for (const imgFile of imgFiles) {
       const buf = imgFile.data.buffer.slice(
         imgFile.data.byteOffset,
         imgFile.data.byteOffset + imgFile.data.byteLength,
       ) as ArrayBuffer;
       const blobUrl = URL.createObjectURL(new Blob([buf], { type: imgFile.mimeType }));
       try {
-        return await resizeImageForVision(blobUrl);
+        uris.push(await resizeImageForVision(blobUrl));
+      } catch (err) {
+        console.warn('[CHAT SERVICE] Vision image preparation failed for file:', imgFile.filename, err);
+      } finally {
+        URL.revokeObjectURL(blobUrl);
+      }
+    }
+    // Fallback: legacy imageData field when uploadedFiles is empty
+    if (uris.length === 0 && context.imageData) {
+      const buf = context.imageData.buffer.slice(
+        context.imageData.byteOffset,
+        context.imageData.byteOffset + context.imageData.byteLength,
+      ) as ArrayBuffer;
+      const blobUrl = URL.createObjectURL(new Blob([buf], { type: 'image/jpeg' }));
+      try {
+        uris.push(await resizeImageForVision(blobUrl));
       } finally {
         URL.revokeObjectURL(blobUrl);
       }
@@ -92,7 +105,7 @@ async function prepareVisionDataUri(context: ToolExecutionContext): Promise<stri
   } catch (err) {
     console.warn('[CHAT SERVICE] Vision image preparation failed:', err);
   }
-  return null;
+  return uris;
 }
 
 // ---------------------------------------------------------------------------
@@ -128,10 +141,10 @@ export async function sendChatMessage(
     onGallerySaved: callbacks.onGallerySaved,
   };
 
-  // Prepare vision context once before the loop: resize the current image
-  // to a compact data URI so the VLM can "see" it on every round.
+  // Prepare vision context once before the loop: resize all current images
+  // to compact data URIs so the VLM can "see" them on every round.
   // Re-prepared inside the loop only when new results are generated.
-  let visionDataUri = await prepareVisionDataUri(context);
+  let visionDataUris = await prepareVisionDataUris(context);
   let visionResultCount = context.resultUrls.length;
 
   while (toolRound < MAX_TOOL_ROUNDS) {
@@ -143,7 +156,7 @@ export async function sendChatMessage(
       // Reserve token budget for the vision image that will be attached.
       const systemMessage: ChatMessage = { role: 'system', content: CHAT_SYSTEM_PROMPT };
       const rawBudget = getInputBudget(context.sogniClient);
-      const budget = visionDataUri ? rawBudget - VISION_IMAGE_TOKENS : rawBudget;
+      const budget = visionDataUris.length > 0 ? rawBudget - VISION_IMAGE_TOKENS * visionDataUris.length : rawBudget;
       const trimResult = trimConversation(updatedMessages, systemMessage, budget);
       if (trimResult.trimmedCount > 0) {
         console.log(`[CHAT SERVICE] Trimmed ${trimResult.trimmedCount} messages to fit context window`);
@@ -157,15 +170,15 @@ export async function sendChatMessage(
         ...updatedMessages,
       ];
 
-      // If a tool generated new results since last round, refresh the cached URI
+      // If a tool generated new results since last round, refresh the cached URIs
       if (context.resultUrls.length > visionResultCount) {
-        visionDataUri = await prepareVisionDataUri(context);
+        visionDataUris = await prepareVisionDataUris(context);
         visionResultCount = context.resultUrls.length;
       }
 
       // Attach cached vision context to the latest user message.
       // Only enhances the copy sent to the API; stored history stays text-only.
-      if (visionDataUri) {
+      if (visionDataUris.length > 0) {
         let lastUserIdx = -1;
         for (let i = allMessages.length - 1; i >= 0; i--) {
           if (allMessages[i].role === 'user') {
@@ -177,8 +190,8 @@ export async function sendChatMessage(
           allMessages[lastUserIdx] = {
             ...allMessages[lastUserIdx],
             content: [
-              { type: 'image_url', image_url: { url: visionDataUri } },
-              { type: 'text', text: allMessages[lastUserIdx].content as string },
+              ...visionDataUris.map(uri => ({ type: 'image_url' as const, image_url: { url: uri } })),
+              { type: 'text' as const, text: allMessages[lastUserIdx].content as string },
             ],
           };
         }
