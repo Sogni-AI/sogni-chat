@@ -132,8 +132,8 @@ export function ChatHistorySidebar({
           />
         </button>
 
-        {/* Sidebar toggle (only when not mobile) */}
-        {!onClose && onToggleCollapse && (
+        {/* Sidebar toggle (only in expanded mode header — in collapsed mode it's in the icon nav below) */}
+        {!collapsed && !onClose && onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -196,6 +196,34 @@ export function ChatHistorySidebar({
       {/* Collapsed mode: icon-only nav */}
       {collapsed && !onClose && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', padding: '0.25rem 0' }}>
+          {/* Sidebar toggle */}
+          {onToggleCollapse && (
+            <button
+              onClick={onToggleCollapse}
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+              style={{
+                width: '2.25rem',
+                height: '2.25rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'transparent',
+                border: 'none',
+                borderRadius: 'var(--radius-sm)',
+                cursor: 'pointer',
+                color: '#8e8e8e',
+                transition: 'color 0.15s, background 0.15s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#ececec'; e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#8e8e8e'; e.currentTarget.style.background = 'transparent'; }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="9" y1="3" x2="9" y2="21" />
+              </svg>
+            </button>
+          )}
           {/* New chat icon */}
           <button
             onClick={onNewProject}

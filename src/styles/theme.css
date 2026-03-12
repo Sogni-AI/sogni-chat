@@ -187,20 +187,20 @@ h1, h2, h3, h4, h5, h6 {
   mask-composite: exclude;
 }
 
-/* Focus States */
+/* Focus States — only show outlines for keyboard navigation, never on click */
 input:focus,
 textarea:focus,
-button:focus {
-  outline: 2px solid rgba(255, 255, 255, 0.2);
-  outline-offset: 2px;
-}
-
-/* Focus-visible for keyboard-only */
-button:focus:not(:focus-visible) {
+button:focus,
+a:focus,
+[tabindex]:focus {
   outline: none;
 }
 
-button:focus-visible {
+input:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.3);
   outline-offset: 2px;
 }

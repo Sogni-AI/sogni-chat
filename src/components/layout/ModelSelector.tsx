@@ -1,6 +1,6 @@
 /**
  * Model variant dropdown — ChatGPT-style dropdown next to the logo.
- * Shows current model name with a chevron; clicking opens a dropdown with variants.
+ * Shows "Sogni Creative Agent 1.0 [variant]" with chevron; opens dropdown on click.
  */
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { MODEL_VARIANTS, type ModelVariant } from '@/config/modelVariants';
@@ -17,7 +17,7 @@ export function ModelSelector({ selectedVariantId, onSelectVariant }: ModelSelec
 
   const selected = MODEL_VARIANTS.find(v => v.id === selectedVariantId) ?? MODEL_VARIANTS[0];
 
-  // Close on outside click
+  // Close on outside click or Escape
   useEffect(() => {
     if (!open) return;
     const handleClick = (e: MouseEvent) => {
@@ -42,11 +42,6 @@ export function ModelSelector({ selectedVariantId, onSelectVariant }: ModelSelec
     setOpen(false);
   }, [onSelectVariant]);
 
-  // Display label for the button
-  const displayLabel = selected.sublabel === 'Auto'
-    ? 'Sogni Creative Agent 1.0'
-    : `Sogni ${selected.label} ${selected.sublabel}`;
-
   return (
     <div style={{ position: 'relative' }}>
       <button
@@ -55,7 +50,7 @@ export function ModelSelector({ selectedVariantId, onSelectVariant }: ModelSelec
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '0.25rem',
+          gap: '0.375rem',
           background: 'transparent',
           border: 'none',
           cursor: 'pointer',
@@ -66,11 +61,17 @@ export function ModelSelector({ selectedVariantId, onSelectVariant }: ModelSelec
           fontWeight: 600,
           letterSpacing: '-0.01em',
           transition: 'background 0.15s',
+          outline: 'none',
         }}
         onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
-        <span>{displayLabel}</span>
+        <span>Sogni Creative Agent 1.0</span>
+        {selected.headerSuffix && (
+          <span style={{ fontWeight: 400, color: 'var(--color-text-secondary)' }}>
+            {selected.headerSuffix}
+          </span>
+        )}
         <svg
           width="16"
           height="16"
@@ -97,7 +98,7 @@ export function ModelSelector({ selectedVariantId, onSelectVariant }: ModelSelec
             position: 'absolute',
             top: 'calc(100% + 4px)',
             left: 0,
-            minWidth: '280px',
+            minWidth: '260px',
             background: '#2f2f2f',
             border: '1px solid rgba(255,255,255,0.1)',
             borderRadius: 'var(--radius-lg)',
@@ -127,13 +128,14 @@ export function ModelSelector({ selectedVariantId, onSelectVariant }: ModelSelec
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 width: '100%',
-                padding: '0.625rem 1rem',
+                padding: '0.5rem 1rem',
                 background: 'transparent',
                 border: 'none',
                 cursor: 'pointer',
                 textAlign: 'left',
                 color: 'var(--color-text-primary)',
                 transition: 'background 0.1s',
+                outline: 'none',
               }}
               onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
@@ -144,18 +146,14 @@ export function ModelSelector({ selectedVariantId, onSelectVariant }: ModelSelec
                   fontWeight: 500,
                   lineHeight: 1.4,
                 }}>
-                  {variant.sublabel === 'Auto' ? 'Auto' : variant.sublabel === 'Answers right away' ? 'Standard' : variant.sublabel}
+                  {variant.menuLabel}
                 </div>
                 <div style={{
                   fontSize: '0.75rem',
                   color: '#8e8e8e',
                   lineHeight: 1.4,
                 }}>
-                  {variant.sublabel === 'Auto' && 'Decides how long to think'}
-                  {variant.sublabel === 'Answers right away' && 'Answers right away'}
-                  {variant.sublabel === 'Thinks longer for better answers' && 'Thinks longer for better answers'}
-                  {variant.sublabel === 'Unrestricted' && 'No content restrictions'}
-                  {variant.sublabel === 'Thinking + Unrestricted' && 'Extended thinking, no restrictions'}
+                  {variant.description}
                 </div>
               </div>
               {variant.id === selectedVariantId && (

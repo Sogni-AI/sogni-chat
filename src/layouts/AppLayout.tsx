@@ -122,6 +122,8 @@ export function AppLayout() {
   return (
     <LayoutContext.Provider value={layoutContext}>
       <div className="flex overflow-hidden" style={{ background: 'var(--color-bg)', height: '100dvh' }}>
+        {/* Sidebar portal target — ChatPage renders sidebar here via portal so it spans full viewport height */}
+        <div id="sidebar-root" style={{ display: 'contents' }} />
         {/* Main content area: header + page */}
         <div className="flex flex-col flex-1 min-w-0">
           <Header

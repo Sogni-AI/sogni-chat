@@ -5,6 +5,7 @@
  * Integrates chat history sidebar on desktop (>=900px).
  */
 import { useEffect, useCallback, useState, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useSogniAuth } from '@/services/sogniAuth';
 import { useWallet } from '@/hooks/useWallet';
 import { useImageUpload } from '@/hooks/useImageUpload';
@@ -703,25 +704,26 @@ export default function ChatPage() {
         description="Chat with AI to generate images, create videos, compose music, restore photos, and more."
         path="/"
       />
-      {/* Full-height flex row: sidebar + main content */}
-      <div className="flex flex-1 min-h-0 page-enter">
-        {/* Desktop sidebar — full height, outside main content column */}
-        {isDesktop && (
-          <ChatHistorySidebar
-            sessions={sessions}
-            activeSessionId={activeSessionId}
-            getThumbnailUrl={getThumbnailUrl}
-            onSelectSession={handleSelectSession}
-            onDeleteSession={handleDeleteSession}
-            onNewProject={handleNewPhoto}
-            onFileDrop={handleFileDrop}
-            unreadSessionIds={unreadSessionIds}
-            activeJobSessionIds={activeJobSessionIds}
-            collapsed={sidebarCollapsed}
-            onToggleCollapse={toggleSidebar}
-          />
-        )}
+      {/* Desktop sidebar — rendered via portal into AppLayout so it spans full viewport height */}
+      {isDesktop && document.getElementById('sidebar-root') && createPortal(
+        <ChatHistorySidebar
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          getThumbnailUrl={getThumbnailUrl}
+          onSelectSession={handleSelectSession}
+          onDeleteSession={handleDeleteSession}
+          onNewProject={handleNewPhoto}
+          onFileDrop={handleFileDrop}
+          unreadSessionIds={unreadSessionIds}
+          activeJobSessionIds={activeJobSessionIds}
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={toggleSidebar}
+        />,
+        document.getElementById('sidebar-root')!,
+      )}
 
+      {/* Full-height flex row: main content */}
+      <div className="flex flex-1 min-h-0 page-enter">
         {/* Main content column */}
         <div className="flex flex-col flex-1 min-h-0 min-w-0">
           {/* Hidden file input */}

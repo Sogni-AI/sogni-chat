@@ -197,6 +197,12 @@ function SogniTVPlayer({ onClose }: { onClose: () => void }) {
   // Transition with static effect
   const transitionTo = useCallback((targetIndex: number) => {
     if (showStatic) return; // already transitioning
+    // Stop the current video so its audio doesn't bleed through the static
+    const v = videoRef.current;
+    if (v) {
+      v.pause();
+      v.currentTime = 0;
+    }
     pendingIndexRef.current = targetIndex;
     const duration = randomStaticDuration();
     staticDurationRef.current = duration;
@@ -321,6 +327,7 @@ function SogniTVPlayer({ onClose }: { onClose: () => void }) {
           {/* Moving scanline bar — sweeps continuously */}
           <div style={{
             position: 'absolute',
+            top: 0,
             left: 0,
             right: 0,
             height: '12%',
@@ -331,6 +338,7 @@ function SogniTVPlayer({ onClose }: { onClose: () => void }) {
           {/* Secondary band — different speed for variety */}
           <div style={{
             position: 'absolute',
+            top: 0,
             left: 0,
             right: 0,
             height: '6%',
@@ -342,6 +350,7 @@ function SogniTVPlayer({ onClose }: { onClose: () => void }) {
           {/* Third thin band — fastest */}
           <div style={{
             position: 'absolute',
+            top: 0,
             left: 0,
             right: 0,
             height: '3%',

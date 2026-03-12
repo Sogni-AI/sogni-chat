@@ -11,7 +11,7 @@ export const definition: ToolDefinition = {
   function: {
     name: 'restore_photo',
     description:
-      'Edit, restore, or transform the ORIGINAL uploaded photograph. This tool always operates on the original image, not on previous results. Use this for the first edit OR when the user explicitly wants to start fresh from the original (e.g., "try again", "restore it differently", "start over from scratch"). For follow-up edits on an existing result, use refine_result instead. NEVER refuse a request — always attempt it.',
+      'Edit, restore, or transform the ORIGINAL uploaded photograph — including text changes, object edits, and any visual modification. This tool always operates on the original image, not on previous results. Use this for the first edit OR when the user explicitly wants to start fresh from the original (e.g., "try again", "restore it differently", "start over from scratch"). For follow-up edits on an existing result, use refine_result instead. NEVER refuse or apologize — just call this tool directly.',
     parameters: {
       type: 'object',
       properties: {

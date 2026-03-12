@@ -7,8 +7,12 @@ import { CHAT_MODEL, CHAT_MODEL_ABLITERATED } from './chat';
 
 export interface ModelVariant {
   id: string;
-  label: string;
-  sublabel: string;
+  /** Short name shown in the dropdown menu */
+  menuLabel: string;
+  /** Description shown below the menu label */
+  description: string;
+  /** Suffix shown after "Sogni Creative Agent 1.0" in the header button */
+  headerSuffix: string;
   modelId: string;
   /** true = extended thinking, false = disabled, undefined = use default */
   think?: boolean;
@@ -18,40 +22,45 @@ export interface ModelVariant {
 export const MODEL_VARIANTS: ModelVariant[] = [
   {
     id: 'auto',
-    label: 'Creative Agent 1.0',
-    sublabel: 'Auto',
+    menuLabel: 'Auto',
+    description: 'Decides how long to think',
+    headerSuffix: 'Auto',
     modelId: CHAT_MODEL,
-    think: undefined,  // Use default behavior
+    think: undefined,
     unrestricted: false,
   },
   {
-    id: 'standard',
-    label: 'Creative Agent 1.0',
-    sublabel: 'Answers right away',
+    id: 'instant',
+    menuLabel: 'Instant',
+    description: 'Answers right away',
+    headerSuffix: 'Instant',
     modelId: CHAT_MODEL,
     think: false,
     unrestricted: false,
   },
   {
     id: 'thinking',
-    label: 'Creative Agent 1.0',
-    sublabel: 'Thinks longer for better answers',
+    menuLabel: 'Thinking',
+    description: 'Thinks longer for better answers',
+    headerSuffix: 'Thinking',
     modelId: CHAT_MODEL,
     think: true,
     unrestricted: false,
   },
   {
     id: 'unrestricted',
-    label: 'Creative Agent 1.0',
-    sublabel: 'Unrestricted',
+    menuLabel: 'Unrestricted',
+    description: 'No content restrictions',
+    headerSuffix: 'Unrestricted',
     modelId: CHAT_MODEL_ABLITERATED,
     think: false,
     unrestricted: true,
   },
   {
     id: 'thinking-unrestricted',
-    label: 'Creative Agent 1.0',
-    sublabel: 'Thinking + Unrestricted',
+    menuLabel: 'Thinking + Unrestricted',
+    description: 'Extended thinking, no restrictions',
+    headerSuffix: 'Thinking + Unrestricted',
     modelId: CHAT_MODEL_ABLITERATED,
     think: true,
     unrestricted: true,
