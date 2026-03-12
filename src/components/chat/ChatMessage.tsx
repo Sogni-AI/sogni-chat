@@ -11,6 +11,7 @@ import { ChatVideoResults } from './ChatVideoResults';
 import ChatAudioResults from './ChatAudioResults';
 import { ChatProgressIndicator } from './ChatProgressIndicator';
 import { SogniTVOffer } from './SogniTVOffer';
+import './chat.css';
 
 interface ChatMessageProps {
   message: UIChatMessage;
@@ -97,35 +98,32 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
           }}
         >
           {isAssistant ? (
-            <ReactMarkdown
-              components={{
-                p: ({ children }) => <span style={{ display: 'block', marginBottom: '0.5em' }}>{children}</span>,
-                strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
-                ol: ({ children }) => <ol style={{ margin: '0.5em 0', paddingLeft: '1.5em' }}>{children}</ol>,
-                ul: ({ children }) => <ul style={{ margin: '0.5em 0', paddingLeft: '1.5em' }}>{children}</ul>,
-                li: ({ children }) => <li style={{ marginBottom: '0.25em' }}>{children}</li>,
-                a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent)', textDecoration: 'underline' }}>{children}</a>,
-                code: ({ children }) => <code style={{ background: 'rgba(255,255,255,0.08)', padding: '0.125em 0.375em', borderRadius: '4px', fontSize: '0.875em' }}>{children}</code>,
-              }}
-            >
-              {message.content.trim()}
-            </ReactMarkdown>
+            <>
+              <ReactMarkdown
+                components={{
+                  p: ({ children }) => <span className="chat-md-p" style={{ display: 'block' }}>{children}</span>,
+                  strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
+                  ol: ({ children }) => <ol style={{ margin: '0.5em 0', paddingLeft: '1.5em' }}>{children}</ol>,
+                  ul: ({ children }) => <ul style={{ margin: '0.5em 0', paddingLeft: '1.5em' }}>{children}</ul>,
+                  li: ({ children }) => <li style={{ marginBottom: '0.25em' }}>{children}</li>,
+                  a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent)', textDecoration: 'underline' }}>{children}</a>,
+                  pre: ({ children }) => <pre style={{ background: 'rgba(255,255,255,0.06)', padding: '0.75em 1em', borderRadius: '6px', overflowX: 'auto', margin: '0.5em 0', fontSize: '0.875em' }}>{children}</pre>,
+                  code: ({ children }) => <code style={{ background: 'rgba(255,255,255,0.08)', padding: '0.125em 0.375em', borderRadius: '4px', fontSize: '0.875em' }}>{children}</code>,
+                }}
+              >
+                {message.content.trim()}
+              </ReactMarkdown>
+              {message.isStreaming && !message.toolProgress && (
+                <span className="chat-streaming-cursor" />
+              )}
+            </>
           ) : (
-            message.content.trim()
-          )}
-          {isAssistant && message.isStreaming && !message.toolProgress && (
-            <span
-              style={{
-                display: 'inline-block',
-                width: '0.5rem',
-                height: '1rem',
-                marginLeft: '0.125rem',
-                background: '#8e8e8e',
-                borderRadius: '1px',
-                animation: 'chatCursorBlink 1s ease-in-out infinite',
-                verticalAlign: 'text-bottom',
-              }}
-            />
+            <>
+              {message.content.trim()}
+              {message.isStreaming && !message.toolProgress && (
+                <span className="chat-streaming-cursor" />
+              )}
+            </>
           )}
         </div>
       )}

@@ -1,3 +1,23 @@
+/* Markdown paragraph spacing — collapse margin on last paragraph */
+.chat-md-p {
+  margin-bottom: 0.5em;
+}
+.chat-md-p:last-of-type {
+  margin-bottom: 0;
+}
+
+/* Streaming cursor — sits inline at end of last content */
+.chat-streaming-cursor {
+  display: inline-block;
+  width: 0.5rem;
+  height: 1rem;
+  margin-left: 0.125rem;
+  background: #8e8e8e;
+  border-radius: 1px;
+  animation: chatCursorBlink 1s ease-in-out infinite;
+  vertical-align: text-bottom;
+}
+
 /* Chat component animations */
 @keyframes chatCursorBlink {
   0%, 100% { opacity: 1; }

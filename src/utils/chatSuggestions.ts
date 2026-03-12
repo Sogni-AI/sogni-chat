@@ -172,8 +172,9 @@ const READY_TO_GENERATE_PATTERNS = [
   'say "go"',
   "say 'go'",
   'go ahead and i\'ll',
-  'let me know when',
-  'let me know if you\'d like',
+  'let me know when you\'re ready',
+  'let me know if you\'d like me to generate',
+  'let me know if you\'d like to proceed',
   'want to proceed',
   'should i go ahead',
 ];
@@ -183,7 +184,7 @@ function detectTopic(messages: UIChatMessage[]): 'image' | 'video' | 'music' | n
   const allText = messages.map((m) => m.content || '').join(' ').toLowerCase();
   if (/\b(song|music|compose|melody|soundtrack|lyrics|beat|bpm|tempo)\b/.test(allText)) return 'music';
   if (/\b(video|animate|animation|clip|motion)\b/.test(allText)) return 'video';
-  if (/\b(image|photo|picture|illustration|painting|drawing|portrait|generate an image)\b/.test(allText)) return 'image';
+  if (/\b(image|photo|picture|illustration|painting|drawing|portrait)\b/.test(allText)) return 'image';
   return null;
 }
 
@@ -204,7 +205,7 @@ function getMidConversationSuggestions(messages: UIChatMessage[]): Suggestion[] 
   // Detect ready-to-generate state
   const isReady = READY_TO_GENERATE_PATTERNS.some((p) => text.includes(p));
   if (isReady) {
-    const topic = detectTopic(messages);
+    const topic = detectTopic(nonWelcome);
     const suggestions: Suggestion[] = [
       { label: 'Generate this', prompt: 'Go ahead and generate it' },
       { label: 'Tweak the prompt', prompt: 'Can you adjust the prompt a bit?' },
@@ -222,7 +223,7 @@ function getMidConversationSuggestions(messages: UIChatMessage[]): Suggestion[] 
   }
 
   // Detect ongoing conversation about a specific topic (LLM asking questions)
-  const topic = detectTopic(messages);
+  const topic = detectTopic(nonWelcome);
   if (topic) {
     if (topic === 'image') {
       return [
