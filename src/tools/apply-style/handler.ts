@@ -28,25 +28,36 @@ export async function execute(
   const scale = (args.scale as number) || 1;
   const aspectRatio = args.aspectRatio as string | undefined;
 
-  if (!context.imageData) {
-    return JSON.stringify({ error: 'no_image', message: 'Please upload an image first.' });
+  if (!context.imageData && context.resultUrls.length === 0) {
+    return JSON.stringify({ error: 'no_image', message: 'Please upload or generate an image first.' });
   }
 
-  // Determine source image data
-  let sourceImageData: Uint8Array = context.imageData;
+  // Determine source image: auto-select latest result when no explicit index and no upload
+  const effectiveSourceIndex = sourceIndex ?? (context.resultUrls.length > 0 ? context.resultUrls.length - 1 : undefined);
+
+  let sourceImageData = context.imageData;
   let sourceWidth = context.width;
   let sourceHeight = context.height;
 
-  if (sourceIndex !== undefined && context.resultUrls[sourceIndex]) {
-    // Fetch the result image and convert to Uint8Array
+  if (effectiveSourceIndex !== undefined && context.resultUrls[effectiveSourceIndex]) {
     try {
-      const fetched = await fetchImageAsUint8Array(context.resultUrls[sourceIndex]);
+      console.log(`[STYLE] Applying style to result image #${effectiveSourceIndex} (${sourceIndex === undefined ? 'auto-selected latest' : 'user-specified'})`);
+      const fetched = await fetchImageAsUint8Array(context.resultUrls[effectiveSourceIndex]);
       sourceImageData = fetched.data;
       sourceWidth = fetched.width;
       sourceHeight = fetched.height;
     } catch (err) {
+      if (!context.imageData) {
+        return JSON.stringify({ error: 'fetch_failed', message: 'Could not retrieve the previously generated image.' });
+      }
       console.error('[STYLE] Failed to fetch source image, using original:', err);
     }
+  } else if (!context.imageData) {
+    return JSON.stringify({ error: 'no_image', message: 'No source image available.' });
+  }
+
+  if (!sourceImageData) {
+    return JSON.stringify({ error: 'no_image', message: 'No source image available.' });
   }
 
   const { width: outputWidth, height: outputHeight } = calculateOutputDimensions(

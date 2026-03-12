@@ -289,7 +289,7 @@ export async function execute(
       resultCount: resultUrls.length,
       model: modelConfig.name,
       creditsCost: formatCredits(estimatedCost),
-      message: `Successfully generated ${resultUrls.length} image${resultUrls.length !== 1 ? 's' : ''} using ${modelConfig.name}. Cost: ~${formatCredits(estimatedCost)} credits. The user can now see the results.`,
+      message: `Successfully generated ${resultUrls.length} image${resultUrls.length !== 1 ? 's' : ''} using ${modelConfig.name}. Cost: ~${formatCredits(estimatedCost)} credits. The user can now see the results. These results are available for follow-up tools (animate_photo, apply_style, change_angle, edit_image) which will automatically use the latest result.`,
     });
   } catch (err: unknown) {
     if (billingId) discardPending(billingId);

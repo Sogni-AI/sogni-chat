@@ -116,6 +116,7 @@ export default function ChatPage() {
   // Background job tracking: which sessions have running jobs, which have unread results
   const [activeJobSessionIds, setActiveJobSessionIds] = useState<Set<string>>(new Set());
   const [unreadSessionIds, setUnreadSessionIds] = useState<Set<string>>(new Set());
+  const [uploadIntent, setUploadIntent] = useState<'edit' | 'video' | 'restore' | null>(null);
   const [qualityTier, setQualityTierState] = useState<QualityTier>(getSavedQualityTier);
   const setQualityTier = useCallback((tier: QualityTier) => {
     setQualityTierState(tier);
@@ -153,6 +154,7 @@ export default function ChatPage() {
   const prevVideoCountRef = useRef(0);
   const prevMsgCountRef = useRef(0);
   const prevGalleryIdCountRef = useRef(0);
+  const prevChatIsLoadingRef = useRef(false);
 
   // (Auth check moved to early return below — no redirect needed since ChatPage IS "/")
 
@@ -278,6 +280,16 @@ export default function ChatPage() {
         sessionDirtyRef.current = true;
       }
       prevMsgCountRef.current = msgCount;
+    }
+
+    // Detect chat round completion (loading went from true to false).
+    // Save immediately so text-only conversations don't rely solely on
+    // the 1500ms debounce — which may not fire before a page refresh.
+    const wasLoading = prevChatIsLoadingRef.current;
+    prevChatIsLoadingRef.current = chatIsLoading;
+    if (wasLoading && !chatIsLoading && activeSessionId && sessionDirtyRef.current && !isRestoringRef.current) {
+      saveActiveSession();
+      return; // skip the debounce — we just saved
     }
 
     if (!chatIsLoading && !chatIsSending && activeSessionId && !isRestoringRef.current) {
@@ -473,8 +485,15 @@ export default function ChatPage() {
       const newId = createNewSession();
       sessionCreatedAtRef.current = Date.now();
       setActiveSessionId(newId);
+      // Update ref immediately so saveActiveSession can use it before next render
+      activeSessionIdRef.current = newId;
+      sessionDirtyRef.current = true;
+      // Save to IndexedDB right away — don't wait for the debounce timer.
+      // Without this, refreshing before the first debounced save loses the session
+      // (sessionStorage has the ID but IndexedDB has no data).
+      saveActiveSession();
     }
-  }, [sessionsInitialized, pendingRestore, activeSessionId, chat.messages, imageData, createNewSession, setActiveSessionId]);
+  }, [sessionsInitialized, pendingRestore, activeSessionId, chat.messages, imageData, createNewSession, setActiveSessionId, saveActiveSession]);
 
   const handleResultsChange = useCallback((urls: string[]) => {
     setResultUrls(urls);
@@ -513,8 +532,9 @@ export default function ChatPage() {
     [upload, saveActiveSession, clearUpload, chat, setActiveSessionId, sessions.length],
   );
 
-  const handleUploadClick = useCallback(() => {
+  const handleUploadClick = useCallback((intent?: 'edit' | 'video' | 'restore') => {
     warmUpAudio(); // Pre-warm audio context for iOS
+    setUploadIntent(intent ?? 'edit');
     // Reset value so re-selecting the same file still triggers onChange
     if (fileInputRef.current) fileInputRef.current.value = '';
     fileInputRef.current?.click();
@@ -559,6 +579,7 @@ export default function ChatPage() {
     isRestoringRef.current = true;
     clearUpload();
     setResultUrls([]);
+    setUploadIntent(null);
     gallerySavedRef.current = false;
     chat.reset({ keepBackground: true });
     sessionTitleRef.current = `New Session #${sessions.length + 1}`;
@@ -771,6 +792,7 @@ export default function ChatPage() {
               onResultsChange={handleResultsChange}
               onLoadingChange={handleLoadingChange}
               onUploadClick={handleUploadClick}
+              uploadIntent={uploadIntent}
               onTokenSwitch={handleTokenSwitch}
               onInsufficientCredits={handleInsufficientCredits}
               onClearAll={handleNewPhoto}

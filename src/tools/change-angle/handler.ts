@@ -30,20 +30,20 @@ export async function execute(
   const qualityTier = context.qualityTier || 'fast';
   const preset = QUALITY_PRESETS[qualityTier];
 
-  if (!context.imageData) {
-    return JSON.stringify({ error: 'no_image', message: 'Please upload an image first.' });
+  if (!context.imageData && context.resultUrls.length === 0) {
+    return JSON.stringify({ error: 'no_image', message: 'Please upload or generate an image first.' });
   }
 
   // Determine source image:
-  // - sourceImageIndex === -1 -> explicitly use original
+  // - sourceImageIndex === -1 -> explicitly use original (only if an upload exists)
   // - sourceImageIndex === undefined -> auto-select latest result (or original if none)
   // - sourceImageIndex >= 0 -> use that specific result
-  const useOriginal = rawSourceIndex === -1;
+  const useOriginal = rawSourceIndex === -1 && context.imageData !== null;
   const effectiveSourceIndex = useOriginal
     ? undefined
     : rawSourceIndex ?? (context.resultUrls.length > 0 ? context.resultUrls.length - 1 : undefined);
 
-  let sourceImageData: Uint8Array = context.imageData;
+  let sourceImageData = context.imageData;
   let sourceWidth = context.width;
   let sourceHeight = context.height;
 
@@ -55,8 +55,17 @@ export async function execute(
       sourceWidth = fetched.width;
       sourceHeight = fetched.height;
     } catch (err) {
+      if (!context.imageData) {
+        return JSON.stringify({ error: 'fetch_failed', message: 'Could not retrieve the previously generated image.' });
+      }
       console.error('[ANGLE] Failed to fetch source image for angle change, using original:', err);
     }
+  } else if (!context.imageData) {
+    return JSON.stringify({ error: 'no_image', message: 'No source image available.' });
+  }
+
+  if (!sourceImageData) {
+    return JSON.stringify({ error: 'no_image', message: 'No source image available.' });
   }
 
   // Fetch real cost estimate from API

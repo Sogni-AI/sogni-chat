@@ -191,8 +191,8 @@ export async function execute(
   const aspectRatio = args.aspectRatio as string | undefined;
   const isLTX = videoModelId.startsWith('ltx');
 
-  if (!context.imageData) {
-    return JSON.stringify({ error: 'no_image', message: 'Please upload an image first.' });
+  if (!context.imageData && context.resultUrls.length === 0) {
+    return JSON.stringify({ error: 'no_image', message: 'Please upload or generate an image first.' });
   }
 
   // Quality-based resolution: Standard (fast) -> 720p (768), High (hq) -> 1080p (1088)
@@ -205,7 +205,7 @@ export async function execute(
   // - sourceImageIndex === -1 -> explicitly use original
   // - sourceImageIndex === undefined -> auto-select latest result (or original if none)
   // - sourceImageIndex >= 0 -> use that specific result
-  const useOriginal = rawSourceIndex === -1;
+  const useOriginal = rawSourceIndex === -1 && context.imageData !== null;
   const effectiveSourceIndex = useOriginal
     ? undefined
     : rawSourceIndex ?? (context.resultUrls.length > 0 ? context.resultUrls.length - 1 : undefined);
@@ -218,7 +218,7 @@ export async function execute(
     resultUrls: context.resultUrls,
   });
 
-  let sourceImageData: Uint8Array = context.imageData;
+  let sourceImageData = context.imageData;
   let sourceWidth = context.width;
   let sourceHeight = context.height;
 
@@ -231,10 +231,19 @@ export async function execute(
       sourceHeight = fetched.height;
       console.log(`[ANIMATE] Successfully fetched result image: ${sourceWidth}x${sourceHeight}, ${sourceImageData.length} bytes`);
     } catch (err) {
+      if (!context.imageData) {
+        return JSON.stringify({ error: 'fetch_failed', message: 'Could not retrieve the previously generated image for animation.' });
+      }
       console.error('[ANIMATE] Failed to fetch source image for animation, using original:', err);
     }
+  } else if (!context.imageData) {
+    return JSON.stringify({ error: 'no_image', message: 'No source image available for animation.' });
   } else {
     console.log(`[ANIMATE] Using original uploaded image for animation (no results available or explicit original)`);
+  }
+
+  if (!sourceImageData) {
+    return JSON.stringify({ error: 'no_image', message: 'No source image available for animation.' });
   }
 
   // Pre-compute video dimensions for aspect ratio (used in all progress callbacks)

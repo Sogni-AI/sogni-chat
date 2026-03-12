@@ -21,6 +21,7 @@ import type { ToolName, ToolExecutionContext, ToolExecutionProgress, ToolCallbac
 import { stripThinkBlocks } from '@/tools/shared/llmHelpers';
 import { isInsufficientCreditsError, getAlternateToken, hasBalance } from '@/tools/shared/creditCheck';
 import { trimConversation, getInputBudget } from '@/services/contextWindow';
+import { resizeImageForVision } from '@/utils/imageProcessing';
 import type { TokenType } from '@/types/wallet';
 
 // ---------------------------------------------------------------------------
@@ -102,6 +103,40 @@ export async function sendChatMessage(
         systemMessage,
         ...updatedMessages,
       ];
+
+      // Attach the most recent relevant image to the latest user message
+      // so the VLM can "see" it — matching the SDK vision chat pattern.
+      // Only enhances the copy sent to the API; stored history stays text-only.
+      let lastUserIdx = -1;
+      for (let i = allMessages.length - 1; i >= 0; i--) {
+        if (allMessages[i].role === 'user') {
+          lastUserIdx = i;
+          break;
+        }
+      }
+      if (lastUserIdx >= 0 && typeof allMessages[lastUserIdx].content === 'string') {
+        let visionImageUrl: string | null = null;
+        if (context.resultUrls.length > 0) {
+          visionImageUrl = context.resultUrls[context.resultUrls.length - 1];
+        } else if (context.imageData) {
+          visionImageUrl = uint8ArrayToDataUri(context.imageData);
+        } else {
+          const imgFile = context.uploadedFiles.find(f => f.type === 'image');
+          if (imgFile) {
+            visionImageUrl = uint8ArrayToDataUri(imgFile.data, imgFile.mimeType);
+          }
+        }
+        if (visionImageUrl) {
+          console.log(`[CHAT SERVICE] Attaching vision context to user message (source: ${context.resultUrls.length > 0 ? 'result' : context.imageData ? 'upload' : 'attachment'})`);
+          allMessages[lastUserIdx] = {
+            ...allMessages[lastUserIdx],
+            content: [
+              { type: 'image_url', image_url: { url: visionImageUrl } },
+              { type: 'text', text: allMessages[lastUserIdx].content as string },
+            ],
+          };
+        }
+      }
 
       const stream = await sogniClient.chat.completions.create({
         model: context.model || CHAT_MODEL,

@@ -37,7 +37,8 @@ interface ChatPanelProps {
   allowAutoAnalysis?: boolean;
   onResultsChange?: (urls: string[]) => void;
   onLoadingChange?: (isLoading: boolean) => void;
-  onUploadClick?: () => void;
+  onUploadClick?: (intent?: 'edit' | 'video' | 'restore') => void;
+  uploadIntent?: 'edit' | 'video' | 'restore' | null;
   onTokenSwitch?: (newType: TokenType) => void;
   onInsufficientCredits?: () => void;
   /** Called when user clicks "Clear Chat" — parent should clear image + results */
@@ -186,6 +187,7 @@ export function ChatPanel({
   onResultsChange,
   onLoadingChange,
   onUploadClick,
+  uploadIntent,
   onTokenSwitch,
   onInsufficientCredits,
   onClearAll,
@@ -218,6 +220,14 @@ export function ChatPanel({
   const isUserNearBottomRef = useRef(true);
   const analysisTriggeredRef = useRef(false);
   const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
+  const videoIntentSentRef = useRef(false);
+
+  // Reset video intent ref when chat is cleared
+  useEffect(() => {
+    if (messages.length === 1 && messages[0].id === 'welcome') {
+      videoIntentSentRef.current = false;
+    }
+  }, [messages]);
 
   // Auto-trigger vision analysis when image is available and chat is at welcome state.
   useEffect(() => {
@@ -321,6 +331,26 @@ export function ChatPanel({
     [sogniClient, imageData, width, height, tokenType, balances, qualityTier, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, onClearMediaFiles, selectedModelVariant],
   );
 
+  // Auto-send animate message when upload intent is 'video' and image is ready
+  useEffect(() => {
+    if (
+      uploadIntent === 'video' &&
+      imageData &&
+      sogniClient &&
+      !isLoading &&
+      !isAnalyzing &&
+      !videoIntentSentRef.current
+    ) {
+      const hasUserTextMessage = messages.some(
+        (m) => m.role === 'user' && m.id !== 'user-upload' && m.content?.trim(),
+      );
+      if (!hasUserTextMessage) {
+        videoIntentSentRef.current = true;
+        handleSend('Animate this photo into a video');
+      }
+    }
+  }, [uploadIntent, imageData, sogniClient, isLoading, isAnalyzing, messages, handleSend]);
+
   const handleImageClick = useCallback((url: string, _index: number) => {
     const globalIndex = allResultUrls.indexOf(url);
     setFullscreenIndex(globalIndex >= 0 ? globalIndex : 0);
@@ -356,11 +386,12 @@ export function ChatPanel({
 
   const showIntentCapture = useMemo(() => {
     if (!hasImage || isLoading || isAnalyzing) return false;
+    if (uploadIntent !== 'restore') return false;
     const hasUserTextMessage = messages.some(
       (m) => m.role === 'user' && m.id !== 'user-upload' && m.content?.trim(),
     );
     return !hasUserTextMessage;
-  }, [hasImage, isLoading, isAnalyzing, messages]);
+  }, [hasImage, isLoading, isAnalyzing, messages, uploadIntent]);
 
   return (
     <FileDropZone
@@ -567,42 +598,51 @@ export function ChatPanel({
               </div>
 
               {/* Upload row */}
-              <button
-                onClick={onUploadClick}
-                disabled={!canSend}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.5rem 1rem',
-                  background: 'transparent',
-                  border: '1px solid rgba(255, 255, 255, 0.08)',
-                  borderRadius: 'var(--radius-pill)',
-                  cursor: canSend ? 'pointer' : 'default',
-                  color: '#8e8e8e',
-                  fontSize: '0.8125rem',
-                  fontWeight: 500,
-                  transition: 'all 0.2s',
-                  opacity: canSend ? 1 : 0.5,
-                }}
-                onMouseEnter={(e) => {
-                  if (!canSend) return;
-                  e.currentTarget.style.color = '#ececec';
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = '#8e8e8e';
-                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-                }}
-                aria-label="Upload a photo to edit"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-                Upload a photo to edit
-              </button>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center' }}>
+                {[
+                  { label: 'Upload a photo to animate', intent: 'video' as const },
+                  { label: 'Upload a photo to edit', intent: 'edit' as const },
+                  { label: 'Upload a photo to restore', intent: 'restore' as const },
+                ].map((item) => (
+                  <button
+                    key={item.intent}
+                    onClick={() => onUploadClick?.(item.intent)}
+                    disabled={!canSend}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.5rem 1rem',
+                      background: 'transparent',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      borderRadius: 'var(--radius-pill)',
+                      cursor: canSend ? 'pointer' : 'default',
+                      color: '#8e8e8e',
+                      fontSize: '0.8125rem',
+                      fontWeight: 500,
+                      transition: 'all 0.2s',
+                      opacity: canSend ? 1 : 0.5,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!canSend) return;
+                      e.currentTarget.style.color = '#ececec';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = '#8e8e8e';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                    }}
+                    aria-label={item.label}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    {item.label}
+                  </button>
+                ))}
+              </div>
 
               <p style={{ color: '#555555', fontSize: '0.75rem', marginTop: '0.5rem' }}>
                 or drag &amp; drop a file anywhere
