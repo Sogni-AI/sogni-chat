@@ -79,6 +79,25 @@ img {
     overflow: hidden;
   }
 
+  /* ---- MOBILE: Hide SogniTV floating bubble ---- */
+  .sogni-tv-bubble {
+    display: none !important;
+  }
+
+  /* ---- MOBILE: Hide drag & drop hint (no drag on touch devices) ---- */
+  .drag-drop-hint {
+    display: none !important;
+  }
+
+  /* ---- MOBILE: Show Sogni Ball logo, hide full text in model selector ---- */
+  .model-selector-text {
+    display: none !important;
+  }
+
+  .model-selector-ball {
+    display: block !important;
+  }
+
   /* ---- HEADER: compact mobile layout ---- */
   .header-logo {
     font-size: 1.125rem !important;

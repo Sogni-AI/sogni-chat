@@ -641,7 +641,7 @@ export function ChatPanel({
                 ))}
               </div>
 
-              <p style={{ color: '#555555', fontSize: '0.75rem', marginTop: '0.5rem' }}>
+              <p className="drag-drop-hint" style={{ color: '#555555', fontSize: '0.75rem', marginTop: '0.5rem' }}>
                 or drag &amp; drop a file anywhere
               </p>
 

@@ -66,7 +66,13 @@ export function ModelSelector({ selectedVariantId, onSelectVariant }: ModelSelec
         onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
-        <span>Sogni Creative Agent 1.0</span>
+        <img
+          src="/Sogni_moon_2026.png"
+          alt="Sogni"
+          className="model-selector-ball"
+          style={{ width: 28, height: 28, objectFit: 'cover', objectPosition: 'left center', display: 'none' }}
+        />
+        <span className="model-selector-text">Sogni Creative Agent 1.0</span>
         {selected.headerSuffix && (
           <span style={{ fontWeight: 400, color: 'var(--color-text-secondary)' }}>
             {selected.headerSuffix}

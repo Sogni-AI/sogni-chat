@@ -342,6 +342,19 @@ function SogniTVPlayer({ onClose, startVideoUrl }: { onClose: () => void; startV
 
   const staticDurationRef = useRef(0);
 
+  // When currentIndex changes (after static clears), load new src and play
+  // Reusing the same <video> element preserves iOS Safari's autoplay "blessing"
+  const prevIndexRef = useRef(currentIndex);
+  useEffect(() => {
+    if (prevIndexRef.current === currentIndex) return;
+    prevIndexRef.current = currentIndex;
+    const v = videoRef.current;
+    if (!v) return;
+    v.src = playlist[currentIndex];
+    v.load();
+    v.play().catch(() => { /* mobile may still block in rare cases */ });
+  }, [currentIndex, playlist]);
+
   // Transition with static effect
   const transitionTo = useCallback((targetIndex: number) => {
     if (showStatic) return; // already transitioning
@@ -623,7 +636,6 @@ function SogniTVPlayer({ onClose, startVideoUrl }: { onClose: () => void; startV
 
         <video
           ref={videoRef}
-          key={currentUrl}
           src={currentUrl}
           autoPlay
           playsInline
@@ -955,6 +967,7 @@ export function SogniTV() {
         }
       `}</style>
       <div
+        className="sogni-tv-bubble"
         style={{
           position: 'fixed',
           bottom: 24,
