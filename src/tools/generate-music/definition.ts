@@ -59,7 +59,7 @@ Include:
           type: 'string',
           enum: ['turbo', 'sft'],
           description:
-            'ACE-Step model variant. "turbo" (default): Fast generation with 4-16 steps, half the cost. Best for quick drafts and iterations. "sft": Higher quality with 10-200 steps, full cost. Best for final production-quality output. Default: "turbo".',
+            'ACE-Step model variant. "turbo" (default): Higher quality audio generation with 4-16 steps and half the cost. Always use turbo unless the user explicitly requests the SFT model. "sft": Experimental model with lower audio quality but very strong lyric handling. 10-200 steps, full cost. Only use when the user specifically asks for SFT. Default: "turbo".',
         },
         timesig: {
           type: 'number',
