@@ -13,6 +13,7 @@ import { generateSuggestions, EDIT_INTENT_SUGGESTIONS } from '@/utils/chatSugges
 import { VIDEO_VISION_ANALYSIS_SYSTEM_PROMPT } from '@/config/chat';
 import { FullscreenBeforeAfter } from '@/components/FullscreenBeforeAfter';
 import { useLayout } from '@/layouts/AppLayout';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { getVariantById } from '@/config/modelVariants';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
@@ -204,6 +205,7 @@ export function ChatPanel({
   onFileDrop,
 }: ChatPanelProps) {
   const { selectedModelVariant, setSelectedModelVariant } = useLayout();
+  const isMobile = useMediaQuery('(max-width: 743px)');
   const {
     messages,
     isLoading,
@@ -702,9 +704,9 @@ export function ChatPanel({
         onSend={handleSend}
         disabled={!canSend}
         placeholder={
-          !hasImage
-            ? 'Describe what you want to create...'
-            : 'Describe what you want to do with your photo...'
+          isMobile
+            ? (hasImage ? 'What should I do with your photo?' : 'What do you want to create?')
+            : (hasImage ? 'Describe what you want to do with your photo...' : 'Describe what you want to create...')
         }
         uploadedFiles={uploadedFiles}
         isMediaUploading={isMediaUploading}
