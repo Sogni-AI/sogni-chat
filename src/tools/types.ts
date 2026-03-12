@@ -53,6 +53,8 @@ export interface ToolExecutionContext {
   signal?: AbortSignal;
   /** Override the LLM model (e.g. for abliterated fallback) */
   model?: string;
+  /** Override the think parameter (true = extended thinking, false = disabled, undefined = default) */
+  think?: boolean;
 }
 
 // ---------------------------------------------------------------------------

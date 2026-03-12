@@ -11,6 +11,7 @@ import type { UploadedFile } from '@/tools/types';
 import { QUALITY_PRESETS } from '@/config/qualityPresets';
 import { generateSuggestions } from '@/utils/chatSuggestions';
 import { FullscreenBeforeAfter } from '@/components/FullscreenBeforeAfter';
+import { useLayout } from '@/layouts/AppLayout';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { SuggestionChips } from './SuggestionChips';
@@ -92,6 +93,7 @@ export function ChatPanel({
   onClearMediaFiles,
   onFileDrop,
 }: ChatPanelProps) {
+  const { selectedModelVariant } = useLayout();
   const {
     messages,
     isLoading,
@@ -206,10 +208,11 @@ export function ChatPanel({
         uploadedFiles,
         onTokenSwitch,
         onInsufficientCredits,
+        modelVariantId: selectedModelVariant,
       });
       onClearMediaFiles?.();
     },
-    [sogniClient, imageData, width, height, tokenType, balances, qualityTier, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, onClearMediaFiles],
+    [sogniClient, imageData, width, height, tokenType, balances, qualityTier, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, onClearMediaFiles, selectedModelVariant],
   );
 
   const handleImageClick = useCallback((url: string, _index: number) => {

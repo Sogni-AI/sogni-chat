@@ -8,15 +8,25 @@ import { DailyCreditsPopup } from '@/components/billing/DailyCreditsPopup';
 import LoginModal, { LoginModalMode } from '@/components/auth/LoginModal';
 import { OutOfCreditsPopup } from '@/components/billing/OutOfCreditsPopup';
 import { trackPageView } from '@/services/analyticsService';
+import { SogniTV } from '@/components/shared/SogniTV';
 import { captureReferralFromURL } from '@/utils/referralTracking';
+import { DEFAULT_VARIANT_ID } from '@/config/modelVariants';
 import { useState, useEffect, createContext, useContext, useCallback } from 'react';
 
-// Shared layout context for child pages to trigger modals
+// Shared layout context for child pages to trigger modals and access layout state
 interface LayoutContextValue {
   showSignupModal: (mode?: LoginModalMode) => void;
   hideSignupModal: () => void;
   showOutOfCreditsPopup: () => void;
   hideOutOfCreditsPopup: () => void;
+  /** Currently selected model variant ID */
+  selectedModelVariant: string;
+  /** Change the selected model variant */
+  setSelectedModelVariant: (variantId: string) => void;
+  /** Whether the sidebar is collapsed */
+  sidebarCollapsed: boolean;
+  /** Toggle sidebar collapsed state */
+  toggleSidebar: () => void;
 }
 
 const LayoutContext = createContext<LayoutContextValue>({
@@ -24,6 +34,10 @@ const LayoutContext = createContext<LayoutContextValue>({
   hideSignupModal: () => {},
   showOutOfCreditsPopup: () => {},
   hideOutOfCreditsPopup: () => {},
+  selectedModelVariant: DEFAULT_VARIANT_ID,
+  setSelectedModelVariant: () => {},
+  sidebarCollapsed: false,
+  toggleSidebar: () => {},
 });
 
 export function useLayout() {
@@ -51,6 +65,26 @@ export function AppLayout() {
   const [errorModal, setErrorModal] = useState<any>(null);
   const [connectionState] = useState<'online' | 'offline' | 'connecting' | 'timeout'>('online');
 
+  // Model variant selection
+  const [selectedModelVariant, setSelectedModelVariant] = useState(DEFAULT_VARIANT_ID);
+
+  // Sidebar collapse state (persisted to localStorage)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('sidebar-collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem('sidebar-collapsed', String(next)); } catch { /* localStorage unavailable */ }
+      return next;
+    });
+  }, []);
+
   const showSignupModal = useCallback((mode: LoginModalMode = 'signup') => {
     setSignupMode(mode);
     setShowSignup(true);
@@ -65,6 +99,10 @@ export function AppLayout() {
     hideSignupModal,
     showOutOfCreditsPopup: () => setShowOutOfCredits(true),
     hideOutOfCreditsPopup: () => setShowOutOfCredits(false),
+    selectedModelVariant,
+    setSelectedModelVariant,
+    sidebarCollapsed,
+    toggleSidebar,
   };
 
   if (authLoading) {
@@ -83,9 +121,15 @@ export function AppLayout() {
 
   return (
     <LayoutContext.Provider value={layoutContext}>
-      <div className="flex flex-col overflow-hidden" style={{ background: 'var(--color-bg)', height: '100dvh' }}>
-        <Header />
-        <Outlet />
+      <div className="flex overflow-hidden" style={{ background: 'var(--color-bg)', height: '100dvh' }}>
+        {/* Main content area: header + page */}
+        <div className="flex flex-col flex-1 min-w-0">
+          <Header
+            selectedModelVariant={selectedModelVariant}
+            onSelectModelVariant={setSelectedModelVariant}
+          />
+          <Outlet />
+        </div>
       </div>
 
       {/* Global Modals */}
@@ -128,6 +172,8 @@ export function AppLayout() {
         onClose={() => setErrorModal(null)}
         onRetry={() => {}}
       />
+
+      <SogniTV />
     </LayoutContext.Provider>
   );
 }

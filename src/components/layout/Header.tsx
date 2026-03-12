@@ -1,15 +1,20 @@
-import { useCallback } from 'react';
+/**
+ * Header bar — sits at the top of the main content area (right of sidebar).
+ * Contains: model selector dropdown + nav + auth status.
+ */
 import { useNavigate } from 'react-router-dom';
 import { useSogniAuth } from '@/services/sogniAuth';
 import { AuthStatus } from '@/components/auth/AuthStatus';
+import { ModelSelector } from './ModelSelector';
 
-export function Header() {
+interface HeaderProps {
+  selectedModelVariant: string;
+  onSelectModelVariant: (variantId: string) => void;
+}
+
+export function Header({ selectedModelVariant, onSelectModelVariant }: HeaderProps) {
   const { isAuthenticated } = useSogniAuth();
   const navigate = useNavigate();
-
-  const handleLogoClick = useCallback(() => {
-    navigate('/');
-  }, [navigate]);
 
   return (
     <header className="flex-shrink-0" role="banner" style={{
@@ -18,28 +23,11 @@ export function Header() {
     }}>
       <div className="px-4 lg:px-6 py-0.5" style={{ minHeight: '3rem', display: 'flex', alignItems: 'center' }}>
         <div className="flex justify-between items-center w-full">
-          {/* Logo */}
-          <span
-            onClick={handleLogoClick}
-            className="header-logo font-medium hover:opacity-80 transition-opacity cursor-pointer"
-            style={{
-              textDecoration: 'none',
-              fontSize: '1.125rem',
-              lineHeight: '1.5',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              flexShrink: 0,
-              color: 'var(--color-text-primary)',
-            }}
-          >
-            <img
-              src="/Sogni_Moon.svg"
-              alt="Sogni"
-              style={{ width: '24px', height: '24px', borderRadius: '50%' }}
-            />
-            <span className="header-logo-text" style={{ fontWeight: 600 }}>Sogni Creative Agent</span>
-          </span>
+          {/* Model selector dropdown */}
+          <ModelSelector
+            selectedVariantId={selectedModelVariant}
+            onSelectVariant={onSelectModelVariant}
+          />
 
           <div className="flex items-center gap-3 header-buttons">
             {/* History link */}

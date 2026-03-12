@@ -13,6 +13,8 @@ import { parseAnalysisSuggestions, stripSuggestTagsForDisplay } from '@/utils/ch
 import { resizeImageForVision } from '@/utils/imageProcessing';
 import type { ChatSession, UIChatMessage } from '@/types/chat';
 import { CHAT_MODEL_ABLITERATED } from '@/config/chat';
+import { sogniTVController } from '@/services/sogniTVController';
+import { getVariantById } from '@/config/modelVariants';
 
 // Re-export UIChatMessage from the canonical location
 export type { UIChatMessage } from '@/types/chat';
@@ -41,6 +43,7 @@ export interface UseChatResult {
       uploadedFiles?: UploadedFile[];
       onTokenSwitch?: (newType: TokenType) => void;
       onInsufficientCredits?: () => void;
+      modelVariantId?: string;
     },
   ) => Promise<void>;
   analyzeImage: (context: {
@@ -340,6 +343,7 @@ export function useChat(): UseChatResult {
         uploadedFiles?: UploadedFile[];
         onTokenSwitch?: (newType: TokenType) => void;
         onInsufficientCredits?: () => void;
+        modelVariantId?: string;
       },
     ) => {
       if (!content.trim()) return;
@@ -402,6 +406,12 @@ export function useChat(): UseChatResult {
         const controllersSet = toolAbortControllersRef.current;
         controllersSet.add(toolAbortController);
 
+        // Determine model from variant (user dropdown) or session override (abliterated fallback)
+        const variant = context.modelVariantId ? getVariantById(context.modelVariantId) : undefined;
+        const effectiveModel = sessionModelRef.current
+          || (variant ? variant.modelId : undefined);
+        const effectiveThink = variant?.think;
+
         const executionContext: ToolExecutionContext = {
           sogniClient: context.sogniClient,
           imageData: context.imageData,
@@ -415,7 +425,8 @@ export function useChat(): UseChatResult {
           onTokenSwitch: context.onTokenSwitch,
           onInsufficientCredits: context.onInsufficientCredits,
           signal: toolAbortController.signal,
-          model: sessionModelRef.current,
+          model: effectiveModel,
+          think: effectiveThink,
         };
 
         let accumulatedContent = '';
@@ -528,6 +539,9 @@ export function useChat(): UseChatResult {
                 resultUrls: string[],
                 videoResultUrls?: string[],
               ) => {
+                // Close SogniTV if it was auto-opened during rendering
+                sogniTVController.notifyToolComplete();
+
                 if (thisRequest.aborted) return;
                 if (!isActiveSession()) {
                   // Background completion — notify parent to persist to IndexedDB

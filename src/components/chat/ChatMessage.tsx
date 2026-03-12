@@ -9,6 +9,7 @@ import { ChatImageResults } from './ChatImageResults';
 import { ChatVideoResults } from './ChatVideoResults';
 import ChatAudioResults from './ChatAudioResults';
 import { ChatProgressIndicator } from './ChatProgressIndicator';
+import { SogniTVOffer } from './SogniTVOffer';
 
 interface ChatMessageProps {
   message: UIChatMessage;
@@ -170,6 +171,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
       {message.toolProgress && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
           <ChatProgressIndicator progress={message.toolProgress} imageUrl={imageUrl} onCancel={onCancelTool} />
+          <SogniTVOffer executionId={message.id} />
         </div>
       )}
 

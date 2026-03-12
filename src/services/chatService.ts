@@ -111,6 +111,8 @@ export async function sendChatMessage(
         stream: true,
         tokenType: context.tokenType,
         ...CHAT_DEFAULT_PARAMS,
+        // Override think param if explicitly specified by model variant
+        ...(typeof context.think === 'boolean' ? { think: context.think } : {}),
       });
 
       // Stream tokens to UI (strip any leaked <think> blocks)

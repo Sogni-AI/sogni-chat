@@ -105,7 +105,7 @@ export default function ChatPage() {
     clearPendingRestore,
   } = useChatSessions();
   const isDesktop = useMediaQuery('(min-width: 900px)');
-  const { showOutOfCreditsPopup, showSignupModal } = useLayout();
+  const { showOutOfCreditsPopup, showSignupModal, sidebarCollapsed, toggleSidebar } = useLayout();
   const { showToast } = useToastContext();
 
   const [resultUrls, setResultUrls] = useState<string[]>([]);
@@ -703,8 +703,27 @@ export default function ChatPage() {
         description="Chat with AI to generate images, create videos, compose music, restore photos, and more."
         path="/"
       />
-      <main className="flex-1 flex flex-col min-h-0 page-enter">
-        <div className="flex flex-col flex-1 min-h-0">
+      {/* Full-height flex row: sidebar + main content */}
+      <div className="flex flex-1 min-h-0 page-enter">
+        {/* Desktop sidebar — full height, outside main content column */}
+        {isDesktop && (
+          <ChatHistorySidebar
+            sessions={sessions}
+            activeSessionId={activeSessionId}
+            getThumbnailUrl={getThumbnailUrl}
+            onSelectSession={handleSelectSession}
+            onDeleteSession={handleDeleteSession}
+            onNewProject={handleNewPhoto}
+            onFileDrop={handleFileDrop}
+            unreadSessionIds={unreadSessionIds}
+            activeJobSessionIds={activeJobSessionIds}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={toggleSidebar}
+          />
+        )}
+
+        {/* Main content column */}
+        <div className="flex flex-col flex-1 min-h-0 min-w-0">
           {/* Hidden file input */}
           <input
             ref={fileInputRef}
@@ -728,65 +747,39 @@ export default function ChatPage() {
             </div>
           )}
 
-          {/* Main content: sidebar + chat panel */}
-          <div
-            style={{
-              display: 'flex',
-              flex: 1,
-              minHeight: 0,
-              gap: 0,
-              width: '100%',
-            }}
-          >
-            {/* Desktop sidebar */}
-            {isDesktop && (
-              <ChatHistorySidebar
-                sessions={sessions}
-                activeSessionId={activeSessionId}
-                getThumbnailUrl={getThumbnailUrl}
-                onSelectSession={handleSelectSession}
-                onDeleteSession={handleDeleteSession}
-                onNewProject={handleUploadClick}
-                onFileDrop={handleFileDrop}
-                unreadSessionIds={unreadSessionIds}
-                activeJobSessionIds={activeJobSessionIds}
-              />
-            )}
-
-            {/* Chat panel */}
-            <div style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
-              <ChatPanel
-                sogniClient={sogniClient}
-                imageData={imageData}
-                imageUrl={imageUrl}
-                width={width}
-                height={height}
-                tokenType={tokenType}
-                balances={balances}
-                isAuthenticated={isAuthenticated}
-                chat={chat}
-                qualityTier={qualityTier}
-                onQualityTierChange={setQualityTier}
-                estimatedCost={estimatedCost}
-                costLoading={costLoading}
-                allowAutoAnalysis={sessionsInitialized && !pendingRestore}
-                onResultsChange={handleResultsChange}
-                onLoadingChange={handleLoadingChange}
-                onUploadClick={handleUploadClick}
-                onTokenSwitch={handleTokenSwitch}
-                onInsufficientCredits={handleInsufficientCredits}
-                onClearAll={handleNewPhoto}
-                onOpenDrawer={!isDesktop ? () => setDrawerOpen(true) : undefined}
-                downloadSlug={slugify(sessionTitleRef.current)}
-                uploadedFiles={uploadedFiles}
-                isMediaUploading={isMediaUploading}
-                mediaUploadError={mediaUploadError}
-                onAddMediaFile={addMediaFile}
-                onRemoveMediaFile={removeMediaFile}
-                onClearMediaFiles={clearMediaFiles}
-                onFileDrop={handleFileDrop}
-              />
-            </div>
+          {/* Chat panel */}
+          <div style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
+            <ChatPanel
+              sogniClient={sogniClient}
+              imageData={imageData}
+              imageUrl={imageUrl}
+              width={width}
+              height={height}
+              tokenType={tokenType}
+              balances={balances}
+              isAuthenticated={isAuthenticated}
+              chat={chat}
+              qualityTier={qualityTier}
+              onQualityTierChange={setQualityTier}
+              estimatedCost={estimatedCost}
+              costLoading={costLoading}
+              allowAutoAnalysis={sessionsInitialized && !pendingRestore}
+              onResultsChange={handleResultsChange}
+              onLoadingChange={handleLoadingChange}
+              onUploadClick={handleUploadClick}
+              onTokenSwitch={handleTokenSwitch}
+              onInsufficientCredits={handleInsufficientCredits}
+              onClearAll={handleNewPhoto}
+              onOpenDrawer={!isDesktop ? () => setDrawerOpen(true) : undefined}
+              downloadSlug={slugify(sessionTitleRef.current)}
+              uploadedFiles={uploadedFiles}
+              isMediaUploading={isMediaUploading}
+              mediaUploadError={mediaUploadError}
+              onAddMediaFile={addMediaFile}
+              onRemoveMediaFile={removeMediaFile}
+              onClearMediaFiles={clearMediaFiles}
+              onFileDrop={handleFileDrop}
+            />
           </div>
         </div>
 
@@ -805,9 +798,7 @@ export default function ChatPage() {
             activeJobSessionIds={activeJobSessionIds}
           />
         )}
-
-        {/* Footer removed for clean layout */}
-      </main>
+      </div>
     </>
   );
 }
