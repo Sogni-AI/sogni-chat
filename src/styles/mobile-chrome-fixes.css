@@ -1,0 +1,15 @@
+/* Mobile browser chrome fixes — dvh for all mobile sizes */
+
+/* Use dynamic viewport height to avoid browser chrome overlap */
+@supports (height: 100dvh) {
+  html,
+  body,
+  #root {
+    height: 100dvh;
+  }
+}
+
+/* Prevent pull-to-refresh on mobile */
+body {
+  overscroll-behavior-y: contain;
+}

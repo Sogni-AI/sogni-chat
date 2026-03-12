@@ -1,0 +1,74 @@
+/**
+ * Tool definition for generate_music.
+ * Based on workflow_text_to_music.mjs — ACE-Step text-to-music generation.
+ */
+
+import type { ToolDefinition } from '@sogni-ai/sogni-client';
+
+export const definition: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'generate_music',
+    description:
+      'Generate music from a text description. Creates original songs with optional lyrics, BPM, key signature, and duration control. Use when the user wants to create music, a song, a beat, a melody, background music, or any audio content.',
+    parameters: {
+      type: 'object',
+      properties: {
+        prompt: {
+          type: 'string',
+          description: `Genre, mood, and style description for the music. Be specific about musical characteristics.
+
+Examples:
+- "upbeat electronic dance music with driving bass and synth arpeggios"
+- "mellow jazz ballad with soft piano, brushed drums, and walking bass"
+- "epic orchestral soundtrack with soaring strings and powerful brass"
+- "lo-fi hip hop beat with vinyl crackle, muted keys, and chill vibes"
+- "acoustic folk song with fingerpicked guitar and warm harmonies"
+
+Include:
+- Genre (rock, jazz, electronic, classical, hip-hop, etc.)
+- Mood (happy, melancholic, energetic, relaxing, epic, etc.)
+- Instruments (piano, guitar, drums, synth, strings, etc.)
+- Style descriptors (driving, mellow, atmospheric, punchy, etc.)`,
+        },
+        duration: {
+          type: 'number',
+          description:
+            'Duration in seconds. Default: 30. Range: 10-600 (10 seconds to 10 minutes). Short clips: 10-30s. Standard songs: 120-300s.',
+          minimum: 10,
+          maximum: 600,
+        },
+        bpm: {
+          type: 'number',
+          description:
+            'Beats per minute / tempo. Default: 120. Range: 30-300. Slow ballad: 60-80. Mid-tempo: 90-120. Upbeat: 120-140. Fast dance: 140-180. Very fast: 180+.',
+          minimum: 30,
+          maximum: 300,
+        },
+        keyscale: {
+          type: 'string',
+          description:
+            'Musical key and scale. E.g., "C major", "A minor", "F# minor", "Bb major". Default: "C major". Only set when the user specifies a key or when a particular mood calls for it (minor keys for sad/dark, major for happy/bright).',
+        },
+        lyrics: {
+          type: 'string',
+          description:
+            'Song lyrics. Optional — omit for instrumental music. Format: write lyrics naturally with line breaks. The model will attempt to sing these lyrics with the generated music. Works best with clear, rhythmic phrasing that matches the BPM.',
+        },
+        model: {
+          type: 'string',
+          enum: ['turbo', 'sft'],
+          description:
+            'ACE-Step model variant. "turbo" (default): Fast generation with 4-16 steps, half the cost. Best for quick drafts and iterations. "sft": Higher quality with 10-200 steps, full cost. Best for final production-quality output. Default: "turbo".',
+        },
+        timesig: {
+          type: 'number',
+          enum: [2, 3, 4, 6],
+          description:
+            'Time signature (beats per measure). 4 = 4/4 time (default, most common). 3 = 3/4 time (waltz). 2 = 2/4 time (march). 6 = 6/8 time (compound). Default: 4.',
+        },
+      },
+      required: ['prompt'],
+    },
+  },
+};

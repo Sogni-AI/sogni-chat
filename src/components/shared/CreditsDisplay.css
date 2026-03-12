@@ -1,0 +1,148 @@
+.credits-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  background: var(--color-bg-elevated);
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  font-size: 0.75rem;
+  position: relative;
+  height: fit-content;
+  max-height: 32px;
+}
+
+.credits-balance {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.credits-label {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  font-size: 0.7rem;
+}
+
+.credits-value {
+  font-weight: 600;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.credits-status-green .credits-value {
+  color: #4CAF50;
+}
+
+.credits-status-yellow .credits-value {
+  color: #FF9800;
+}
+
+.credits-status-red .credits-value {
+  color: #f44336;
+}
+
+.credits-separator {
+  width: 1px;
+  height: 16px;
+  background: var(--color-border);
+  flex-shrink: 0;
+}
+
+.credits-estimate-compact {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.credits-estimate-label {
+  color: var(--color-text-secondary);
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+.credits-estimate-value {
+  font-weight: 600;
+  font-size: 0.8rem;
+  line-height: 1;
+  color: var(--color-text);
+}
+
+.credits-insufficient {
+  color: #f44336;
+}
+
+/* Tooltip */
+.credits-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.credits-tooltip-content {
+  background: #1a1a1a;
+  color: #ffffff;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 180px;
+  line-height: 1.5;
+}
+
+.credits-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.credits-tooltip-row:last-child {
+  margin-bottom: 0;
+}
+
+.credits-tooltip-row span:first-child {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.credits-tooltip-value {
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.credits-tooltip-remaining {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .credits-display {
+    padding: 4px 8px;
+    gap: 6px;
+  }
+
+  .credits-label {
+    display: none;
+  }
+
+  .credits-estimate-label {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .credits-display {
+    font-size: 0.7rem;
+  }
+
+  .credits-value,
+  .credits-estimate-value {
+    font-size: 0.75rem;
+  }
+}

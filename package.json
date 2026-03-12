@@ -1,0 +1,72 @@
+{
+  "name": "sogni-chat",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AI-powered chat studio using the Sogni Client SDK",
+  "homepage": "https://chat.sogni.ai",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Sogni-AI/sogni-chat"
+  },
+  "bugs": {
+    "url": "https://github.com/Sogni-AI/sogni-chat/issues"
+  },
+  "keywords": [
+    "ai",
+    "chat",
+    "photo-restoration",
+    "image-editing",
+    "video-generation",
+    "sogni",
+    "sogni-sdk",
+    "react",
+    "typescript",
+    "vite"
+  ],
+  "author": "Sogni AI",
+  "license": "MIT",
+  "scripts": {
+    "dev": "npx kill-port 5173 && vite --host 0.0.0.0 --port 5173 --strictPort",
+    "build": "tsc && vite build",
+    "build:staging": "tsc && vite build --mode staging",
+    "preview": "vite preview",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings 16",
+    "validate:useeffect": "node scripts/validate-useeffect.js",
+    "precommit": "npm run validate:useeffect",
+    "server:install": "cd server && npm install",
+    "server:dev": "cd server && npm run dev",
+    "server:start": "cd server && npm start",
+    "deploy:production": "bash scripts/deploy-production.sh",
+    "deploy:staging": "bash scripts/deploy-staging.sh",
+    "prepare": "npm run server:install"
+  },
+  "dependencies": {
+    "@sogni-ai/sogni-client": "^4.1.0-alpha.4",
+    "@types/uuid": "^10.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-helmet-async": "^2.0.5",
+    "react-router-dom": "^7.13.1",
+    "react-turnstile": "^1.1.5",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@typescript-eslint/eslint-plugin": "^8.50.0",
+    "@typescript-eslint/parser": "^8.50.0",
+    "@vitejs/plugin-react": "^4.4.1",
+    "autoprefixer": "^10.4.16",
+    "eslint": "^9.0.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.0.0",
+    "globals": "^15.0.0",
+    "postcss": "^8.4.33",
+    "sharp": "^0.34.5",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.6.3",
+    "vite": "^6.2.2"
+  }
+}

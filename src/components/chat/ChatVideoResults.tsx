@@ -1,0 +1,273 @@
+/**
+ * Inline video results displayed within chat messages.
+ * Shows video players with a save/download button overlay.
+ * Prefers gallery blob URLs (persistent) over remote URLs (may expire).
+ * Shows an "expired" state if the video fails to load.
+ */
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { downloadImage } from '@/utils/download';
+import { buildDownloadFilename } from '@/utils/downloadFilename';
+import { useGalleryBlobUrls } from '@/hooks/useGalleryBlobUrls';
+
+/** Global registry: when any chat video plays, pause all others */
+const activeVideos = new Set<HTMLVideoElement>();
+
+function pauseOtherVideos(current: HTMLVideoElement) {
+  activeVideos.forEach((v) => {
+    if (v !== current && !v.paused) v.pause();
+  });
+}
+
+/** Individual video player that pauses all other chat videos when it starts playing.
+ *  Hides the native player until the first frame is ready to prevent the
+ *  ugly black unstyled rectangle that flashes while the video is loading. */
+function ChatVideoPlayer({ src, onError, aspectRatio }: { src: string; onError: () => void; aspectRatio?: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+
+    activeVideos.add(el);
+
+    const handlePlay = () => pauseOtherVideos(el);
+    el.addEventListener('play', handlePlay);
+
+    // Pause video when scrolled out of view
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting && !el.paused) {
+          el.pause();
+        }
+      },
+      { threshold: 0 },
+    );
+    observer.observe(el);
+
+    return () => {
+      el.removeEventListener('play', handlePlay);
+      activeVideos.delete(el);
+      observer.disconnect();
+    };
+  }, []);
+
+  // Reset ready state when src changes
+  useEffect(() => {
+    setReady(false);
+  }, [src]);
+
+  return (
+    <div style={{ position: 'relative' }}>
+      {/* Loading placeholder — shown until the first video frame is decoded */}
+      {!ready && (
+        <div
+          style={{
+            aspectRatio: aspectRatio || '16 / 9',
+            width: '100%',
+            maxWidth: '100%',
+            maxHeight: '400px',
+            borderRadius: 'var(--radius-md)',
+            background: 'rgba(var(--rgb-primary), 0.06)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <div
+            className="animate-spin"
+            style={{
+              width: '1.5rem',
+              height: '1.5rem',
+              border: '2.5px solid var(--color-border)',
+              borderTopColor: 'var(--color-accent)',
+              borderRadius: '50%',
+            }}
+          />
+        </div>
+      )}
+      <video
+        ref={videoRef}
+        src={src}
+        autoPlay
+        controls
+        loop
+        playsInline
+        preload="auto"
+        onLoadedData={() => setReady(true)}
+        onError={onError}
+        style={{
+          display: ready ? 'block' : 'none',
+          maxWidth: '100%',
+          maxHeight: '400px',
+          borderRadius: 'var(--radius-md)',
+          ...(aspectRatio ? { aspectRatio, width: '100%' } : {}),
+        }}
+      >
+        Your browser does not support video playback.
+      </video>
+    </div>
+  );
+}
+
+interface ChatVideoResultsProps {
+  urls: string[];
+  /** Gallery video IDs for persistent blob-based rendering (parallel to urls) */
+  galleryVideoIds?: string[];
+  /** Descriptive slug for download filenames (e.g. from session title) */
+  downloadSlug?: string;
+  /** Video aspect ratio as CSS string (e.g. "9 / 16") — prevents reflow when video loads */
+  videoAspectRatio?: string;
+}
+
+export const ChatVideoResults = memo(function ChatVideoResults({
+  urls,
+  galleryVideoIds,
+  downloadSlug,
+  videoAspectRatio,
+}: ChatVideoResultsProps) {
+  // Resolve gallery IDs to blob URLs — persistent local copies that never expire
+  const galleryBlobUrls = useGalleryBlobUrls(galleryVideoIds);
+  const [failedVideos, setFailedVideos] = useState<Set<number>>(new Set());
+
+  const handleDownload = useCallback((url: string, index: number) => {
+    const filename = buildDownloadFilename(downloadSlug, index + 1, 'video');
+    downloadImage(url, filename).catch((err) =>
+      console.error('[CHAT VIDEO] Download failed:', err),
+    );
+  }, [downloadSlug]);
+
+  const handleError = useCallback((index: number) => {
+    setFailedVideos((prev) => new Set([...prev, index]));
+  }, []);
+
+  return (
+    <div
+      role="group"
+      aria-label={`${urls.length} video result${urls.length !== 1 ? 's' : ''}`}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.5rem',
+      }}
+    >
+      {urls.map((url, index) => {
+        // Prefer gallery blob URL (persistent) over remote URL (may expire)
+        const displayUrl = galleryBlobUrls.get(index) || url;
+        const isFailed = failedVideos.has(index);
+
+        return (
+        <div
+          key={`${url}-${index}`}
+          style={{
+            position: 'relative',
+            display: 'inline-block',
+            borderRadius: 'var(--radius-md)',
+            overflow: 'hidden',
+            maxWidth: '360px',
+          }}
+        >
+          {isFailed ? (
+            /* Expired / error state */
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.375rem',
+                width: '100%',
+                aspectRatio: '16/9',
+                background: 'rgba(var(--rgb-primary), 0.04)',
+                borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--color-border)',
+                color: 'var(--color-text-tertiary)',
+              }}
+            >
+              {/* Film/video icon with X */}
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+                <rect x="2" y="4" width="20" height="16" rx="2" />
+                <path d="M2 8h20" />
+                <path d="M2 16h20" />
+                <path d="M6 4v16" />
+                <path d="M18 4v16" />
+                <line x1="2" y1="4" x2="22" y2="20" />
+              </svg>
+              <span style={{ fontSize: '0.75rem', fontWeight: 500, opacity: 0.7 }}>
+                Video expired
+              </span>
+            </div>
+          ) : (
+            /* Video player */
+            <ChatVideoPlayer
+              src={displayUrl}
+              onError={() => handleError(index)}
+              aspectRatio={videoAspectRatio}
+            />
+          )}
+
+          {/* Index badge (hidden for single results) */}
+          {urls.length > 1 && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '0.375rem',
+                left: '0.375rem',
+                background: 'rgba(0,0,0,0.6)',
+                color: '#fff',
+                fontSize: '0.6875rem',
+                fontWeight: 600,
+                padding: '0.125rem 0.375rem',
+                borderRadius: '0.25rem',
+                lineHeight: '1.2',
+              }}
+            >
+              #{index + 1}
+            </div>
+          )}
+
+          {/* Save / Download button — only shown when video loaded */}
+          {!isFailed && (
+            <button
+              onClick={() => handleDownload(displayUrl, index)}
+              aria-label="Save video"
+              style={{
+                position: 'absolute',
+                top: '0.375rem',
+                right: '0.375rem',
+                background: 'rgba(0,0,0,0.6)',
+                backdropFilter: 'blur(4px)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: 'white',
+                transition: 'background 0.2s',
+              }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </button>
+          )}
+        </div>
+        );
+      })}
+    </div>
+  );
+});

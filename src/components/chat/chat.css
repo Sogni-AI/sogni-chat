@@ -1,0 +1,92 @@
+/* Chat component animations */
+@keyframes chatCursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes chipsFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 480px) {
+  .suggestion-chips-wrap {
+    gap: 0.375rem;
+  }
+}
+
+/* ── Mobile chat history drawer ── */
+@keyframes drawerSlideIn {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes drawerSlideOut {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+
+@keyframes drawerBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes drawerBackdropOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.mobile-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  animation: drawerBackdropIn 0.2s ease-out forwards;
+}
+
+.mobile-drawer-backdrop.closing {
+  animation: drawerBackdropOut 0.2s ease-in forwards;
+}
+
+.mobile-drawer-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 100vw;
+  z-index: 1001;
+  animation: drawerSlideIn 0.25s ease-out forwards;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-drawer-panel.closing {
+  animation: drawerSlideOut 0.25s ease-in forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-drawer-backdrop,
+  .mobile-drawer-backdrop.closing,
+  .mobile-drawer-panel,
+  .mobile-drawer-panel.closing {
+    animation-duration: 0.01ms;
+  }
+}
+
+/* Background job spinner for sidebar session items */
+.chat-session-spinner {
+  border: 2px solid rgba(var(--rgb-primary), 0.15);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: chat-session-spin 0.8s linear infinite;
+}
+
+@keyframes chat-session-spin {
+  to { transform: rotate(360deg); }
+}

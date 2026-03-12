@@ -1,0 +1,101 @@
+/* Import premium theme FIRST */
+@import './styles/theme.css';
+@import './styles/mobile-portrait-fixes.css';
+@import './styles/mobile-chrome-fixes.css';
+@import './styles/responsive.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  height: 100dvh;
+  width: 100%;
+  background: var(--color-bg);
+}
+
+#root {
+  height: 100%;
+  height: 100dvh;
+  width: 100%;
+}
+
+/* Lock viewport for restore workspace only */
+.restore-viewport {
+  overflow: hidden;
+}
+
+/* Sign in button hover effect */
+.auth-signin-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(var(--rgb-blue-gray), 0.25);
+}
+
+.auth-signin-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Fade in/out animation for carousel hints */
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  15% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  85% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+}
+
+/* Fade in animation for gallery items */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.6s ease-out forwards;
+}
+
+/* Hover hint animation */
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px);
+  }
+  20% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  80% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+}

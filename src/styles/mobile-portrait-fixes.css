@@ -1,0 +1,48 @@
+/*
+  CRITICAL MOBILE PORTRAIT MODE FIXES
+  Uses dvh (dynamic viewport height) to account for iOS/Chrome browser chrome
+*/
+
+/* Only apply these fixes in portrait mode on mobile devices */
+@media (max-width: 743px) and (orientation: portrait) {
+  html,
+  body {
+    height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  #root {
+    height: 100dvh;
+  }
+
+  /* Fallback for older browsers that don't support dvh */
+  @supports not (height: 100dvh) {
+    html, body, #root {
+      height: -webkit-fill-available;
+    }
+  }
+
+  /* Ensure footer clears iPhone home indicator */
+  .app-footer {
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Ensure chat input clears iPhone home indicator */
+  .chat-input-wrap {
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  /* Prevent text size adjustment on iOS */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+/* Mobile landscape fixes */
+@media (max-width: 743px) and (orientation: landscape) {
+  header {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+}

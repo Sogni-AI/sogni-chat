@@ -1,0 +1,81 @@
+/**
+ * Tool definition for animate_photo.
+ * Extracted from the superapp's chatTools.ts ANIMATE_PHOTO_TOOL.
+ */
+
+import type { ToolDefinition } from '@sogni-ai/sogni-client';
+import { ASPECT_RATIO_DESCRIPTION } from '../shared';
+
+export const definition: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'animate_photo',
+    description:
+      'Generate a video clip from a photo, bringing it to life with motion and animation. Default duration is 5 seconds; use the duration parameter when the user requests a specific length. Use when the user wants to animate, bring to life, create a video from, or add motion to their photo. Examples: "make them wave", "bring this to life", "animate this photo", "create a video of them smiling", "make a 10 second video". IMPORTANT: When previous results exist, this tool automatically uses the LATEST result image unless you specify a different sourceImageIndex or the user explicitly says "original". So just call it without sourceImageIndex for follow-up requests.',
+    parameters: {
+      type: 'object',
+      properties: {
+        prompt: {
+          type: 'string',
+          description: `Motion and action prompt for video generation.
+
+--- WAN 2.2 (videoModel "wan22") --- 30-150 words ---
+Describe the MOTION and ANIMATION you want to see, not the static image content.
+- Include specific actions: "gently smiling and turning their head slightly to the left", "waving hello with a warm expression".
+- Describe camera movement if relevant: "slow zoom in", "gentle pan to the right", "camera pushes forward".
+- Include atmosphere and mood: "soft warm lighting", "gentle breeze moving their hair".
+- For people: describe natural, lifelike movements. Avoid extreme or physically impossible motions.
+- Keep movements subtle and natural — small gestures look more realistic than large dramatic actions.
+
+--- LTX-2 (videoModel "ltx2") --- 2-4 present-tense sentences ---
+The scene description is automatically generated from the image — you only need to describe MOTION, ACTION, ATMOSPHERE, SOUND, and CAMERA. DO NOT describe the subject's appearance or environment.
+1. ACTION (1-2 sentences): One main thread of motion. Use temporal connectors ("as", "then", "while"). Keep actions physically filmable and subtle.
+2. ATMOSPHERE & SOUND (1 sentence): Environmental motion and ambient sound woven into prose.
+3. CAMERA (append): Camera movement ("slow push-in", "gentle pan right", "static tripod", "handheld subtle drift"). End with "The footage remains smooth and stabilised throughout."
+
+--- AUDIO & DIALOGUE (LTX-2 only) ---
+LTX-2 generates audio natively. Describe audio clearly in your prompt:
+- Ambient sounds: "the sound of waves crashing on shore", "birds chirping in the background", "a bustling city street with distant traffic".
+- Music: "soft piano melody playing", "upbeat jazz music in the background".
+- Dialogue: Place the EXACT spoken text between quotation marks. E.g., The subject says "Hello, how are you today?" with a warm, friendly tone.
+- Language/accent: If relevant, specify: "speaking in French with a Parisian accent", "saying 'gracias' in Spanish".
+- For longer dialogue (10s+ video), write natural conversational lines. Space dialogue across the duration.
+
+CONSTRAINTS (both models):
+- Present tense only. Positive phrasing.
+- No vague words ("beautiful", "nice") — use concrete sensory details.
+- Keep movements subtle and natural — small gestures look more realistic than dramatic actions.
+- SPEECH: If the user specifies dialogue or speech in quotes (e.g., "make them say 'hello'"), include the exact quoted text in the prompt (e.g., 'The subject says "hello"'). Preserve the user's exact words.`,
+        },
+        videoModel: {
+          type: 'string',
+          enum: ['ltx2', 'wan22'],
+          description:
+            'Which video model to use. "ltx2" (default): Higher quality, generates audio, supports elaborate cinematic prompts with atmosphere, sound design, and camera work. Use for detailed/creative requests, any request mentioning sound or audio, or longer videos. "wan22": Faster, simpler motion, no audio. Use for short simple actions like "make her wave", "make him smile", "bring this to life" where the user just wants basic motion without cinematic detail. Default: "ltx2".',
+        },
+        duration: {
+          type: 'number',
+          description:
+            'Video duration in seconds. Default: 5. Use when the user explicitly requests a specific length (e.g., "make a 10 second video"). Range: 2-20.',
+        },
+        sourceImageIndex: {
+          type: 'number',
+          description:
+            'Which result image to animate (0-based index). Omit to use the latest result automatically (or the original if no results exist). Only set explicitly when the user specifies a particular image number or explicitly says "original" (use -1 for original).',
+        },
+        numberOfVariations: {
+          type: 'number',
+          description:
+            'Number of video variations to generate (1-16). ALWAYS use 1 unless the user explicitly requests multiple videos (e.g., "make 3 versions", "generate 2 videos"). Default: 1.',
+          minimum: 1,
+          maximum: 16,
+        },
+        aspectRatio: {
+          type: 'string',
+          description: ASPECT_RATIO_DESCRIPTION,
+        },
+      },
+      required: ['prompt'],
+    },
+  },
+};

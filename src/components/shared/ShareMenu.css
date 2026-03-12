@@ -1,0 +1,71 @@
+.share-menu-container {
+  position: relative;
+  display: inline-block;
+}
+
+.share-menu-dropdown {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  min-width: 200px;
+  z-index: 9999999;
+  animation: shareMenuSlideUp 0.2s ease-out;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+@keyframes shareMenuSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.share-menu-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 18px;
+  border: none;
+  background: white;
+  color: #333;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.share-menu-option:hover {
+  background: #f0f0f0;
+}
+
+.share-menu-option:active {
+  background: #e0e0e0;
+}
+
+.share-menu-option svg {
+  flex-shrink: 0;
+  color: #1DA1F2;
+}
+
+.share-menu-option.webshare-option svg {
+  color: #5856D6;
+}
+
+.share-menu-option.qr-option svg {
+  color: #4CAF50;
+}
+
+/* Add a subtle divider between options when both are present */
+.share-menu-option + .share-menu-option {
+  border-top: 1px solid #e0e0e0;
+}

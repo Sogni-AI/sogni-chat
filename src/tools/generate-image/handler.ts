@@ -1,0 +1,389 @@
+/**
+ * Handler for generate_image tool.
+ * Based on workflow_text_to_image.mjs — creates images from text prompts
+ * using sogniClient.projects.create() directly.
+ */
+
+import type { ToolExecutionContext, ToolCallbacks } from '../types';
+import {
+  preflightCreditCheck,
+  tryWithTokenFallback,
+  isInsufficientCreditsError,
+  registerPendingCost,
+  recordCompletion,
+  discardPending,
+  formatCredits,
+} from '../shared';
+import type { TokenType } from '@/types/wallet';
+import { parseAspectRatio } from '@/utils/imageDimensions';
+import { fetchImageCostEstimate } from '@/services/creditsService';
+
+// ---------------------------------------------------------------------------
+// Model configurations (from MODELS.image in workflow-helpers.mjs)
+// ---------------------------------------------------------------------------
+
+interface ImageModelConfig {
+  id: string;
+  name: string;
+  defaultWidth: number;
+  defaultHeight: number;
+  maxWidth: number;
+  maxHeight: number;
+  defaultSteps: number;
+  defaultGuidance?: number;
+  sampler: string;
+  scheduler: string;
+}
+
+const IMAGE_MODELS: Record<string, ImageModelConfig> = {
+  'z-turbo': {
+    id: 'z_image_turbo_bf16',
+    name: 'Z-Image Turbo',
+    defaultWidth: 1024,
+    defaultHeight: 1024,
+    maxWidth: 2048,
+    maxHeight: 2048,
+    defaultSteps: 8,
+    defaultGuidance: 1.0,
+    sampler: 'res_multistep',
+    scheduler: 'simple',
+  },
+  'chroma-v46-flash': {
+    id: 'chroma-v.46-flash_fp8',
+    name: 'Chroma v.46 Flash',
+    defaultWidth: 1024,
+    defaultHeight: 1024,
+    maxWidth: 2048,
+    maxHeight: 2048,
+    defaultSteps: 10,
+    defaultGuidance: 1.0,
+    sampler: 'euler',
+    scheduler: 'simple',
+  },
+  flux2: {
+    id: 'flux2_dev_fp8',
+    name: 'Flux.2 Dev',
+    defaultWidth: 1248,
+    defaultHeight: 832,
+    maxWidth: 2048,
+    maxHeight: 2048,
+    defaultSteps: 20,
+    defaultGuidance: 4.0,
+    sampler: 'euler',
+    scheduler: 'simple',
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Dimension helpers
+// ---------------------------------------------------------------------------
+
+function snapToMultipleOf16(value: number): number {
+  return Math.round(value / 16) * 16;
+}
+
+function computeDimensions(
+  requestedWidth: number | undefined,
+  requestedHeight: number | undefined,
+  aspectRatio: string | undefined,
+  config: ImageModelConfig,
+): { width: number; height: number } {
+  let w = requestedWidth ?? config.defaultWidth;
+  let h = requestedHeight ?? config.defaultHeight;
+
+  const parsed = parseAspectRatio(aspectRatio);
+  if (parsed?.type === 'exact') {
+    w = parsed.width;
+    h = parsed.height;
+  } else if (parsed?.type === 'ratio') {
+    const area = w * h;
+    const ratio = parsed.ratioW / parsed.ratioH;
+    w = Math.sqrt(area * ratio);
+    h = area / w;
+  }
+
+  w = snapToMultipleOf16(w);
+  h = snapToMultipleOf16(h);
+  w = Math.max(16, Math.min(config.maxWidth, w));
+  h = Math.max(16, Math.min(config.maxHeight, h));
+
+  return { width: w, height: h };
+}
+
+// ---------------------------------------------------------------------------
+// Main handler
+// ---------------------------------------------------------------------------
+
+export async function execute(
+  args: Record<string, unknown>,
+  context: ToolExecutionContext,
+  callbacks: ToolCallbacks,
+): Promise<string> {
+  const prompt = args.prompt as string;
+  const modelKey = (args.model as string) || 'z-turbo';
+  const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
+  const negativePrompt = args.negativePrompt as string | undefined;
+  const aspectRatio = args.aspectRatio as string | undefined;
+
+  const modelConfig = IMAGE_MODELS[modelKey] ?? IMAGE_MODELS['z-turbo'];
+  const { width, height } = computeDimensions(
+    args.width as number | undefined,
+    args.height as number | undefined,
+    aspectRatio,
+    modelConfig,
+  );
+
+  const steps = modelConfig.defaultSteps;
+  const guidance = modelConfig.defaultGuidance;
+
+  // Cost estimation & pre-flight
+  const originalToken = context.tokenType;
+  let estimatedCost = await fetchImageCostEstimate(context.sogniClient, context.tokenType, modelConfig.id, numberOfMedia, steps, guidance, modelConfig.sampler);
+
+  const preflight = preflightCreditCheck(context, estimatedCost);
+  if (!preflight.ok) return preflight.errorJson;
+  if (context.tokenType !== originalToken) {
+    estimatedCost = await fetchImageCostEstimate(context.sogniClient, context.tokenType, modelConfig.id, numberOfMedia, steps, guidance, modelConfig.sampler);
+  }
+
+  callbacks.onToolProgress({
+    type: 'started',
+    toolName: 'generate_image',
+    totalCount: numberOfMedia,
+    estimatedCost,
+  });
+
+  const billingId = estimatedCost > 0
+    ? registerPendingCost('generate_image', estimatedCost, context.tokenType)
+    : null;
+
+  try {
+    const resultUrls = await tryWithTokenFallback(
+      (tokenType: TokenType) => runImageGeneration(
+        context.sogniClient,
+        {
+          modelId: modelConfig.id,
+          prompt,
+          negativePrompt,
+          width,
+          height,
+          steps,
+          guidance,
+          numberOfMedia,
+          tokenType,
+          sampler: modelConfig.sampler,
+          scheduler: modelConfig.scheduler,
+        },
+        (progress) => {
+          callbacks.onToolProgress({
+            type: progress.completed ? 'completed' : 'progress',
+            toolName: 'generate_image',
+            progress: progress.progress,
+            completedCount: progress.completedCount,
+            totalCount: numberOfMedia,
+            jobIndex: progress.jobIndex,
+            etaSeconds: progress.etaSeconds,
+            resultUrls: progress.resultUrl ? [progress.resultUrl] : undefined,
+            estimatedCost,
+          });
+        },
+        context.signal,
+      ),
+      context,
+      estimatedCost,
+    );
+
+    if (billingId) void recordCompletion(billingId);
+    callbacks.onToolComplete('generate_image', resultUrls);
+
+    return JSON.stringify({
+      success: true,
+      resultCount: resultUrls.length,
+      model: modelConfig.name,
+      creditsCost: formatCredits(estimatedCost),
+      message: `Successfully generated ${resultUrls.length} image${resultUrls.length !== 1 ? 's' : ''} using ${modelConfig.name}. Cost: ~${formatCredits(estimatedCost)} credits. The user can now see the results.`,
+    });
+  } catch (err: unknown) {
+    if (billingId) discardPending(billingId);
+    if (isInsufficientCreditsError(err)) {
+      return JSON.stringify({ error: 'insufficient_credits', message: 'The user does not have enough credits for image generation.' });
+    }
+    throw err;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// SDK project execution
+// ---------------------------------------------------------------------------
+
+interface ImageGenParams {
+  modelId: string;
+  prompt: string;
+  negativePrompt?: string;
+  width: number;
+  height: number;
+  steps: number;
+  guidance?: number;
+  numberOfMedia: number;
+  tokenType: TokenType;
+  sampler: string;
+  scheduler: string;
+}
+
+interface ImageProgress {
+  progress?: number;
+  completedCount?: number;
+  jobIndex?: number;
+  etaSeconds?: number;
+  resultUrl?: string;
+  completed?: boolean;
+}
+
+async function runImageGeneration(
+  sogniClient: ToolExecutionContext['sogniClient'],
+  params: ImageGenParams,
+  onProgress: (progress: ImageProgress) => void,
+  signal?: AbortSignal,
+): Promise<string[]> {
+  const projectParams: Record<string, unknown> = {
+    type: 'image',
+    modelId: params.modelId,
+    positivePrompt: params.prompt,
+    numberOfMedia: params.numberOfMedia,
+    steps: params.steps,
+    seed: -1,
+    tokenType: params.tokenType,
+    width: params.width,
+    height: params.height,
+    sampler: params.sampler,
+    scheduler: params.scheduler,
+  };
+
+  if (params.negativePrompt) {
+    projectParams.negativePrompt = params.negativePrompt;
+  }
+  if (params.guidance !== undefined) {
+    projectParams.guidance = params.guidance;
+  }
+
+  const project = await (sogniClient as unknown as { projects: { create: (p: Record<string, unknown>) => Promise<{ id: string }>; on: (e: string, h: (ev: Record<string, unknown>) => void) => void; off: (e: string, h: (ev: Record<string, unknown>) => void) => void } }).projects.create(projectParams);
+
+  return new Promise<string[]>((resolve, reject) => {
+    const resultUrls: string[] = [];
+    let completedCount = 0;
+    let failedCount = 0;
+    const totalJobs = params.numberOfMedia;
+    // Check if already aborted before setting up listeners
+    if (signal?.aborted) {
+      reject(new Error('Aborted'));
+      return;
+    }
+
+    // Safety timeout: 5 minutes
+    const safetyTimeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Image generation timed out'));
+    }, 300_000);
+
+    const abortHandler = () => {
+      cleanup();
+      reject(new Error('Image generation aborted'));
+    };
+
+    const cleanup = () => {
+      clearTimeout(safetyTimeout);
+      signal?.removeEventListener('abort', abortHandler);
+      (sogniClient as unknown as { projects: { off: (e: string, h: (ev: Record<string, unknown>) => void) => void } }).projects.off('job', jobHandler);
+      (sogniClient as unknown as { projects: { off: (e: string, h: (ev: Record<string, unknown>) => void) => void } }).projects.off('project', projectHandler);
+    };
+
+    const checkDone = () => {
+      if (completedCount + failedCount >= totalJobs) {
+        cleanup();
+        if (failedCount === totalJobs) {
+          reject(new Error(`All ${totalJobs} image generation jobs failed`));
+        } else {
+          resolve(resultUrls.filter(Boolean));
+        }
+      }
+    };
+
+    // Handle abort signal
+    if (signal) {
+      signal.addEventListener('abort', abortHandler, { once: true });
+    }
+
+    // Map jobId → jobIndex from initiating/started events (which include jobIndex)
+    const jobIdToIndex = new Map<string, number>();
+
+    const jobHandler = (event: Record<string, unknown>) => {
+      if ((event as { projectId?: string }).projectId !== (project as { id: string }).id) return;
+
+      switch (event.type) {
+        case 'initiating':
+        case 'started': {
+          if (event.jobId && event.jobIndex !== undefined) {
+            jobIdToIndex.set(event.jobId as string, event.jobIndex as number);
+          }
+          break;
+        }
+        case 'progress': {
+          const step = event.step as number | undefined;
+          const stepCount = event.stepCount as number | undefined;
+          if (step !== undefined && stepCount !== undefined && stepCount > 0) {
+            onProgress({
+              progress: step / stepCount,
+              jobIndex: event.jobId ? jobIdToIndex.get(event.jobId as string) : undefined,
+            });
+          }
+          break;
+        }
+        case 'jobETA': {
+          onProgress({
+            etaSeconds: event.etaSeconds as number | undefined,
+            jobIndex: event.jobId ? jobIdToIndex.get(event.jobId as string) : undefined,
+          });
+          break;
+        }
+        case 'completed': {
+          if (!event.jobId) return;
+          const resultUrl = event.resultUrl as string | undefined;
+          if (resultUrl && !event.error) {
+            resultUrls.push(resultUrl);
+            completedCount++;
+            onProgress({
+              completed: completedCount >= totalJobs,
+              completedCount,
+              jobIndex: jobIdToIndex.get(event.jobId as string),
+              resultUrl,
+              progress: 1,
+            });
+          } else {
+            failedCount++;
+            console.error('[GENERATE IMAGE] Job completed with error:', event.error);
+          }
+          checkDone();
+          break;
+        }
+        case 'error':
+        case 'failed': {
+          failedCount++;
+          console.error('[GENERATE IMAGE] Job failed:', event.error);
+          checkDone();
+          break;
+        }
+      }
+    };
+
+    const projectHandler = (event: Record<string, unknown>) => {
+      if ((event as { projectId?: string }).projectId !== (project as { id: string }).id) return;
+      if (event.type === 'error' || event.type === 'failed') {
+        cleanup();
+        reject(new Error(String((event.error as { message?: string })?.message || event.error || 'Project failed')));
+      }
+    };
+
+    (sogniClient as unknown as { projects: { on: (e: string, h: (ev: Record<string, unknown>) => void) => void } }).projects.on('job', jobHandler);
+    (sogniClient as unknown as { projects: { on: (e: string, h: (ev: Record<string, unknown>) => void) => void } }).projects.on('project', projectHandler);
+  });
+}

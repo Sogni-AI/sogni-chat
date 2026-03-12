@@ -1,0 +1,133 @@
+import { Outlet, useLocation } from 'react-router-dom';
+import { useSogniAuth } from '@/services/sogniAuth';
+import { useToastContext } from '@/context/ToastContext';
+import { Header } from '@/components/layout/Header';
+import NetworkStatus from '@/components/shared/NetworkStatus';
+import FriendlyErrorModal from '@/components/shared/FriendlyErrorModal';
+import { DailyCreditsPopup } from '@/components/billing/DailyCreditsPopup';
+import LoginModal, { LoginModalMode } from '@/components/auth/LoginModal';
+import { OutOfCreditsPopup } from '@/components/billing/OutOfCreditsPopup';
+import { trackPageView } from '@/services/analyticsService';
+import { captureReferralFromURL } from '@/utils/referralTracking';
+import { useState, useEffect, createContext, useContext, useCallback } from 'react';
+
+// Shared layout context for child pages to trigger modals
+interface LayoutContextValue {
+  showSignupModal: (mode?: LoginModalMode) => void;
+  hideSignupModal: () => void;
+  showOutOfCreditsPopup: () => void;
+  hideOutOfCreditsPopup: () => void;
+}
+
+const LayoutContext = createContext<LayoutContextValue>({
+  showSignupModal: () => {},
+  hideSignupModal: () => {},
+  showOutOfCreditsPopup: () => {},
+  hideOutOfCreditsPopup: () => {},
+});
+
+export function useLayout() {
+  return useContext(LayoutContext);
+}
+
+export function AppLayout() {
+  const { isAuthenticated, isLoading: authLoading, getSogniClient } = useSogniAuth();
+  const { showToast } = useToastContext();
+  const location = useLocation();
+
+  // Capture referral parameter from URL on initial load
+  useEffect(() => {
+    captureReferralFromURL();
+  }, []);
+
+  // Track SPA page views on route change
+  useEffect(() => {
+    trackPageView(location.pathname + location.search, document.title);
+  }, [location]);
+
+  const [showSignup, setShowSignup] = useState(false);
+  const [signupMode, setSignupMode] = useState<LoginModalMode>('signup');
+  const [showOutOfCredits, setShowOutOfCredits] = useState(false);
+  const [errorModal, setErrorModal] = useState<any>(null);
+  const [connectionState] = useState<'online' | 'offline' | 'connecting' | 'timeout'>('online');
+
+  const showSignupModal = useCallback((mode: LoginModalMode = 'signup') => {
+    setSignupMode(mode);
+    setShowSignup(true);
+  }, []);
+
+  const hideSignupModal = useCallback(() => {
+    setShowSignup(false);
+  }, []);
+
+  const layoutContext: LayoutContextValue = {
+    showSignupModal,
+    hideSignupModal,
+    showOutOfCreditsPopup: () => setShowOutOfCredits(true),
+    hideOutOfCreditsPopup: () => setShowOutOfCredits(false),
+  };
+
+  if (authLoading) {
+    return (
+      <div className="w-screen flex items-center justify-center" style={{ background: 'var(--color-bg)', height: '100dvh' }}>
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-10 w-10 border-2 border-transparent mb-4" style={{
+            borderTopColor: 'var(--color-accent)',
+            borderRightColor: 'var(--color-primary)'
+          }}></div>
+          <p style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <LayoutContext.Provider value={layoutContext}>
+      <div className="flex flex-col overflow-hidden" style={{ background: 'var(--color-bg)', height: '100dvh' }}>
+        <Header />
+        <Outlet />
+      </div>
+
+      {/* Global Modals */}
+      <OutOfCreditsPopup
+        isOpen={showOutOfCredits}
+        onClose={() => setShowOutOfCredits(false)}
+        onSwitchPayment={() => setShowOutOfCredits(false)}
+      />
+
+      <DailyCreditsPopup
+        isAuthenticated={isAuthenticated}
+        sogniClient={getSogniClient()}
+        onClaim={(success, creditsAdded) => {
+          if (success) {
+            showToast({
+              type: 'success',
+              title: 'Credits Claimed!',
+              message: `${creditsAdded || 50} credits have been added to your account.`
+            });
+          }
+        }}
+      />
+
+      <LoginModal
+        open={showSignup}
+        mode={signupMode}
+        onModeChange={(mode) => setSignupMode(mode)}
+        onClose={hideSignupModal}
+        onSignupComplete={() => setShowSignup(false)}
+      />
+
+      <NetworkStatus
+        connectionState={connectionState}
+        isGenerating={false}
+        onRetryAll={() => {}}
+      />
+
+      <FriendlyErrorModal
+        error={errorModal}
+        onClose={() => setErrorModal(null)}
+        onRetry={() => {}}
+      />
+    </LayoutContext.Provider>
+  );
+}
