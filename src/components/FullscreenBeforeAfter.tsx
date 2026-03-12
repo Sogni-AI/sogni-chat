@@ -56,12 +56,14 @@ export function FullscreenBeforeAfter({
       onClick={handleBackdropClick}
     >
       <div className="relative max-w-[90vw] max-h-[90vh] flex gap-4">
+        {item.before && (
+          <div className="flex-1">
+            <p className="text-white text-xs text-center mb-2 opacity-60">Original</p>
+            <img src={item.before} alt="Original" className="max-h-[80vh] rounded-lg" />
+          </div>
+        )}
         <div className="flex-1">
-          <p className="text-white text-xs text-center mb-2 opacity-60">Original</p>
-          <img src={item.before} alt="Original" className="max-h-[80vh] rounded-lg" />
-        </div>
-        <div className="flex-1">
-          <p className="text-white text-xs text-center mb-2 opacity-60">Result</p>
+          {item.before && <p className="text-white text-xs text-center mb-2 opacity-60">Result</p>}
           <img src={item.after} alt="Result" className="max-h-[80vh] rounded-lg" />
         </div>
       </div>
