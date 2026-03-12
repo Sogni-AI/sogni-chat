@@ -426,11 +426,18 @@ export function useChat(): UseChatResult {
           || (variant ? variant.modelId : undefined);
         const effectiveThink = variant?.think;
 
+        // If no primary image but uploadedFiles has an image, use it as the primary.
+        // This handles the + icon upload flow where images go through useMediaUpload
+        // instead of useImageUpload, so tool handlers that check context.imageData work.
+        const primaryUploadedImage = !context.imageData
+          ? (context.uploadedFiles || []).find(f => f.type === 'image')
+          : undefined;
+
         const executionContext: ToolExecutionContext = {
           sogniClient: context.sogniClient,
-          imageData: context.imageData,
-          width: context.width,
-          height: context.height,
+          imageData: context.imageData || (primaryUploadedImage ? primaryUploadedImage.data : null),
+          width: context.imageData ? context.width : (primaryUploadedImage?.width || context.width),
+          height: context.imageData ? context.height : (primaryUploadedImage?.height || context.height),
           tokenType: context.tokenType,
           uploadedFiles: context.uploadedFiles || [],
           get resultUrls() { return allResultUrlsRef.current; },
@@ -665,12 +672,14 @@ export function useChat(): UseChatResult {
               onComplete: (_fullContent: string) => {
                 if (thisRequest.aborted) return;
                 if (!isActiveSession()) return;
-                // Mark the current streaming message as done
+                // Mark the current streaming message as done.
+                // Also clear any leftover toolProgress — if a tool returned an error
+                // without calling onToolComplete, the spinner would persist forever.
                 const currentMsgId = localStreamingId.current;
                 setUIMessages((prev) => {
                   const updated = prev.map((msg) =>
                     msg.id === currentMsgId
-                      ? { ...msg, isStreaming: false }
+                      ? { ...msg, isStreaming: false, toolProgress: msg.toolProgress ? null : msg.toolProgress }
                       : msg,
                   );
                   // Remove empty assistant messages (but preserve active streaming/tool placeholders from other requests)
@@ -696,7 +705,7 @@ export function useChat(): UseChatResult {
                   prev
                     .map((msg) =>
                       msg.id === currentMsgId
-                        ? { ...msg, isStreaming: false }
+                        ? { ...msg, isStreaming: false, toolProgress: null }
                         : msg,
                     )
                     .filter(
