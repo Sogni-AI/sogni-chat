@@ -43,11 +43,11 @@ export function useTypingPlaceholder({
   const stateRef = useRef({
     phraseIndex: 0,
     charIndex: 0,
-    phase: 'typing' as 'typing' | 'pausing' | 'deleting' | 'gap',
+    phase: 'typing' as 'typing' | 'pausing' | 'deleting',
   });
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || phrases.length === 0) {
       setText('');
       stateRef.current = { phraseIndex: 0, charIndex: 0, phase: 'typing' };
       return;
@@ -89,15 +89,16 @@ export function useTypingPlaceholder({
           break;
         case 'deleting':
           state.charIndex--;
-          setText(phrase.slice(0, state.charIndex));
           if (state.charIndex <= 0) {
-            state.phase = 'gap';
+            // Advance to next phrase and start typing its first char immediately
+            // so the placeholder is never empty while the effect is active
+            state.phraseIndex = (state.phraseIndex + 1) % shuffledPhrases.length;
+            state.charIndex = 1;
+            state.phase = 'typing';
+            setText(shuffledPhrases[state.phraseIndex].slice(0, 1));
+          } else {
+            setText(phrase.slice(0, state.charIndex));
           }
-          break;
-        case 'gap':
-          state.phraseIndex = (state.phraseIndex + 1) % shuffledPhrases.length;
-          state.charIndex = 0;
-          state.phase = 'typing';
           break;
       }
     };
@@ -116,9 +117,6 @@ export function useTypingPlaceholder({
         case 'deleting':
           delay = deleteSpeed;
           break;
-        case 'gap':
-          delay = 300;
-          break;
       }
       timerId = setTimeout(() => {
         tick();
@@ -129,7 +127,7 @@ export function useTypingPlaceholder({
     schedule();
 
     return () => clearTimeout(timerId);
-  }, [enabled, shuffledPhrases, typingSpeed, deleteSpeed, pauseDuration]);
+  }, [enabled, phrases.length, shuffledPhrases, typingSpeed, deleteSpeed, pauseDuration]);
 
   return text;
 }

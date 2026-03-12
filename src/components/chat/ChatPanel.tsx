@@ -10,7 +10,6 @@ import type { UseChatResult } from '@/hooks/useChat';
 import type { UploadedFile } from '@/tools/types';
 import { QUALITY_PRESETS } from '@/config/qualityPresets';
 import { generateSuggestions, EDIT_INTENT_SUGGESTIONS } from '@/utils/chatSuggestions';
-import { VIDEO_VISION_ANALYSIS_SYSTEM_PROMPT } from '@/config/chat';
 import { FullscreenBeforeAfter } from '@/components/FullscreenBeforeAfter';
 import { useLayout } from '@/layouts/AppLayout';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
@@ -19,7 +18,6 @@ import { getVariantById } from '@/config/modelVariants';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { SuggestionChips } from './SuggestionChips';
-import { ChatAnalysisIndicator } from './ChatAnalysisIndicator';
 import { FileDropZone } from './FileDropZone';
 import { IntentCaptureCard } from './IntentCaptureCard';
 
@@ -37,8 +35,6 @@ interface ChatPanelProps {
   onQualityTierChange: (tier: 'fast' | 'hq') => void;
   estimatedCost?: number | null;
   costLoading?: boolean;
-  /** When false, suppress auto-analysis trigger (e.g. during session restore) */
-  allowAutoAnalysis?: boolean;
   onResultsChange?: (urls: string[]) => void;
   onLoadingChange?: (isLoading: boolean) => void;
   onUploadClick?: (intent?: 'edit' | 'video' | 'restore') => void;
@@ -57,14 +53,16 @@ interface ChatPanelProps {
   isMediaUploading?: boolean;
   /** Last media upload validation or processing error */
   mediaUploadError?: string | null;
+  /** Dismiss the media upload error */
+  onClearMediaUploadError?: () => void;
   /** Add a media file (audio, video, or extra image) */
   onAddMediaFile?: (file: File) => Promise<void>;
   /** Remove a media file by index */
   onRemoveMediaFile?: (index: number) => void;
-  /** Clear all media files */
-  onClearMediaFiles?: () => void;
   /** Called when a file is dropped onto the chat panel (drag-and-drop) */
   onFileDrop?: (file: File) => void;
+  /** Get a blob URL preview for an image at the given index */
+  getPreviewUrl?: (index: number) => string | null;
 }
 
 /** Minimal dropdown for quality tier selection */
@@ -187,7 +185,6 @@ export function ChatPanel({
   onQualityTierChange,
   estimatedCost,
   costLoading,
-  allowAutoAnalysis = true,
   onResultsChange,
   onLoadingChange,
   onUploadClick,
@@ -200,22 +197,21 @@ export function ChatPanel({
   uploadedFiles,
   isMediaUploading,
   mediaUploadError,
+  onClearMediaUploadError,
   onAddMediaFile,
   onRemoveMediaFile,
-  onClearMediaFiles,
   onFileDrop,
+  getPreviewUrl,
 }: ChatPanelProps) {
   const { selectedModelVariant, setSelectedModelVariant } = useLayout();
   const isMobile = useMediaQuery('(max-width: 743px)');
   const {
     messages,
     isLoading,
-    isAnalyzing,
     error,
     allResultUrls,
     analysisSuggestions,
     sendMessage,
-    analyzeImage,
     reset,
   } = chat;
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -223,7 +219,6 @@ export function ChatPanel({
   const prevResultCountRef = useRef(0);
   const prevMessageCountRef = useRef(messages.length);
   const isUserNearBottomRef = useRef(true);
-  const analysisTriggeredRef = useRef(false);
   const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
 
   // Wrap acceptModelSwitch to also update the header model selector
@@ -234,42 +229,6 @@ export function ChatPanel({
     setSelectedModelVariant(targetVariant);
     chat.acceptModelSwitch();
   }, [chat, selectedModelVariant, setSelectedModelVariant]);
-
-  // Auto-trigger vision analysis when image is available and chat is at welcome state.
-  // For 'video' intent, uses a video-focused analysis prompt instead of restoration.
-  useEffect(() => {
-    if (
-      allowAutoAnalysis &&
-      imageData &&
-      imageUrl &&
-      sogniClient &&
-      !isLoading &&
-      !analysisTriggeredRef.current &&
-      messages.length === 1 &&
-      messages[0].id === 'welcome'
-    ) {
-      analysisTriggeredRef.current = true;
-      analyzeImage({
-        sogniClient,
-        imageUrl,
-        tokenType,
-        balances,
-        onTokenSwitch,
-        onInsufficientCredits,
-        ...(uploadIntent === 'video' && {
-          visionSystemPrompt: VIDEO_VISION_ANALYSIS_SYSTEM_PROMPT,
-          visionUserText: 'Analyze this photo for animation — what motion and cinematic ideas would bring it to life?',
-        }),
-      });
-    }
-  }, [allowAutoAnalysis, uploadIntent, imageData, imageUrl, sogniClient, isLoading, messages, tokenType, balances, onTokenSwitch, onInsufficientCredits, analyzeImage]);
-
-  // Reset analysis trigger when chat is reset
-  useEffect(() => {
-    if (messages.length === 1 && messages[0].id === 'welcome') {
-      analysisTriggeredRef.current = false;
-    }
-  }, [messages]);
 
   const suggestions = useMemo(
     () => {
@@ -346,9 +305,8 @@ export function ChatPanel({
         onInsufficientCredits,
         modelVariantId: selectedModelVariant,
       });
-      onClearMediaFiles?.();
     },
-    [sogniClient, imageData, width, height, tokenType, balances, qualityTier, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, onClearMediaFiles, selectedModelVariant],
+    [sogniClient, imageData, width, height, tokenType, balances, qualityTier, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, selectedModelVariant],
   );
 
   const handleImageClick = useCallback((url: string, _index: number) => {
@@ -378,7 +336,7 @@ export function ChatPanel({
     return ids;
   }, [messages]);
 
-  const hasImage = !!imageData && !!imageUrl;
+  const hasImage = !!(uploadedFiles && uploadedFiles.some(f => f.type === 'image'));
   const canSend = isAuthenticated && !!sogniClient;
 
   // True when the welcome empty state UI is showing (has its own category chips)
@@ -388,13 +346,13 @@ export function ChatPanel({
   const typingPlaceholder = useTypingPlaceholder({ enabled: showWelcomeScreen });
 
   const showIntentCapture = useMemo(() => {
-    if (!hasImage || isLoading || isAnalyzing) return false;
+    if (!hasImage || isLoading) return false;
     if (uploadIntent !== 'restore') return false;
     const hasUserTextMessage = messages.some(
       (m) => m.role === 'user' && m.id !== 'user-upload' && m.content?.trim(),
     );
     return !hasUserTextMessage;
-  }, [hasImage, isLoading, isAnalyzing, messages, uploadIntent]);
+  }, [hasImage, isLoading, messages, uploadIntent]);
 
   return (
     <FileDropZone
@@ -674,8 +632,6 @@ export function ChatPanel({
             );
           })}
 
-          {isAnalyzing && <ChatAnalysisIndicator intent={uploadIntent} />}
-
           {showIntentCapture && canSend && (
             <IntentCaptureCard onSubmit={handleSend} disabled={isLoading} />
           )}
@@ -701,7 +657,7 @@ export function ChatPanel({
             >
               <span>{error || mediaUploadError}</span>
               <button
-                onClick={() => chat.clearError()}
+                onClick={() => { chat.clearError(); onClearMediaUploadError?.(); }}
                 aria-label="Dismiss error"
                 style={{
                   background: 'none',
@@ -741,6 +697,7 @@ export function ChatPanel({
         isMediaUploading={isMediaUploading}
         onAddMediaFile={onAddMediaFile}
         onRemoveMediaFile={onRemoveMediaFile}
+        getPreviewUrl={getPreviewUrl}
       />
 
       {/* Fullscreen before/after viewer */}

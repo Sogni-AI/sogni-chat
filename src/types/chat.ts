@@ -4,7 +4,7 @@
 
 import type { ChatMessage } from '@sogni-ai/sogni-client';
 import type { Suggestion } from '@/utils/chatSuggestions';
-import type { ToolExecutionProgress } from '@/tools/types';
+import type { ToolExecutionProgress, UploadedFile } from '@/tools/types';
 
 /** UI message (extends ChatMessage with display metadata) */
 export interface UIChatMessage {
@@ -46,11 +46,14 @@ export interface ChatSession {
   analysisSuggestions: Suggestion[];
   /** If the session was switched to abliterated model, persist that choice */
   sessionModel?: string;
-  /** Image data as Uint8Array (if uploaded) */
+  /** Attached files (images, audio, video) persisted for session restoration */
+  uploadedFiles?: UploadedFile[];
+  // Legacy fields — kept for backward compat with sessions saved before unified uploads
+  /** @deprecated Use uploadedFiles instead */
   imageData?: Uint8Array;
-  /** Image width */
+  /** @deprecated Use uploadedFiles instead */
   width?: number;
-  /** Image height */
+  /** @deprecated Use uploadedFiles instead */
   height?: number;
 }
 

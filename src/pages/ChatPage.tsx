@@ -8,7 +8,6 @@ import { useEffect, useCallback, useState, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useSogniAuth } from '@/services/sogniAuth';
 import { useWallet } from '@/hooks/useWallet';
-import { useImageUpload } from '@/hooks/useImageUpload';
 import { useMediaUpload } from '@/hooks/useMediaUpload';
 import { useChat } from '@/hooks/useChat';
 import { useChatSessions } from '@/hooks/useChatSessions';
@@ -24,6 +23,7 @@ import { saveRestorationToGallery } from '@/services/galleryService';
 import { generateSessionTitle } from '@/services/chatService';
 import { slugify } from '@/utils/downloadFilename';
 import type { ChatSession } from '@/types/chat';
+import type { UploadedFile } from '@/tools/types';
 import type { QualityTier } from '@/config/qualityPresets';
 import { CHAT_MODEL_ABLITERATED } from '@/config/chat';
 import { DEFAULT_VARIANT_ID } from '@/config/modelVariants';
@@ -71,20 +71,24 @@ function deriveSessionTitle(filename?: string, sessionNumber?: number): string {
   return cleaned || placeholder;
 }
 
+/** Construct UploadedFile array from legacy session fields for backward compat */
+function legacySessionToUploadedFiles(session: ChatSession): UploadedFile[] {
+  if (session.uploadedFiles?.length) return session.uploadedFiles;
+  if (!session.imageData || !session.width || !session.height) return [];
+  return [{
+    type: 'image',
+    data: session.imageData,
+    width: session.width,
+    height: session.height,
+    mimeType: 'image/jpeg',
+    filename: 'restored-image.jpg',
+  }];
+}
+
 
 export default function ChatPage() {
   const { isAuthenticated, getSogniClient } = useSogniAuth();
   const { tokenType, balances, switchPaymentMethod } = useWallet();
-  const {
-    imageUrl,
-    imageData,
-    width,
-    height,
-    error: uploadError,
-    upload,
-    clear: clearUpload,
-    loadFromData,
-  } = useImageUpload({ persist: true });
   const {
     uploadedFiles,
     isUploading: isMediaUploading,
@@ -92,7 +96,28 @@ export default function ChatPage() {
     addFile: addMediaFile,
     removeFile: removeMediaFile,
     clearFiles: clearMediaFiles,
+    loadFiles,
+    getPreviewUrl,
+    clearError: clearMediaUploadError,
   } = useMediaUpload();
+
+  // Derive primary image data from uploadedFiles for backward compat with existing consumers
+  const primaryImage = useMemo(() => {
+    if (!uploadedFiles || uploadedFiles.length === 0) return null;
+    return uploadedFiles.find(f => f.type === 'image') ?? null;
+  }, [uploadedFiles]);
+  const primaryImageIndex = useMemo(() => {
+    if (!primaryImage || !uploadedFiles) return -1;
+    return uploadedFiles.indexOf(primaryImage);
+  }, [primaryImage, uploadedFiles]);
+  const imageData = primaryImage?.data ?? null;
+  const width = primaryImage?.width || 1024;
+  const height = primaryImage?.height || 1024;
+  const imageUrl = useMemo(() => {
+    if (primaryImageIndex < 0) return null;
+    return getPreviewUrl(primaryImageIndex);
+  }, [primaryImageIndex, getPreviewUrl]);
+
   const chat = useChat();
   const {
     sessions,
@@ -144,12 +169,8 @@ export default function ChatPage() {
   activeSessionIdRef.current = activeSessionId;
   const chatRef = useRef(chat);
   chatRef.current = chat;
-  const imageDataRef = useRef(imageData);
-  imageDataRef.current = imageData;
-  const widthRef = useRef(width);
-  widthRef.current = width;
-  const heightRef = useRef(height);
-  heightRef.current = height;
+  const uploadedFilesRef = useRef(uploadedFiles);
+  uploadedFilesRef.current = uploadedFiles;
 
   // Track counts for immediate save when new content is generated
   const prevResultCountRef = useRef(0);
@@ -159,6 +180,11 @@ export default function ChatPage() {
   const prevChatIsLoadingRef = useRef(false);
 
   // (Auth check moved to early return below — no redirect needed since ChatPage IS "/")
+
+  // Clean up orphaned IndexedDB from removed useImageUpload hook
+  useEffect(() => {
+    indexedDB.deleteDatabase('sogni_chat_image');
+  }, []);
 
   // Keep useChat's sessionIdRef in sync with the active session
   const { loadFromSession, setSessionId, setOnBackgroundComplete, setOnBackgroundGallerySaved } = chat;
@@ -171,7 +197,7 @@ export default function ChatPage() {
     const videoMsgCount = pendingRestore.uiMessages.filter(m => m.videoResults?.length).length;
     const videoUrlCount = pendingRestore.uiMessages.reduce((n, m) => n + (m.videoResults?.length || 0), 0);
     const galleryVideoIdCount = pendingRestore.uiMessages.filter(m => m.galleryVideoIds?.length).length;
-    console.log(`[CHAT PAGE] Restoring session: ${pendingRestore.uiMessages.length} msgs, ${videoMsgCount} with videos (${videoUrlCount} urls), ${galleryVideoIdCount} with gallery video IDs, hasImageData=${!!pendingRestore.imageData}`);
+    console.log(`[CHAT PAGE] Restoring session: ${pendingRestore.uiMessages.length} msgs, ${videoMsgCount} with videos (${videoUrlCount} urls), ${galleryVideoIdCount} with gallery video IDs, uploadedFiles=${pendingRestore.uploadedFiles?.length || 0}`);
     loadFromSession(pendingRestore);
     // Sync model selector with session's model override
     if (pendingRestore.sessionModel === CHAT_MODEL_ABLITERATED) {
@@ -186,15 +212,13 @@ export default function ChatPage() {
     sessionDirtyRef.current = false;
     gallerySavedRef.current = pendingRestore.allResultUrls.length > 0;
     setResultUrls(pendingRestore.allResultUrls);
-    // Restore image data from session
-    if (pendingRestore.imageData && pendingRestore.width && pendingRestore.height) {
-      loadFromData(pendingRestore.imageData, pendingRestore.width, pendingRestore.height);
-    }
+    // Restore uploaded files from session (with backward compat for legacy imageData sessions)
+    loadFiles(legacySessionToUploadedFiles(pendingRestore));
     clearPendingRestore();
     // Allow saves again after state settles (must exceed 1500ms debounce)
     const timer = setTimeout(() => { isRestoringRef.current = false; }, 2000);
     return () => clearTimeout(timer);
-  }, [pendingRestore, loadFromSession, setSessionId, setSelectedModelVariant, loadFromData, clearPendingRestore]);
+  }, [pendingRestore, loadFromSession, setSessionId, setSelectedModelVariant, loadFiles, clearPendingRestore]);
 
   // ── Stable save function — reads from refs so it never triggers re-renders ──
   const saveActiveSession = useCallback(async () => {
@@ -219,15 +243,14 @@ export default function ChatPage() {
       conversation: state.conversation,
       allResultUrls: state.allResultUrls,
       analysisSuggestions: state.analysisSuggestions,
-      imageData: imageDataRef.current ?? undefined,
-      width: widthRef.current,
-      height: heightRef.current,
+      sessionModel: state.sessionModel,
+      uploadedFiles: uploadedFilesRef.current,
     };
 
     const msgsWithVideos = state.uiMessages.filter(m => m.videoResults?.length);
     const totalVideoUrls = state.uiMessages.reduce((n, m) => n + (m.videoResults?.length || 0), 0);
     const msgsWithGalleryVideoIds = state.uiMessages.filter(m => m.galleryVideoIds?.length);
-    console.log(`[CHAT PAGE] saveActiveSession: id=${id}, dirty=${sessionDirtyRef.current}, ${state.uiMessages.length} msgs, ${state.allResultUrls.length} allResultUrls, ${state.uiMessages.filter(m => m.imageResults?.length).length} msgs with images, ${msgsWithVideos.length} msgs with videos (${totalVideoUrls} urls), ${msgsWithGalleryVideoIds.length} msgs with gallery video IDs, hasImageData=${!!imageDataRef.current}`);
+    console.log(`[CHAT PAGE] saveActiveSession: id=${id}, dirty=${sessionDirtyRef.current}, ${state.uiMessages.length} msgs, ${state.allResultUrls.length} allResultUrls, ${state.uiMessages.filter(m => m.imageResults?.length).length} msgs with images, ${msgsWithVideos.length} msgs with videos (${totalVideoUrls} urls), ${msgsWithGalleryVideoIds.length} msgs with gallery video IDs, uploadedFiles=${uploadedFilesRef.current?.length || 0}`);
     await saveCurrentSession(id, session);
     sessionUpdatedAtRef.current = updatedAt;
     sessionDirtyRef.current = false;
@@ -341,12 +364,13 @@ export default function ChatPage() {
       !gallerySavedRef.current
     ) {
       gallerySavedRef.current = true;
+      const mimeType = primaryImage?.mimeType || 'image/jpeg';
       saveRestorationToGallery({
-        sourceImageBlob: new Blob([imageData as BlobPart], { type: 'image/jpeg' }),
-        sourceFilename: `source-${Date.now()}.jpg`,
+        sourceImageBlob: new Blob([imageData as BlobPart], { type: mimeType }),
+        sourceFilename: primaryImage?.filename || `source-${Date.now()}.jpg`,
         sourceWidth: width,
         sourceHeight: height,
-        sourceMimeType: 'image/jpeg',
+        sourceMimeType: mimeType,
         resultUrls,
         model: QUALITY_PRESETS[qualityTier].model,
         prompt: 'Chat restoration',
@@ -363,15 +387,16 @@ export default function ChatPage() {
         console.error('[CHAT PAGE] Failed to save to gallery:', err);
       });
     }
-  }, [resultUrls, chatLoading, imageData, width, height]);
+  }, [resultUrls, chatLoading, imageData, width, height, primaryImage, qualityTier, saveActiveSession]);
 
   // Update thumbnail when image is available for the active session
   useEffect(() => {
     if (activeSessionId && imageData) {
-      const blob = new Blob([imageData as BlobPart], { type: 'image/jpeg' });
+      const mimeType = primaryImage?.mimeType || 'image/jpeg';
+      const blob = new Blob([imageData as BlobPart], { type: mimeType });
       updateThumbnail(activeSessionId, blob);
     }
-  }, [activeSessionId, imageData, updateThumbnail]);
+  }, [activeSessionId, imageData, primaryImage, updateThumbnail]);
 
   // Register background job completion handlers
   useEffect(() => {
@@ -489,7 +514,7 @@ export default function ChatPage() {
     if (!sessionsInitialized || pendingRestore || isRestoringRef.current) return;
     if (activeSessionId) return;
     // Wait until there's something worth saving (more than welcome msg)
-    if (chat.messages.length > 1 || (imageData && chat.messages[0]?.id !== 'welcome')) {
+    if (chat.messages.length > 1) {
       const newId = createNewSession();
       sessionCreatedAtRef.current = Date.now();
       setActiveSessionId(newId);
@@ -501,7 +526,7 @@ export default function ChatPage() {
       // (sessionStorage has the ID but IndexedDB has no data).
       saveActiveSession();
     }
-  }, [sessionsInitialized, pendingRestore, activeSessionId, chat.messages, imageData, createNewSession, setActiveSessionId, saveActiveSession]);
+  }, [sessionsInitialized, pendingRestore, activeSessionId, chat.messages, createNewSession, setActiveSessionId, saveActiveSession]);
 
   const handleResultsChange = useCallback((urls: string[]) => {
     setResultUrls(urls);
@@ -515,29 +540,9 @@ export default function ChatPage() {
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
-
-      // Save current session before starting fresh with the new image
-      if (activeSessionIdRef.current) await saveActiveSession();
-
-      // Track background jobs before resetting
-      if (chatRef.current.isLoading || chatRef.current.isSending) {
-        const currentId = activeSessionIdRef.current;
-        if (currentId) setActiveJobSessionIds((prev) => new Set(prev).add(currentId));
-      }
-
-      isRestoringRef.current = true;
-      clearUpload();
-      setResultUrls([]);
-      gallerySavedRef.current = false;
-      chat.reset({ keepBackground: true });
-      sessionTitleRef.current = deriveSessionTitle(file.name, sessions.length + 1);
-      sessionCreatedAtRef.current = Date.now();
-      setActiveSessionId(null);
-      setTimeout(() => { isRestoringRef.current = false; }, 2000);
-
-      await upload(file);
+      await addMediaFile(file);
     },
-    [upload, saveActiveSession, clearUpload, chat, setActiveSessionId, sessions.length],
+    [addMediaFile],
   );
 
   const handleUploadClick = useCallback((intent?: 'edit' | 'video' | 'restore') => {
@@ -562,7 +567,7 @@ export default function ChatPage() {
       }
 
       isRestoringRef.current = true;
-      clearUpload();
+      clearMediaFiles();
       setResultUrls([]);
       gallerySavedRef.current = false;
       chat.reset({ keepBackground: true });
@@ -571,9 +576,9 @@ export default function ChatPage() {
       setActiveSessionId(null);
       setTimeout(() => { isRestoringRef.current = false; }, 2000);
 
-      await upload(file);
+      await addMediaFile(file);
     },
-    [upload, saveActiveSession, clearUpload, chat, setActiveSessionId, sessions.length],
+    [addMediaFile, saveActiveSession, clearMediaFiles, chat, setActiveSessionId, sessions.length],
   );
 
   const handleNewPhoto = useCallback(async () => {
@@ -587,7 +592,7 @@ export default function ChatPage() {
     }
 
     isRestoringRef.current = true;
-    clearUpload();
+    clearMediaFiles();
     setResultUrls([]);
     setUploadIntent(null);
     gallerySavedRef.current = false;
@@ -601,7 +606,7 @@ export default function ChatPage() {
     // No IndexedDB load here (unlike session switching), so 2s is too long
     // — it blocks session creation when the user sends a message immediately.
     setTimeout(() => { isRestoringRef.current = false; }, 100);
-  }, [clearUpload, chat, saveActiveSession, setActiveSessionId, sessions.length]);
+  }, [clearMediaFiles, chat, saveActiveSession, setActiveSessionId, sessions.length]);
 
   const handleSelectSession = useCallback(async (id: string) => {
     if (id === activeSessionIdRef.current) return;
@@ -627,6 +632,12 @@ export default function ChatPage() {
 
     // Restore chat state
     chat.loadFromSession(session);
+    // Sync model selector with session's model override
+    if (session.sessionModel === CHAT_MODEL_ABLITERATED) {
+      setSelectedModelVariant('unrestricted');
+    } else if (!session.sessionModel) {
+      setSelectedModelVariant(DEFAULT_VARIANT_ID);
+    }
     sessionTitleRef.current = session.title;
     sessionCreatedAtRef.current = session.createdAt;
     sessionUpdatedAtRef.current = session.updatedAt;
@@ -635,12 +646,8 @@ export default function ChatPage() {
     gallerySavedRef.current = session.allResultUrls.length > 0;
     setResultUrls(session.allResultUrls);
 
-    // Restore image
-    if (session.imageData && session.width && session.height) {
-      loadFromData(session.imageData, session.width, session.height);
-    } else {
-      clearUpload();
-    }
+    // Restore uploaded files (with backward compat for legacy imageData sessions)
+    loadFiles(legacySessionToUploadedFiles(session));
 
     // Switching sessions clears any pending upload intent
     setUploadIntent(null);
@@ -658,7 +665,7 @@ export default function ChatPage() {
     });
 
     setTimeout(() => { isRestoringRef.current = false; }, 2000);
-  }, [saveActiveSession, switchSession, chat, loadFromData, clearUpload]);
+  }, [saveActiveSession, switchSession, chat, loadFiles, setSelectedModelVariant]);
 
   const handleDeleteSession = useCallback(async (id: string) => {
     const isActive = id === activeSessionIdRef.current;
@@ -669,7 +676,7 @@ export default function ChatPage() {
     if (isActive) {
       // Clear active session BEFORE deleting to prevent saves of stale state
       setActiveSessionId(null);
-      clearUpload();
+      clearMediaFiles();
       setResultUrls([]);
       gallerySavedRef.current = false;
       chat.reset();
@@ -684,7 +691,7 @@ export default function ChatPage() {
     setUnreadSessionIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
 
     setTimeout(() => { isRestoringRef.current = false; }, 2000);
-  }, [deleteSessionById, clearUpload, chat, setActiveSessionId, sessions.length]);
+  }, [deleteSessionById, clearMediaFiles, chat, setActiveSessionId, sessions.length]);
 
   const handleTokenSwitch = useCallback((newType: TokenType) => {
     switchPaymentMethod(newType);
@@ -774,20 +781,6 @@ export default function ChatPage() {
             className="hidden"
           />
 
-          {/* Upload error */}
-          {uploadError && (
-            <div
-              className="card-premium px-5 py-3 flex-shrink-0 mx-4"
-              style={{
-                background: 'rgba(239, 68, 68, 0.1)',
-                borderColor: 'rgba(239, 68, 68, 0.3)',
-                color: '#f87171',
-              }}
-            >
-              {uploadError}
-            </div>
-          )}
-
           {/* Chat panel */}
           <div style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
             <ChatPanel
@@ -804,7 +797,6 @@ export default function ChatPage() {
               onQualityTierChange={setQualityTier}
               estimatedCost={estimatedCost}
               costLoading={costLoading}
-              allowAutoAnalysis={sessionsInitialized && !pendingRestore}
               onResultsChange={handleResultsChange}
               onLoadingChange={handleLoadingChange}
               onUploadClick={handleUploadClick}
@@ -817,10 +809,11 @@ export default function ChatPage() {
               uploadedFiles={uploadedFiles}
               isMediaUploading={isMediaUploading}
               mediaUploadError={mediaUploadError}
+              onClearMediaUploadError={clearMediaUploadError}
               onAddMediaFile={addMediaFile}
               onRemoveMediaFile={removeMediaFile}
-              onClearMediaFiles={clearMediaFiles}
               onFileDrop={handleFileDrop}
+              getPreviewUrl={getPreviewUrl}
             />
           </div>
         </div>

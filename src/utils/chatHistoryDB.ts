@@ -118,7 +118,7 @@ export async function getAllSessions(): Promise<ChatSessionSummary[]> {
           title: s.title,
           createdAt: s.createdAt,
           updatedAt: s.updatedAt,
-          hasImage: !!s.imageData,
+          hasImage: !!s.imageData || !!(s.uploadedFiles?.some(f => f.type === 'image')),
         });
         cursor.continue();
       } else {

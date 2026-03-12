@@ -174,11 +174,6 @@ export function useChat(): UseChatResult {
   // Analysis suggestions ref for access in callbacks
   const analysisSuggestionsRef = useRef<Suggestion[]>([]);
 
-  // Cached image promoted from uploadedFiles when no primary imageData exists.
-  // Persists across messages so follow-up requests can still access the image
-  // after uploadedFiles is cleared post-send.
-  const promotedImageRef = useRef<{ data: Uint8Array; width: number; height: number } | null>(null);
-
   // Model override: once user accepts switch, all subsequent messages use this model
   const sessionModelRef = useRef<string | undefined>(undefined);
   // Pending refusal: stores the message ID that has a refusal, so user can accept/decline
@@ -431,28 +426,11 @@ export function useChat(): UseChatResult {
           || (variant ? variant.modelId : undefined);
         const effectiveThink = variant?.think;
 
-        // If no primary image but uploadedFiles has an image, promote it as the primary.
-        // This handles the + icon upload flow where images go through useMediaUpload
-        // instead of useImageUpload, so tool handlers that check context.imageData work.
-        // Cache the promotion so follow-up messages can still access the image after
-        // uploadedFiles is cleared post-send.
-        const primaryUploadedImage = !context.imageData
-          ? (context.uploadedFiles || []).find(f => f.type === 'image')
-          : undefined;
-        if (primaryUploadedImage) {
-          promotedImageRef.current = {
-            data: primaryUploadedImage.data,
-            width: primaryUploadedImage.width || 0,
-            height: primaryUploadedImage.height || 0,
-          };
-        }
-        const promoted = promotedImageRef.current;
-
         const executionContext: ToolExecutionContext = {
           sogniClient: context.sogniClient,
-          imageData: context.imageData || promoted?.data || null,
-          width: context.imageData ? context.width : (promoted?.width || context.width),
-          height: context.imageData ? context.height : (promoted?.height || context.height),
+          imageData: context.imageData,
+          width: context.width,
+          height: context.height,
           tokenType: context.tokenType,
           uploadedFiles: context.uploadedFiles || [],
           get resultUrls() { return allResultUrlsRef.current; },
@@ -906,7 +884,6 @@ export function useChat(): UseChatResult {
     analysisSuggestionsRef.current = [];
     conversationRef.current = [];
     sessionModelRef.current = undefined;
-    promotedImageRef.current = null;
     setPendingRefusalMsgId(null);
     lastUserMessageRef.current = '';
     lastSendContextRef.current = null;
@@ -965,7 +942,6 @@ export function useChat(): UseChatResult {
     allResultUrlsRef.current = session.allResultUrls;
     analysisSuggestionsRef.current = session.analysisSuggestions;
     sessionModelRef.current = session.sessionModel;
-    promotedImageRef.current = null;
   }, []);
 
   /** Set gallery image/video IDs on the most recent messages that have matching results */
