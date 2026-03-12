@@ -95,6 +95,9 @@ export const CHAT_DEFAULT_PARAMS = {
   think: false,  // Disable thinking — Qwen3's <think> blocks break the hermes tool call parser
 } as const;
 
+/** Message ID for the video masterpiece guided flow */
+export const VIDEO_FLOW_GUIDE_MSG_ID = 'video-flow-guide';
+
 /** Context window budget constants for sliding window trimming */
 export const CONTEXT_WINDOW_CONFIG = {
   DEFAULT_CONTEXT_LENGTH: 32_768,  // Conservative for llamacpp worker slots

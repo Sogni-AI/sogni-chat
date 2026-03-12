@@ -60,6 +60,10 @@ interface ChatPanelProps {
   onClearMediaFiles?: () => void;
   /** Called when a file is dropped onto the chat panel (drag-and-drop) */
   onFileDrop?: (file: File) => void;
+  /** Called when user clicks "Create a Video Masterpiece" */
+  onStartVideoFlow?: () => void;
+  /** Called when user clicks "Go to Chat" */
+  onGoToChat?: () => void;
 }
 
 export function ChatPanel({
@@ -92,6 +96,8 @@ export function ChatPanel({
   onRemoveMediaFile,
   onClearMediaFiles,
   onFileDrop,
+  onStartVideoFlow,
+  onGoToChat,
 }: ChatPanelProps) {
   const { selectedModelVariant } = useLayout();
   const {
@@ -196,6 +202,11 @@ export function ChatPanel({
 
   const handleSend = useCallback(
     (content: string) => {
+      // Intercept upload sentinel from video flow suggestion chips
+      if (content === '__UPLOAD_PHOTO__') {
+        onUploadClick?.();
+        return;
+      }
       if (!sogniClient) return;
       sendMessage(content, {
         sogniClient,
@@ -212,7 +223,7 @@ export function ChatPanel({
       });
       onClearMediaFiles?.();
     },
-    [sogniClient, imageData, width, height, tokenType, balances, qualityTier, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, onClearMediaFiles, selectedModelVariant],
+    [sogniClient, imageData, width, height, tokenType, balances, qualityTier, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, onClearMediaFiles, selectedModelVariant, onUploadClick],
   );
 
   const handleImageClick = useCallback((url: string, _index: number) => {
@@ -491,6 +502,7 @@ export function ChatPanel({
               {/* Upload row */}
               <button
                 onClick={onUploadClick}
+                disabled={!canSend}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -499,13 +511,15 @@ export function ChatPanel({
                   background: 'transparent',
                   border: '1px solid rgba(255, 255, 255, 0.08)',
                   borderRadius: 'var(--radius-pill)',
-                  cursor: 'pointer',
+                  cursor: canSend ? 'pointer' : 'default',
                   color: '#8e8e8e',
                   fontSize: '0.8125rem',
                   fontWeight: 500,
                   transition: 'all 0.2s',
+                  opacity: canSend ? 1 : 0.5,
                 }}
                 onMouseEnter={(e) => {
+                  if (!canSend) return;
                   e.currentTarget.style.color = '#ececec';
                   e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
                 }}
@@ -526,6 +540,67 @@ export function ChatPanel({
               <p style={{ color: '#555555', fontSize: '0.75rem', marginTop: '0.5rem' }}>
                 or drag &amp; drop a file anywhere
               </p>
+
+              {/* Primary CTAs */}
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '2rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <button
+                  onClick={onStartVideoFlow}
+                  disabled={!canSend}
+                  className="radiant-orb-hover"
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(59, 130, 246, 0.3))',
+                    border: '1px solid rgba(139, 92, 246, 0.4)',
+                    borderRadius: 'var(--radius-pill)',
+                    cursor: canSend ? 'pointer' : 'default',
+                    color: '#ececec',
+                    fontSize: '0.9375rem',
+                    fontWeight: 600,
+                    transition: 'all 0.2s',
+                    opacity: canSend ? 1 : 0.5,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!canSend) return;
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.45), rgba(59, 130, 246, 0.45))';
+                    e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.6)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(59, 130, 246, 0.3))';
+                    e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+                  }}
+                >
+                  Create a Video Masterpiece
+                </button>
+                <button
+                  onClick={onGoToChat}
+                  disabled={!canSend}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    borderRadius: 'var(--radius-pill)',
+                    cursor: canSend ? 'pointer' : 'default',
+                    color: '#b4b4b4',
+                    fontSize: '0.9375rem',
+                    fontWeight: 500,
+                    transition: 'all 0.2s',
+                    opacity: canSend ? 1 : 0.5,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!canSend) return;
+                    e.currentTarget.style.color = '#ececec';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = '#b4b4b4';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+                  }}
+                >
+                  Go to Chat
+                </button>
+              </div>
             </div>
           )}
 

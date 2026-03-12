@@ -28,7 +28,9 @@ import type { QualityTier } from '@/config/qualityPresets';
 import { QUALITY_PRESETS, getSavedQualityTier, saveQualityTier } from '@/config/qualityPresets';
 import { useRestorationCostEstimation } from '@/hooks/useRestorationCostEstimation';
 import type { TokenType } from '@/types/wallet';
+import { SogniTVPreview } from '@/components/shared/SogniTVPreview';
 import { warmUpAudio } from '@/utils/sonicLogos';
+import { VIDEO_FLOW_GUIDE_MSG_ID } from '@/config/chat';
 import '@/components/chat/chat.css';
 
 /** Returns true if a title is predominantly numeric or a known placeholder — not human-readable */
@@ -465,10 +467,10 @@ export default function ChatPage() {
 
   // Assign a session ID on first meaningful interaction (only after init completes)
   useEffect(() => {
-    if (!sessionsInitialized || pendingRestore) return;
+    if (!sessionsInitialized || pendingRestore || isRestoringRef.current) return;
     if (activeSessionId) return;
     // Wait until there's something worth saving (more than welcome msg)
-    if (chat.messages.length > 1 || (imageData && chat.messages[0]?.id !== 'welcome')) {
+    if (chat.messages.length > 1 || (imageData && chat.messages[0]?.id !== 'welcome' && chat.messages[0]?.id !== VIDEO_FLOW_GUIDE_MSG_ID)) {
       const newId = createNewSession();
       sessionCreatedAtRef.current = Date.now();
       setActiveSessionId(newId);
@@ -661,6 +663,62 @@ export default function ChatPage() {
     showOutOfCreditsPopup();
   }, [showOutOfCreditsPopup]);
 
+  /** Start the guided video masterpiece flow: create a new session with a guiding assistant message */
+  const handleStartVideoFlow = useCallback(async () => {
+    // Save current session before starting fresh
+    if (activeSessionIdRef.current) await saveActiveSession();
+
+    // Track background jobs before resetting
+    if (chatRef.current.isLoading || chatRef.current.isSending) {
+      const currentId = activeSessionIdRef.current;
+      if (currentId) setActiveJobSessionIds((prev) => new Set(prev).add(currentId));
+    }
+
+    isRestoringRef.current = true;
+    clearUpload();
+    setResultUrls([]);
+    gallerySavedRef.current = false;
+    chat.reset({ keepBackground: true });
+    sessionTitleRef.current = 'Video Masterpiece';
+    sessionCreatedAtRef.current = Date.now();
+    sessionUpdatedAtRef.current = Date.now();
+    sessionDirtyRef.current = false;
+    setActiveSessionId(null);
+
+    // Inject the guided assistant message after a tick so state settles
+    setTimeout(() => {
+      chat.loadFromSession({
+        id: '',
+        title: 'Video Masterpiece',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        uiMessages: [
+          {
+            id: VIDEO_FLOW_GUIDE_MSG_ID,
+            role: 'assistant',
+            content: 'Most amazing LTX-2.3 videos start with an amazing still image or photo. Do you want to generate one from scratch or upload one?',
+            timestamp: Date.now(),
+          },
+        ],
+        conversation: [],
+        allResultUrls: [],
+        analysisSuggestions: [],
+      });
+      setTimeout(() => { isRestoringRef.current = false; }, 2000);
+    }, 100);
+  }, [clearUpload, chat, saveActiveSession, setActiveSessionId]);
+
+  /** Go to Chat: switch to the first existing session, or create a new empty one */
+  const handleGoToChat = useCallback(async () => {
+    if (sessions.length > 0) {
+      // Switch to the most recent session
+      await handleSelectSession(sessions[0].id);
+    } else {
+      // Create a fresh session
+      await handleNewPhoto();
+    }
+  }, [sessions, handleSelectSession, handleNewPhoto]);
+
   const sogniClient = getSogniClient();
 
   if (!isAuthenticated) {
@@ -693,6 +751,7 @@ export default function ChatPage() {
             </button>
           </div>
         </main>
+        <SogniTVPreview />
       </>
     );
   }
@@ -781,6 +840,8 @@ export default function ChatPage() {
               onRemoveMediaFile={removeMediaFile}
               onClearMediaFiles={clearMediaFiles}
               onFileDrop={handleFileDrop}
+              onStartVideoFlow={handleStartVideoFlow}
+              onGoToChat={handleGoToChat}
             />
           </div>
         </div>

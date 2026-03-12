@@ -4,6 +4,7 @@
  */
 import type { UIChatMessage } from '@/types/chat';
 import { RESTORATION_PRESETS, type RestorationModeId } from '@/config/restorationPresets';
+import { VIDEO_FLOW_GUIDE_MSG_ID } from '@/config/chat';
 
 /** Tool names used in chat — must match ToolName union from tools/types.ts */
 type ChatToolName =
@@ -31,6 +32,12 @@ const WELCOME_SUGGESTIONS: Suggestion[] = [
   { label: 'Restore this photo', prompt: 'Restore this photo' },
   { label: 'Apply an artistic style', prompt: 'Apply an artistic style to this photo' },
   { label: 'Animate this photo', prompt: 'Animate this photo with gentle movement' },
+];
+
+/** Suggestions for the video masterpiece guided flow */
+const VIDEO_FLOW_SUGGESTIONS: Suggestion[] = [
+  { label: 'Generate an image', prompt: 'Generate a stunning cinematic still image that would make an amazing video' },
+  { label: 'Upload a photo', prompt: '__UPLOAD_PHOTO__' },
 ];
 
 /** Suggestions shown when no image is uploaded — text-to-image/video/music prompts */
@@ -70,7 +77,7 @@ const SUGGESTIONS_BY_TOOL: Record<ChatToolName, Suggestion[]> = {
   generate_image: [
     { label: 'Try a different style', prompt: 'Generate the same scene in a different art style' },
     { label: 'Make it wider', prompt: 'Generate a wider landscape version' },
-    { label: 'Animate this result', prompt: 'Animate this into a short video clip' },
+    { label: 'Animate this into a video', prompt: 'Animate this into a video using LTX-2.3' },
   ],
   edit_image: [
     { label: 'Edit it further', prompt: 'Make another edit to this result' },
@@ -160,6 +167,11 @@ export function generateSuggestions(
   analysisSuggestions?: Suggestion[],
   hasImage?: boolean,
 ): Suggestion[] {
+  // Video masterpiece guided flow — show generate/upload choices
+  if (messages.length === 1 && messages[0].id === VIDEO_FLOW_GUIDE_MSG_ID) {
+    return VIDEO_FLOW_SUGGESTIONS;
+  }
+
   // Walk backwards to find the last assistant message with a completed tool
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
