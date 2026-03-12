@@ -103,12 +103,14 @@ export const CHAT_DEFAULT_PARAMS = {
   temperature: 0.7,
   top_p: 0.9,
   max_tokens: 4096,
-  think: false,  // Disable thinking — Qwen3's <think> blocks break the hermes tool call parser
+  // think is intentionally omitted — model variant controls it via context.think override.
+  // Auto (undefined) = server decides (thinking enabled), Instant = false, Thinking = true.
+  // Worker SSE bridge separates reasoning_content from tool_calls, so thinking + tools coexist.
 } as const;
 
 /** Context window budget constants for sliding window trimming */
 export const CONTEXT_WINDOW_CONFIG = {
-  DEFAULT_CONTEXT_LENGTH: 32_768,  // Conservative for llamacpp worker slots
+  DEFAULT_CONTEXT_LENGTH: 65_536,  // Fallback; actual value read from socket's maxContextLength at runtime
   MAX_OUTPUT_TOKENS: 4_096,
   SAFETY_MARGIN: 2_048,
   TOOL_SCHEMA_TOKENS: 2_500,
