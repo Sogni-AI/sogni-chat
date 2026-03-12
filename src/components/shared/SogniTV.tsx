@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { cdnAssets } from '@/assets/cdn';
+import { cdnAssets, videoMetadata } from '@/assets/cdn';
+import type { VideoMetadata } from '@/assets/cdn';
 import { sogniTVController } from '@/services/sogniTVController';
 import type { TVProgress } from '@/services/sogniTVController';
 
@@ -59,6 +60,20 @@ function getVideoLabel(url: string): string {
     .split(' ')
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(' ');
+}
+
+function getVideoMeta(url: string): VideoMetadata | undefined {
+  const entry = VIDEO_NAMES.find((key) => cdnAssets.videos[key] === url);
+  return entry ? videoMetadata[entry] : undefined;
+}
+
+function formatMetaDuration(seconds: number): string {
+  if (seconds >= 60) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.round(seconds % 60);
+    return s > 0 ? `${m}m ${s}s` : `${m}m`;
+  }
+  return `${seconds.toFixed(1)}s`;
 }
 
 // --- TV Static Effect (canvas noise + white noise audio) ---
@@ -310,6 +325,7 @@ function SogniTVPlayer({ onClose, startVideoUrl }: { onClose: () => void; startV
   });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showStatic, setShowStatic] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(false);
   const pendingIndexRef = useRef<number | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const preloadRef = useRef<HTMLVideoElement>(null);
@@ -322,6 +338,7 @@ function SogniTVPlayer({ onClose, startVideoUrl }: { onClose: () => void; startV
   const currentUrl = playlist[currentIndex];
   const nextIndex = (currentIndex + 1) % playlist.length;
   const label = getVideoLabel(currentUrl);
+  const meta = getVideoMeta(currentUrl);
 
   const staticDurationRef = useRef(0);
 
@@ -338,6 +355,7 @@ function SogniTVPlayer({ onClose, startVideoUrl }: { onClose: () => void; startV
     const duration = randomStaticDuration();
     staticDurationRef.current = duration;
     setShowStatic(true);
+    setShowPrompt(false);
     startStatic();
 
     setTimeout(() => {
@@ -427,6 +445,11 @@ function SogniTVPlayer({ onClose, startVideoUrl }: { onClose: () => void; startV
         }
         .sogni-tv-close:hover {
           background: rgba(255,255,255,0.15) !important;
+        }
+        .sogni-tv-info-btn:hover {
+          background: rgba(255,255,255,0.18) !important;
+          color: rgba(255,255,255,0.8) !important;
+          border-color: rgba(255,255,255,0.35) !important;
         }
       `}</style>
 
@@ -662,29 +685,222 @@ function SogniTVPlayer({ onClose, startVideoUrl }: { onClose: () => void; startV
         left: 0,
         right: 0,
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
-        gap: 16,
-        padding: '16px 20px',
+        padding: '20px 20px 16px',
         zIndex: 30,
         background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)',
       }}>
-        <span style={{
-          color: 'rgba(255,255,255,0.5)',
-          fontSize: '0.8rem',
-          fontWeight: 500,
-        }}>
-          {currentIndex + 1} / {playlist.length}
-        </span>
+        {/* Title */}
         {label && (
           <span style={{
-            color: 'rgba(255,255,255,0.7)',
-            fontSize: '0.85rem',
+            color: 'rgba(255,255,255,0.8)',
+            fontSize: '0.9rem',
+            fontWeight: 600,
+            fontFamily: 'Inter, sans-serif',
+            marginBottom: 6,
           }}>
-            LTX-2.3 Video - {label}
+            {label}
           </span>
         )}
+        {/* Specs row */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+        }}>
+          <span style={{
+            color: 'rgba(255,255,255,0.5)',
+            fontSize: '0.8rem',
+            fontWeight: 500,
+          }}>
+            {currentIndex + 1} / {playlist.length}
+          </span>
+          {meta ? (
+            <>
+              <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.7rem' }}>·</span>
+              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.8rem', fontFamily: 'Inter, sans-serif' }}>
+                {meta.resolution.replace('x', '×')}
+              </span>
+              <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.7rem' }}>·</span>
+              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.8rem', fontFamily: 'Inter, sans-serif' }}>
+                {meta.fps}fps
+              </span>
+              <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.7rem' }}>·</span>
+              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.8rem', fontFamily: 'Inter, sans-serif' }}>
+                {formatMetaDuration(meta.duration)}
+              </span>
+              <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.7rem' }}>·</span>
+              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.8rem', fontFamily: 'Inter, sans-serif' }}>
+                LTX-2.3 23b I2V
+              </span>
+            </>
+          ) : (
+            <>
+              <span style={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.7rem' }}>·</span>
+              <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.8rem' }}>
+                LTX-2.3 23b Image-to-Video
+              </span>
+            </>
+          )}
+        </div>
+        {/* Prompt row with info icon */}
+        {meta?.prompt && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            maxWidth: '60vw',
+            marginTop: 6,
+          }}>
+            <div style={{
+              flex: 1,
+              minWidth: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              color: 'rgba(255,255,255,0.35)',
+              fontSize: '0.75rem',
+              fontStyle: 'italic',
+              fontFamily: 'Inter, sans-serif',
+            }}>
+              &ldquo;{meta.prompt}&rdquo;
+            </div>
+            <button
+              onClick={() => setShowPrompt(true)}
+              className="sogni-tv-info-btn"
+              style={{
+                flexShrink: 0,
+                width: 20,
+                height: 20,
+                borderRadius: '50%',
+                border: '1px solid rgba(255,255,255,0.2)',
+                background: 'rgba(255,255,255,0.08)',
+                color: 'rgba(255,255,255,0.5)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.65rem',
+                fontWeight: 700,
+                fontFamily: 'Inter, sans-serif',
+                fontStyle: 'italic',
+                padding: 0,
+                lineHeight: 1,
+                transition: 'background 0.2s, color 0.2s, border-color 0.2s',
+              }}
+              aria-label="Show full prompt"
+            >
+              i
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Prompt detail popup */}
+      {showPrompt && meta?.prompt && (
+        <div
+          onClick={() => setShowPrompt(false)}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 50,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(4px)',
+            animation: 'sogniTvFadeIn 0.2s ease-out',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#1a1a1e',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: 12,
+              padding: '20px 24px',
+              maxWidth: 560,
+              width: '90vw',
+              maxHeight: '60vh',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 12,
+              animation: 'sogniTvFadeIn 0.2s ease-out',
+            }}
+          >
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              <span style={{
+                color: '#fff',
+                fontSize: '0.9rem',
+                fontWeight: 600,
+                fontFamily: 'Inter, sans-serif',
+              }}>
+                Prompt
+              </span>
+              <button
+                onClick={() => setShowPrompt(false)}
+                className="sogni-tv-close"
+                style={{
+                  background: 'rgba(255,255,255,0.1)',
+                  border: 'none',
+                  color: '#fff',
+                  width: 28,
+                  height: 28,
+                  borderRadius: '50%',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '0.9rem',
+                  transition: 'background 0.2s',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{
+              color: 'rgba(255,255,255,0.7)',
+              fontSize: '0.85rem',
+              lineHeight: 1.6,
+              fontFamily: 'Inter, sans-serif',
+              overflowY: 'auto',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              userSelect: 'text',
+            }}>
+              {meta.prompt}
+            </div>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(meta.prompt!);
+              }}
+              className="sogni-tv-nav"
+              style={{
+                alignSelf: 'flex-end',
+                background: 'rgba(139,92,246,0.2)',
+                border: '1px solid rgba(139,92,246,0.3)',
+                color: '#c4b5fd',
+                borderRadius: 8,
+                padding: '6px 14px',
+                cursor: 'pointer',
+                fontSize: '0.8rem',
+                fontWeight: 500,
+                fontFamily: 'Inter, sans-serif',
+                transition: 'background 0.2s',
+              }}
+            >
+              Copy prompt
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Render progress overlay (bottom-right countdown) */}
       <RenderProgressOverlay />

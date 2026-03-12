@@ -60,11 +60,113 @@ interface ChatPanelProps {
   onClearMediaFiles?: () => void;
   /** Called when a file is dropped onto the chat panel (drag-and-drop) */
   onFileDrop?: (file: File) => void;
-  /** Called when user clicks "Create a Video Masterpiece" */
-  onStartVideoFlow?: () => void;
-  /** Called when user clicks "Go to Chat" */
-  onGoToChat?: () => void;
 }
+
+/** Minimal dropdown for quality tier selection */
+const QualityDropdown: React.FC<{
+  qualityTier: 'fast' | 'hq';
+  onQualityTierChange: (tier: 'fast' | 'hq') => void;
+  estimatedCost?: number | null;
+  costLoading?: boolean;
+  disabled?: boolean;
+}> = ({ qualityTier, onQualityTierChange, estimatedCost, costLoading, disabled }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = QUALITY_PRESETS[qualityTier];
+  const showCost = estimatedCost != null && !costLoading;
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => !disabled && setOpen(!open)}
+        disabled={disabled}
+        style={{
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '3px',
+          opacity: disabled ? 0.5 : 1,
+        }}
+      >
+        <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#8e8e8e' }}>
+          Quality: {selected.label}
+        </span>
+        {showCost && (
+          <span style={{ fontSize: '0.625rem', fontWeight: 400, color: '#666' }}>
+            ~{estimatedCost.toFixed(1)}cr
+          </span>
+        )}
+        <svg width="8" height="8" viewBox="0 0 10 10" fill="none" style={{
+          transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s ease',
+          marginLeft: '1px',
+        }}>
+          <path d="M2 3.5L5 6.5L8 3.5" stroke="#666" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute',
+          top: 'calc(100% + 4px)',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: '#2a2a2a',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '0.375rem',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+          zIndex: 50,
+          overflow: 'hidden',
+          minWidth: '120px',
+        }}>
+          {(['fast', 'hq'] as const).map((tier) => {
+            const isSelected = qualityTier === tier;
+            return (
+              <button
+                key={tier}
+                type="button"
+                onClick={() => {
+                  onQualityTierChange(tier);
+                  setOpen(false);
+                }}
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  padding: '0.4rem 0.75rem',
+                  fontSize: '0.75rem',
+                  fontWeight: isSelected ? 600 : 400,
+                  background: isSelected ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                  color: isSelected ? '#ececec' : '#8e8e8e',
+                  border: 'none',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'background 0.15s ease',
+                }}
+                onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'; }}
+                onMouseLeave={(e) => { if (!isSelected) e.currentTarget.style.background = 'transparent'; }}
+              >
+                {QUALITY_PRESETS[tier].label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
 
 export function ChatPanel({
   sogniClient,
@@ -96,8 +198,6 @@ export function ChatPanel({
   onRemoveMediaFile,
   onClearMediaFiles,
   onFileDrop,
-  onStartVideoFlow,
-  onGoToChat,
 }: ChatPanelProps) {
   const { selectedModelVariant } = useLayout();
   const {
@@ -202,11 +302,6 @@ export function ChatPanel({
 
   const handleSend = useCallback(
     (content: string) => {
-      // Intercept upload sentinel from video flow suggestion chips
-      if (content === '__UPLOAD_PHOTO__') {
-        onUploadClick?.();
-        return;
-      }
       if (!sogniClient) return;
       sendMessage(content, {
         sogniClient,
@@ -223,7 +318,7 @@ export function ChatPanel({
       });
       onClearMediaFiles?.();
     },
-    [sogniClient, imageData, width, height, tokenType, balances, qualityTier, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, onClearMediaFiles, selectedModelVariant, onUploadClick],
+    [sogniClient, imageData, width, height, tokenType, balances, qualityTier, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, onClearMediaFiles, selectedModelVariant],
   );
 
   const handleImageClick = useCallback((url: string, _index: number) => {
@@ -330,41 +425,13 @@ export function ChatPanel({
         <div className="chat-panel-quality" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           {(hasImage || messages.length > 1) && (
             <>
-              <span className="chat-quality-label" style={{ fontSize: '0.75rem', color: '#8e8e8e', fontWeight: 500 }}>
-                Quality:
-              </span>
-              <div style={{
-                display: 'inline-flex',
-                borderRadius: 'var(--radius-lg)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                overflow: 'hidden',
-              }}>
-                {(['fast', 'hq'] as const).map((tier) => {
-                  const isSelected = qualityTier === tier;
-                  const showCost = isSelected && estimatedCost != null && !costLoading;
-                  return (
-                  <button
-                    key={tier}
-                    type="button"
-                    onClick={() => onQualityTierChange(tier)}
-                    style={{
-                      padding: '0.25rem 0.625rem',
-                      fontSize: '0.75rem',
-                      fontWeight: isSelected ? 600 : 400,
-                      background: isSelected ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
-                      color: isSelected ? '#ececec' : '#8e8e8e',
-                      border: 'none',
-                      borderRight: tier === 'fast' ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                    title={QUALITY_PRESETS[tier].description}
-                  >
-                    {QUALITY_PRESETS[tier].label}{showCost ? `: ~${estimatedCost.toFixed(1)}` : ''}
-                  </button>
-                  );
-                })}
-              </div>
+              <QualityDropdown
+                qualityTier={qualityTier}
+                onQualityTierChange={onQualityTierChange}
+                estimatedCost={estimatedCost}
+                costLoading={costLoading}
+                disabled={isLoading}
+              />
 
               {messages.length > 1 && (
                 <button
@@ -440,9 +507,9 @@ export function ChatPanel({
               {/* Category chips */}
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'center', marginBottom: '2rem' }}>
                 {[
-                  { label: 'Generate an image', prompt: 'Generate an image of a magical forest with bioluminescent mushrooms, soft fog, and moonlight filtering through ancient trees', icon: 'image' },
-                  { label: 'Create a video', prompt: 'Generate a video of a cozy cafe on a rainy night, raindrops on the window, warm light inside, gentle camera push-in', icon: 'video' },
-                  { label: 'Compose music', prompt: 'Generate a dreamy indie pop track, 110 BPM, with reverb-heavy guitars, soft vocals, and atmospheric synth pads', icon: 'music' },
+                  { label: 'Generate an image', prompt: 'Generate an image', icon: 'image' },
+                  { label: 'Create a video', prompt: 'Create a video', icon: 'video' },
+                  { label: 'Compose music', prompt: 'Compose music', icon: 'music' },
                 ].map((chip) => (
                   <button
                     key={chip.label}
@@ -541,66 +608,6 @@ export function ChatPanel({
                 or drag &amp; drop a file anywhere
               </p>
 
-              {/* Primary CTAs */}
-              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '2rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-                <button
-                  onClick={onStartVideoFlow}
-                  disabled={!canSend}
-                  className="radiant-orb-hover"
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(59, 130, 246, 0.3))',
-                    border: '1px solid rgba(139, 92, 246, 0.4)',
-                    borderRadius: 'var(--radius-pill)',
-                    cursor: canSend ? 'pointer' : 'default',
-                    color: '#ececec',
-                    fontSize: '0.9375rem',
-                    fontWeight: 600,
-                    transition: 'all 0.2s',
-                    opacity: canSend ? 1 : 0.5,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!canSend) return;
-                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.45), rgba(59, 130, 246, 0.45))';
-                    e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.6)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(59, 130, 246, 0.3))';
-                    e.currentTarget.style.borderColor = 'rgba(139, 92, 246, 0.4)';
-                  }}
-                >
-                  Create a Video Masterpiece
-                </button>
-                <button
-                  onClick={onGoToChat}
-                  disabled={!canSend}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    background: 'rgba(255, 255, 255, 0.06)',
-                    border: '1px solid rgba(255, 255, 255, 0.12)',
-                    borderRadius: 'var(--radius-pill)',
-                    cursor: canSend ? 'pointer' : 'default',
-                    color: '#b4b4b4',
-                    fontSize: '0.9375rem',
-                    fontWeight: 500,
-                    transition: 'all 0.2s',
-                    opacity: canSend ? 1 : 0.5,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!canSend) return;
-                    e.currentTarget.style.color = '#ececec';
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = '#b4b4b4';
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
-                  }}
-                >
-                  Go to Chat
-                </button>
-              </div>
             </div>
           )}
 

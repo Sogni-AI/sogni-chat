@@ -38,6 +38,7 @@ const CDN_BASE = 'https://cdn.sogni.ai/sogni-chat';
 const ASSETS_DIR = join(__dirname, 'assets');
 const MANIFEST_PATH = join(__dirname, '..', 'src', 'assets', 'cdn.ts');
 const COMPLETED_CSV = join(__dirname, 'completed.csv');
+const METADATA_CACHE = join(__dirname, 'video-metadata.json');
 
 const args = process.argv.slice(2);
 const FORCE = args.includes('--force');
@@ -145,6 +146,158 @@ function uploadFile(file) {
   }
 }
 
+// ── Metadata scraping ─────────────────────────────────────────────
+
+function loadMetadataCache() {
+  if (existsSync(METADATA_CACHE)) {
+    return JSON.parse(readFileSync(METADATA_CACHE, 'utf-8'));
+  }
+  return {};
+}
+
+function saveMetadataCache(cache) {
+  writeFileSync(METADATA_CACHE, JSON.stringify(cache, null, 2));
+}
+
+function hasFfprobe() {
+  try {
+    execSync('ffprobe -version', { stdio: 'pipe', timeout: 5000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function probeVideo(filePath) {
+  try {
+    const output = execSync(
+      `ffprobe -v quiet -print_format json -show_format -show_streams "${filePath}"`,
+      { encoding: 'utf-8', timeout: 30000 }
+    );
+    return JSON.parse(output);
+  } catch {
+    return null;
+  }
+}
+
+function parseFPS(rateStr) {
+  if (!rateStr || rateStr === '0/0') return null;
+  const parts = rateStr.split('/');
+  if (parts.length === 2) {
+    const num = parseInt(parts[0]);
+    const den = parseInt(parts[1]);
+    return den > 0 ? num / den : null;
+  }
+  return parseFloat(rateStr) || null;
+}
+
+function extractPositivePrompt(promptObj) {
+  if (!promptObj || typeof promptObj !== 'object') return null;
+  for (const node of Object.values(promptObj)) {
+    if (!node || typeof node !== 'object') continue;
+    const classType = node.class_type;
+    const inputs = node.inputs;
+    const title = node._meta?.title?.toLowerCase() || '';
+    if (!classType || !inputs) continue;
+    if (['CLIPTextEncode', 'CLIPTextEncodeFlux', 'TextEncodeQwenImageEditPlus'].includes(classType)) {
+      if (title.includes('negative')) continue;
+      const text = (inputs.text || inputs.prompt || '').trim();
+      if (text) return text;
+    }
+  }
+  return null;
+}
+
+function extractPromptFromTags(tags) {
+  if (!tags) return null;
+  for (const [key, value] of Object.entries(tags)) {
+    if (typeof value !== 'string') continue;
+    try {
+      const parsed = JSON.parse(value);
+      if (typeof parsed !== 'object' || parsed === null) continue;
+      if (key.toLowerCase() === 'prompt') return extractPositivePrompt(parsed);
+      if (parsed.prompt) {
+        const p = typeof parsed.prompt === 'string' ? JSON.parse(parsed.prompt) : parsed.prompt;
+        return extractPositivePrompt(p);
+      }
+    } catch { /* not JSON */ }
+  }
+  for (const key of ['description', 'comment', 'title']) {
+    if (tags[key] && typeof tags[key] === 'string' && !tags[key].startsWith('{')) {
+      return tags[key];
+    }
+  }
+  return null;
+}
+
+function extractVideoMetadata(filePath) {
+  const probe = probeVideo(filePath);
+  if (!probe) return null;
+
+  const metadata = { model: 'LTX-2.3 23b Image-to-Video' };
+
+  if (probe.format?.duration) {
+    metadata.duration = parseFloat(parseFloat(probe.format.duration).toFixed(2));
+  }
+
+  const videoStream = probe.streams?.find(s => s.codec_type === 'video');
+  if (videoStream) {
+    metadata.resolution = `${videoStream.width}x${videoStream.height}`;
+    const fps = parseFPS(videoStream.r_frame_rate);
+    if (fps) metadata.fps = Math.round(fps);
+  }
+
+  const prompt = extractPromptFromTags(probe.format?.tags);
+  if (prompt) metadata.prompt = prompt;
+
+  if (!metadata.prompt && videoStream?.tags) {
+    const streamPrompt = extractPromptFromTags(videoStream.tags);
+    if (streamPrompt) metadata.prompt = streamPrompt;
+  }
+
+  return metadata;
+}
+
+function scrapeMetadata(files) {
+  if (!hasFfprobe()) {
+    console.warn('Warning: ffprobe not found — skipping metadata scraping.');
+    console.warn('Install ffmpeg to enable metadata extraction.\n');
+    return loadMetadataCache();
+  }
+
+  const cache = loadMetadataCache();
+  const videoFiles = files.filter(f => f.remotePath.startsWith('videos/'));
+
+  let scraped = 0;
+  let cached = 0;
+
+  for (const file of videoFiles) {
+    const key = toCamelCase(basename(file.remotePath, extname(file.remotePath)));
+
+    if (cache[key] && cache[key].hash === file.hash) {
+      cached++;
+      continue;
+    }
+
+    process.stdout.write(`  Scraping metadata: ${file.remotePath}...`);
+    const meta = extractVideoMetadata(file.localPath);
+    if (meta) {
+      cache[key] = { ...meta, hash: file.hash };
+      scraped++;
+      console.log(' done');
+    } else {
+      console.log(' failed');
+    }
+  }
+
+  if (scraped > 0) {
+    saveMetadataCache(cache);
+  }
+
+  console.log(`Metadata: ${scraped} scraped, ${cached} cached\n`);
+  return cache;
+}
+
 // ── Manifest generation ───────────────────────────────────────────
 
 function naturalSort(a, b) {
@@ -155,7 +308,7 @@ function toCamelCase(str) {
   return str.replace(/[-_]+(.)/g, (_, c) => c.toUpperCase());
 }
 
-function generateManifest(files) {
+function generateManifest(files, metadataCache = {}) {
   // Group files by top-level folder
   const byFolder = {};
   const hashMap = {};
@@ -179,6 +332,17 @@ function generateManifest(files) {
   }
 
   const lines = [`const CDN_BASE = '${CDN_BASE}';`, ''];
+
+  // VideoMetadata interface
+  lines.push('export interface VideoMetadata {');
+  lines.push('  resolution: string;');
+  lines.push('  fps: number;');
+  lines.push('  duration: number;');
+  lines.push('  prompt?: string;');
+  lines.push('  model: string;');
+  lines.push('}');
+  lines.push('');
+
   lines.push('export const cdnAssets = {');
 
   // Process each configured folder in declaration order
@@ -232,6 +396,23 @@ function generateManifest(files) {
 
   lines.push('} as const;');
   lines.push('');
+
+  // Video metadata export
+  const metaKeys = Object.keys(metadataCache).sort(naturalSort);
+  lines.push('export const videoMetadata: Record<string, VideoMetadata> = {');
+  for (const key of metaKeys) {
+    const { hash, ...meta } = metadataCache[key];
+    const parts = [];
+    if (meta.resolution) parts.push(`resolution: '${meta.resolution}'`);
+    if (meta.fps != null) parts.push(`fps: ${meta.fps}`);
+    if (meta.duration != null) parts.push(`duration: ${meta.duration}`);
+    if (meta.prompt) parts.push(`prompt: ${JSON.stringify(meta.prompt)}`);
+    parts.push(`model: '${meta.model || 'LTX-2.3 23b Image-to-Video'}'`);
+    lines.push(`  ${key}: { ${parts.join(', ')} },`);
+  }
+  lines.push('};');
+  lines.push('');
+
   return lines.join('\n');
 }
 
@@ -360,9 +541,13 @@ async function main() {
     }
   }
 
+  // Scrape metadata for video files (even for already-uploaded videos)
+  console.log('Checking video metadata...');
+  const metadataCache = scrapeMetadata(localFiles);
+
   // Regenerate manifest from ALL local files
   console.log('Regenerating src/assets/cdn.ts...');
-  const manifest = generateManifest(localFiles);
+  const manifest = generateManifest(localFiles, metadataCache);
   if (!DRY_RUN) {
     writeFileSync(MANIFEST_PATH, manifest);
     console.log('Manifest updated.\n');

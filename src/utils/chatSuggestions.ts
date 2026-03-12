@@ -4,7 +4,6 @@
  */
 import type { UIChatMessage } from '@/types/chat';
 import { RESTORATION_PRESETS, type RestorationModeId } from '@/config/restorationPresets';
-import { VIDEO_FLOW_GUIDE_MSG_ID } from '@/config/chat';
 
 /** Tool names used in chat — must match ToolName union from tools/types.ts */
 type ChatToolName =
@@ -31,27 +30,21 @@ export interface Suggestion {
 const WELCOME_SUGGESTIONS: Suggestion[] = [
   { label: 'Restore this photo', prompt: 'Restore this photo' },
   { label: 'Apply an artistic style', prompt: 'Apply an artistic style to this photo' },
-  { label: 'Animate this photo', prompt: 'Animate this photo with gentle movement' },
+  { label: 'Animate this photo', prompt: 'Animate this photo' },
 ];
 
-/** Suggestions for the video masterpiece guided flow */
-const VIDEO_FLOW_SUGGESTIONS: Suggestion[] = [
-  { label: 'Generate an image', prompt: 'Generate a stunning cinematic still image that would make an amazing video' },
-  { label: 'Upload a photo', prompt: '__UPLOAD_PHOTO__' },
-];
-
-/** Suggestions shown when no image is uploaded — text-to-image/video/music prompts */
+/** Suggestions shown when no image is uploaded — short prompts that trigger LLM conversation */
 const NO_IMAGE_SUGGESTIONS: Suggestion[] = [
-  { label: 'Generate an image', prompt: 'Generate an image of a magical forest with bioluminescent mushrooms, soft fog, and moonlight filtering through ancient trees' },
-  { label: 'Create a video', prompt: 'Generate a video of a cozy cafe on a rainy night, warm light inside, gentle camera push-in' },
-  { label: 'Compose a song', prompt: 'Generate a dreamy indie pop track, 110 BPM, with reverb-heavy guitars and atmospheric synth pads' },
-  { label: 'Make a music video', prompt: 'Generate a video of abstract colorful paint swirling in water, synchronized to a deep electronic beat' },
+  { label: 'Generate an image', prompt: 'Generate an image' },
+  { label: 'Create a video', prompt: 'Create a video' },
+  { label: 'Compose a song', prompt: 'Compose a song' },
+  { label: 'Make a music video', prompt: 'Make a music video' },
 ];
 
 const SUGGESTIONS_BY_TOOL: Record<ChatToolName, Suggestion[]> = {
   restore_photo: [
-    { label: 'Apply a Norman Rockwell style', prompt: 'Apply a Norman Rockwell style' },
-    { label: 'Bring it to life', prompt: 'Animate this photo with a gentle smile and subtle movement' },
+    { label: 'Apply an artistic style', prompt: 'Apply an artistic style' },
+    { label: 'Bring it to life', prompt: 'Animate this photo' },
     { label: 'Try different variations', prompt: 'Try different variations' },
   ],
   apply_style: [
@@ -61,31 +54,31 @@ const SUGGESTIONS_BY_TOOL: Record<ChatToolName, Suggestion[]> = {
   ],
   refine_result: [
     { label: 'Apply an artistic style', prompt: 'Apply an artistic style' },
-    { label: 'Bring it to life', prompt: 'Animate this photo with gentle movement' },
+    { label: 'Bring it to life', prompt: 'Animate this photo' },
     { label: 'Start fresh with new settings', prompt: 'Start fresh with new settings' },
   ],
   animate_photo: [
-    { label: 'Try a different animation', prompt: 'Animate it differently -- try a gentle wave' },
+    { label: 'Try a different animation', prompt: 'Animate it differently' },
     { label: 'View from another angle', prompt: 'Show me this from a different angle' },
     { label: 'Restore the photo', prompt: 'Restore the original photo' },
   ],
   change_angle: [
-    { label: 'Try another angle', prompt: 'Show me from the other side' },
-    { label: 'Bring it to life', prompt: 'Animate this with subtle movement' },
+    { label: 'Try another angle', prompt: 'Show me from another angle' },
+    { label: 'Bring it to life', prompt: 'Animate this' },
     { label: 'Restore the photo', prompt: 'Restore the original photo' },
   ],
   generate_image: [
-    { label: 'Try a different style', prompt: 'Generate the same scene in a different art style' },
-    { label: 'Make it wider', prompt: 'Generate a wider landscape version' },
-    { label: 'Animate this into a video', prompt: 'Animate this into a video using LTX-2.3' },
+    { label: 'Try a different style', prompt: 'Try a different art style' },
+    { label: 'Change the aspect ratio', prompt: 'Generate it with a different aspect ratio' },
+    { label: 'Animate this into a video', prompt: 'Animate this into a video' },
   ],
   edit_image: [
     { label: 'Edit it further', prompt: 'Make another edit to this result' },
     { label: 'Try a different style', prompt: 'Apply an artistic style to this' },
-    { label: 'Animate it', prompt: 'Bring this to life with gentle movement' },
+    { label: 'Animate it', prompt: 'Animate this' },
   ],
   generate_video: [
-    { label: 'Try different motion', prompt: 'Generate a new video with different camera movement' },
+    { label: 'Try different motion', prompt: 'Generate a new video with different motion' },
     { label: 'Generate an image instead', prompt: 'Generate a still image of this scene' },
     { label: 'Add music', prompt: 'Generate a soundtrack for this video' },
   ],
@@ -100,9 +93,9 @@ const SUGGESTIONS_BY_TOOL: Record<ChatToolName, Suggestion[]> = {
     { label: 'Generate music for it', prompt: 'Compose background music for this video' },
   ],
   generate_music: [
-    { label: 'Try a different genre', prompt: 'Generate another track in a different genre' },
+    { label: 'Try a different genre', prompt: 'Try a different genre' },
     { label: 'Sync to video', prompt: 'Create a video synced to this music' },
-    { label: 'Adjust the tempo', prompt: 'Generate a similar track but faster tempo' },
+    { label: 'Adjust the tempo', prompt: 'Adjust the tempo' },
   ],
   analyze_image: [
     { label: 'Read the text', prompt: 'Extract all visible text from this image' },
@@ -162,16 +155,109 @@ export function getRestoreModePrompt(mode: RestorationModeId, analysisSuggestion
   return buildFullRestorePrompt(analysisSuggestions || [], mode);
 }
 
+/** Patterns indicating the LLM is waiting for user confirmation to generate */
+const READY_TO_GENERATE_PATTERNS = [
+  'ready to generate',
+  'ready to create',
+  'ready to proceed',
+  'shall i generate',
+  'shall i create',
+  'shall i proceed',
+  'want me to generate',
+  'want me to create',
+  'want me to proceed',
+  'just say "go"',
+  "just say 'go'",
+  'just say go',
+  'say "go"',
+  "say 'go'",
+  'go ahead and i\'ll',
+  'let me know when',
+  'let me know if you\'d like',
+  'want to proceed',
+  'should i go ahead',
+];
+
+/** Detect the creative topic from message history */
+function detectTopic(messages: UIChatMessage[]): 'image' | 'video' | 'music' | null {
+  const allText = messages.map((m) => m.content || '').join(' ').toLowerCase();
+  if (/\b(song|music|compose|melody|soundtrack|lyrics|beat|bpm|tempo)\b/.test(allText)) return 'music';
+  if (/\b(video|animate|animation|clip|motion)\b/.test(allText)) return 'video';
+  if (/\b(image|photo|picture|illustration|painting|drawing|portrait|generate an image)\b/.test(allText)) return 'image';
+  return null;
+}
+
+/** Generate contextual suggestions for mid-conversation states (no tool completed yet) */
+function getMidConversationSuggestions(messages: UIChatMessage[]): Suggestion[] | null {
+  // Need at least a user message + assistant response beyond welcome
+  const nonWelcome = messages.filter((m) => m.id !== 'welcome');
+  if (nonWelcome.length < 2) return null;
+
+  // Find the last assistant message with content
+  const lastAssistant = [...nonWelcome].reverse().find(
+    (m) => m.role === 'assistant' && m.content?.trim(),
+  );
+  if (!lastAssistant) return null;
+
+  const text = lastAssistant.content.toLowerCase();
+
+  // Detect ready-to-generate state
+  const isReady = READY_TO_GENERATE_PATTERNS.some((p) => text.includes(p));
+  if (isReady) {
+    const topic = detectTopic(messages);
+    const suggestions: Suggestion[] = [
+      { label: 'Generate this', prompt: 'Go ahead and generate it' },
+      { label: 'Tweak the prompt', prompt: 'Can you adjust the prompt a bit?' },
+    ];
+    if (topic === 'image') {
+      suggestions.push({ label: 'Try a different style', prompt: 'Try it in a different art style' });
+    } else if (topic === 'video') {
+      suggestions.push({ label: 'Different motion style', prompt: 'Try a different motion or animation style' });
+    } else if (topic === 'music') {
+      suggestions.push({ label: 'Different genre', prompt: 'Try a different musical genre' });
+    } else {
+      suggestions.push({ label: 'Start over', prompt: "Let's try something completely different" });
+    }
+    return suggestions;
+  }
+
+  // Detect ongoing conversation about a specific topic (LLM asking questions)
+  const topic = detectTopic(messages);
+  if (topic) {
+    if (topic === 'image') {
+      return [
+        { label: 'Photorealistic style', prompt: 'Make it photorealistic' },
+        { label: 'Anime style', prompt: 'Use anime style' },
+        { label: 'Oil painting', prompt: 'Make it look like an oil painting' },
+        { label: 'Surprise me', prompt: 'Surprise me with a creative style' },
+      ];
+    }
+    if (topic === 'video') {
+      return [
+        { label: 'Cinematic look', prompt: 'Make it cinematic' },
+        { label: 'Smooth motion', prompt: 'Use smooth, flowing motion' },
+        { label: 'Fast-paced', prompt: 'Make it fast-paced and dynamic' },
+        { label: 'Surprise me', prompt: 'Surprise me with something creative' },
+      ];
+    }
+    if (topic === 'music') {
+      return [
+        { label: 'Upbeat pop', prompt: 'Make it upbeat pop' },
+        { label: 'Chill lo-fi', prompt: 'Go for a chill lo-fi vibe' },
+        { label: 'Epic orchestral', prompt: 'Make it epic and orchestral' },
+        { label: 'Surprise me', prompt: 'Surprise me with something creative' },
+      ];
+    }
+  }
+
+  return null;
+}
+
 export function generateSuggestions(
   messages: UIChatMessage[],
   analysisSuggestions?: Suggestion[],
   hasImage?: boolean,
 ): Suggestion[] {
-  // Video masterpiece guided flow — show generate/upload choices
-  if (messages.length === 1 && messages[0].id === VIDEO_FLOW_GUIDE_MSG_ID) {
-    return VIDEO_FLOW_SUGGESTIONS;
-  }
-
   // Walk backwards to find the last assistant message with a completed tool
   for (let i = messages.length - 1; i >= 0; i--) {
     const msg = messages[i];
@@ -197,6 +283,10 @@ export function generateSuggestions(
       ...filtered,
     ];
   }
+
+  // Mid-conversation: detect context and show relevant suggestions
+  const midConversation = getMidConversationSuggestions(messages);
+  if (midConversation) return midConversation;
 
   // Fallback: show image-upload suggestions or text-only creation suggestions
   if (messages.length > 0 && messages[0].role === 'assistant') {

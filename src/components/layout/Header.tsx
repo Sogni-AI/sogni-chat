@@ -2,7 +2,7 @@
  * Header bar — sits at the top of the main content area (right of sidebar).
  * Contains: model selector dropdown + nav + auth status.
  */
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useSogniAuth } from '@/services/sogniAuth';
 import { AuthStatus } from '@/components/auth/AuthStatus';
 import { ModelSelector } from './ModelSelector';
@@ -15,6 +15,8 @@ interface HeaderProps {
 export function Header({ selectedModelVariant, onSelectModelVariant }: HeaderProps) {
   const { isAuthenticated } = useSogniAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const onHistoryPage = location.pathname === '/history';
 
   return (
     <header className="flex-shrink-0" role="banner" style={{
@@ -34,7 +36,7 @@ export function Header({ selectedModelVariant, onSelectModelVariant }: HeaderPro
             {isAuthenticated && (
               <nav className="header-nav flex items-center" style={{ fontSize: '0.875rem' }}>
                 <button
-                  onClick={() => navigate('/history')}
+                  onClick={() => navigate(onHistoryPage ? '/' : '/history')}
                   className="px-3 py-1.5 transition-colors"
                   style={{
                     fontWeight: 500,
@@ -47,7 +49,7 @@ export function Header({ selectedModelVariant, onSelectModelVariant }: HeaderPro
                   onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
                 >
-                  My Media
+                  {onHistoryPage ? '← Chat' : 'My Media'}
                 </button>
               </nav>
             )}

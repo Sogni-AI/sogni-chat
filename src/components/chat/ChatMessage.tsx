@@ -4,6 +4,7 @@
  * system notifications, inline image results, and tool execution progress.
  */
 import { memo } from 'react';
+import ReactMarkdown from 'react-markdown';
 import type { UIChatMessage } from '@/hooks/useChat';
 import { ChatImageResults } from './ChatImageResults';
 import { ChatVideoResults } from './ChatVideoResults';
@@ -92,10 +93,26 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
             fontSize: '0.9375rem',
             lineHeight: '1.6',
             wordBreak: 'break-word',
-            whiteSpace: 'pre-wrap',
+            whiteSpace: isUser ? 'pre-wrap' : undefined,
           }}
         >
-          {message.content.trim()}
+          {isAssistant ? (
+            <ReactMarkdown
+              components={{
+                p: ({ children }) => <span style={{ display: 'block', marginBottom: '0.5em' }}>{children}</span>,
+                strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
+                ol: ({ children }) => <ol style={{ margin: '0.5em 0', paddingLeft: '1.5em' }}>{children}</ol>,
+                ul: ({ children }) => <ul style={{ margin: '0.5em 0', paddingLeft: '1.5em' }}>{children}</ul>,
+                li: ({ children }) => <li style={{ marginBottom: '0.25em' }}>{children}</li>,
+                a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent)', textDecoration: 'underline' }}>{children}</a>,
+                code: ({ children }) => <code style={{ background: 'rgba(255,255,255,0.08)', padding: '0.125em 0.375em', borderRadius: '4px', fontSize: '0.875em' }}>{children}</code>,
+              }}
+            >
+              {message.content.trim()}
+            </ReactMarkdown>
+          ) : (
+            message.content.trim()
+          )}
           {isAssistant && message.isStreaming && !message.toolProgress && (
             <span
               style={{
