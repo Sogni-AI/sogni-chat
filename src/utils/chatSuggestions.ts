@@ -33,6 +33,24 @@ const WELCOME_SUGGESTIONS: Suggestion[] = [
   { label: 'Animate this photo', prompt: 'Animate this photo' },
 ];
 
+/** Suggestions shown when uploadIntent is 'video' and an image has been uploaded */
+export const VIDEO_INTENT_SUGGESTIONS: Suggestion[] = [
+  { label: 'Animate with subtle motion', prompt: 'Animate with subtle motion' },
+  { label: 'Create a cinematic scene', prompt: 'Create a cinematic scene' },
+  { label: 'Add dramatic camera movement', prompt: 'Add dramatic camera movement' },
+  { label: 'Generate with dialogue', prompt: 'Generate with dialogue' },
+  { label: 'Loop as a cinemagraph', prompt: 'Loop as a cinemagraph' },
+];
+
+/** Suggestions shown when uploadIntent is 'edit' and an image has been uploaded */
+export const EDIT_INTENT_SUGGESTIONS: string[] = [
+  'Apply artistic style',
+  'Change the background',
+  'Edit specific details',
+  'Generate variations',
+  'Change the viewing angle',
+];
+
 /** Suggestions shown when no image is uploaded — short prompts that trigger LLM conversation */
 const NO_IMAGE_SUGGESTIONS: Suggestion[] = [
   { label: 'Generate an image', prompt: 'Generate an image' },

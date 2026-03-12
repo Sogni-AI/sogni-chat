@@ -9,7 +9,7 @@ import type { TokenType, Balances } from '@/types/wallet';
 import type { UseChatResult } from '@/hooks/useChat';
 import type { UploadedFile } from '@/tools/types';
 import { QUALITY_PRESETS } from '@/config/qualityPresets';
-import { generateSuggestions } from '@/utils/chatSuggestions';
+import { generateSuggestions, VIDEO_INTENT_SUGGESTIONS } from '@/utils/chatSuggestions';
 import { FullscreenBeforeAfter } from '@/components/FullscreenBeforeAfter';
 import { useLayout } from '@/layouts/AppLayout';
 import { ChatMessage } from './ChatMessage';
@@ -261,8 +261,12 @@ export function ChatPanel({
   }, [messages]);
 
   const suggestions = useMemo(
-    () => (isLoading ? [] : generateSuggestions(messages, analysisSuggestions, !!imageData)),
-    [messages, isLoading, analysisSuggestions, imageData],
+    () => {
+      if (isLoading) return [];
+      if (uploadIntent === 'video' && imageData) return VIDEO_INTENT_SUGGESTIONS;
+      return generateSuggestions(messages, uploadIntent === 'video' ? [] : analysisSuggestions, !!imageData);
+    },
+    [messages, isLoading, analysisSuggestions, imageData, uploadIntent],
   );
 
   // Smart auto-scroll

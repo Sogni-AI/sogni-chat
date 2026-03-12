@@ -543,6 +543,8 @@ export default function ChatPage() {
   const handleFileDrop = useCallback(
     async (file: File) => {
       // Same flow as handleFileSelect but accepts a File directly (for drag-and-drop)
+      // Drag-drop has no explicit intent — default to 'edit'
+      setUploadIntent('edit');
       if (activeSessionIdRef.current) await saveActiveSession();
 
       // Track background jobs before resetting
