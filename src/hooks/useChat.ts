@@ -368,7 +368,13 @@ export function useChat(): UseChatResult {
       const runRequest = async () => {
         const thisRequest = { aborted: false };
         const capturedSessionId = sessionIdRef.current;
-        const isActiveSession = () => sessionIdRef.current === capturedSessionId;
+        // When capturedSessionId is null (first message before session ID assigned),
+        // fall back to checking if this is still the current request via abortRef.
+        // Matches the same pattern used in analyzeImage().
+        const isActiveSession = () =>
+          capturedSessionId === null
+            ? abortRef.current === thisRequest
+            : sessionIdRef.current === capturedSessionId;
 
         activeRequestCountRef.current++;
         setIsSending(true);
@@ -531,13 +537,18 @@ export function useChat(): UseChatResult {
                     : currentToolVideoUrls.length > 0
                       ? [...new Set(currentToolVideoUrls)]
                       : undefined;
-                  onBackgroundCompleteRef.current?.(capturedSessionId!, {
-                    toolName,
-                    resultUrls: allResultUrlsMerged,
-                    videoResultUrls: allVideoUrls,
-                    assistantContent: accumulatedContent,
-                    streamingMsgId: localStreamingId.current,
-                  });
+                  // Use capturedSessionId, or fall back to current ref (session ID
+                  // may have been assigned after tool started but before it completed)
+                  const effectiveSessionId = capturedSessionId || sessionIdRef.current;
+                  if (effectiveSessionId) {
+                    onBackgroundCompleteRef.current?.(effectiveSessionId, {
+                      toolName,
+                      resultUrls: allResultUrlsMerged,
+                      videoResultUrls: allVideoUrls,
+                      assistantContent: accumulatedContent,
+                      streamingMsgId: localStreamingId.current,
+                    });
+                  }
                   return;
                 }
                 currentToolResultUrls = [
@@ -667,7 +678,10 @@ export function useChat(): UseChatResult {
               onGallerySaved: (galleryImageIds: string[], galleryVideoIds: string[]) => {
                 if (thisRequest.aborted) return;
                 if (!isActiveSession()) {
-                  onBackgroundGallerySavedRef.current?.(capturedSessionId!, galleryImageIds, galleryVideoIds);
+                  const effectiveGallerySessionId = capturedSessionId || sessionIdRef.current;
+                  if (effectiveGallerySessionId) {
+                    onBackgroundGallerySavedRef.current?.(effectiveGallerySessionId, galleryImageIds, galleryVideoIds);
+                  }
                   return;
                 }
                 console.log(`[CHAT HOOK] onGallerySaved: ${galleryImageIds.length} image IDs, ${galleryVideoIds.length} video IDs`);

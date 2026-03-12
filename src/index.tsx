@@ -9,6 +9,15 @@ window.addEventListener('vite:preloadError', (event) => {
   window.location.reload();
 });
 
+// Unregister stale service workers from previous deployments (e.g. "Sogni 360")
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const registration of registrations) {
+      registration.unregister();
+    }
+  });
+}
+
 // Update viewport height for mobile
 function setViewportHeight() {
   const vh = window.innerHeight * 0.01;

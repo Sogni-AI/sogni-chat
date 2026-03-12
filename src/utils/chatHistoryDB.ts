@@ -136,6 +136,7 @@ export async function getAllSessions(): Promise<ChatSessionSummary[]> {
 
 /** Get a full session by ID */
 export async function getSession(id: string): Promise<ChatSession | null> {
+  if (!id) return null;
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(SESSIONS_STORE, 'readonly');
@@ -151,6 +152,7 @@ export async function getSession(id: string): Promise<ChatSession | null> {
 
 /** Delete a session and its thumbnail */
 export async function deleteSession(id: string): Promise<void> {
+  if (!id) return;
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction([SESSIONS_STORE, THUMBNAILS_STORE], 'readwrite');
@@ -184,6 +186,7 @@ export async function saveThumbnail(thumbnail: ChatSessionThumbnail): Promise<vo
 
 /** Get a thumbnail by session ID */
 export async function getThumbnail(sessionId: string): Promise<ChatSessionThumbnail | null> {
+  if (!sessionId) return null;
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(THUMBNAILS_STORE, 'readonly');

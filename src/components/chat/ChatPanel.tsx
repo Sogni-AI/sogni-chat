@@ -529,7 +529,9 @@ export function ChatPanel({
           {/* Chat messages — skip welcome message when in no-image empty state */}
           {processedMessages.map((msg) => {
             // Hide the welcome sentinel message when the empty state UI is showing
-            if (msg.id === 'welcome' && showWelcomeScreen) return null;
+            // Always hide the welcome sentinel — it's only used to detect the empty state,
+            // never displayed as an actual chat bubble.
+            if (msg.id === 'welcome') return null;
             return (
               <ChatMessage
                 key={msg.id}

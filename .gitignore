@@ -43,3 +43,7 @@ coverage/
 # Temp
 tmp/
 temp/
+
+# CDN asset management (local copies + audit log)
+local-scripts/assets/
+local-scripts/completed.csv
