@@ -25,6 +25,8 @@ import { generateSessionTitle } from '@/services/chatService';
 import { slugify } from '@/utils/downloadFilename';
 import type { ChatSession } from '@/types/chat';
 import type { QualityTier } from '@/config/qualityPresets';
+import { CHAT_MODEL_ABLITERATED } from '@/config/chat';
+import { DEFAULT_VARIANT_ID } from '@/config/modelVariants';
 import { QUALITY_PRESETS, getSavedQualityTier, saveQualityTier } from '@/config/qualityPresets';
 import { useRestorationCostEstimation } from '@/hooks/useRestorationCostEstimation';
 import type { TokenType } from '@/types/wallet';
@@ -107,7 +109,7 @@ export default function ChatPage() {
     clearPendingRestore,
   } = useChatSessions();
   const isDesktop = useMediaQuery('(min-width: 900px)');
-  const { showOutOfCreditsPopup, showSignupModal, sidebarCollapsed, toggleSidebar } = useLayout();
+  const { showOutOfCreditsPopup, showSignupModal, sidebarCollapsed, toggleSidebar, setSelectedModelVariant } = useLayout();
   const { showToast } = useToastContext();
 
   const [resultUrls, setResultUrls] = useState<string[]>([]);
@@ -171,6 +173,12 @@ export default function ChatPage() {
     const galleryVideoIdCount = pendingRestore.uiMessages.filter(m => m.galleryVideoIds?.length).length;
     console.log(`[CHAT PAGE] Restoring session: ${pendingRestore.uiMessages.length} msgs, ${videoMsgCount} with videos (${videoUrlCount} urls), ${galleryVideoIdCount} with gallery video IDs, hasImageData=${!!pendingRestore.imageData}`);
     loadFromSession(pendingRestore);
+    // Sync model selector with session's model override
+    if (pendingRestore.sessionModel === CHAT_MODEL_ABLITERATED) {
+      setSelectedModelVariant('unrestricted');
+    } else if (!pendingRestore.sessionModel) {
+      setSelectedModelVariant(DEFAULT_VARIANT_ID);
+    }
     setSessionId(pendingRestore.id);
     sessionTitleRef.current = pendingRestore.title;
     sessionCreatedAtRef.current = pendingRestore.createdAt;
@@ -186,7 +194,7 @@ export default function ChatPage() {
     // Allow saves again after state settles (must exceed 1500ms debounce)
     const timer = setTimeout(() => { isRestoringRef.current = false; }, 2000);
     return () => clearTimeout(timer);
-  }, [pendingRestore, loadFromSession, setSessionId, loadFromData, clearPendingRestore]);
+  }, [pendingRestore, loadFromSession, setSessionId, setSelectedModelVariant, loadFromData, clearPendingRestore]);
 
   // ── Stable save function — reads from refs so it never triggers re-renders ──
   const saveActiveSession = useCallback(async () => {
@@ -589,7 +597,10 @@ export default function ChatPage() {
     sessionUpdatedAtRef.current = Date.now();
     sessionDirtyRef.current = false;
     setActiveSessionId(null);
-    setTimeout(() => { isRestoringRef.current = false; }, 2000);
+    // Short timeout: just enough for React state to settle after reset.
+    // No IndexedDB load here (unlike session switching), so 2s is too long
+    // — it blocks session creation when the user sends a message immediately.
+    setTimeout(() => { isRestoringRef.current = false; }, 100);
   }, [clearUpload, chat, saveActiveSession, setActiveSessionId, sessions.length]);
 
   const handleSelectSession = useCallback(async (id: string) => {

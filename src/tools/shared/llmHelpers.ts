@@ -5,8 +5,12 @@
  * potentially other tools that make LLM sub-calls during execution.
  */
 
-/** Timeout for LLM sub-calls (image description, dialogue refinement) */
+/** Timeout for non-thinking LLM sub-calls (image description, short completions) */
 export const LLM_SUBCALL_TIMEOUT_MS = 20_000;
+
+/** Timeout for thinking-mode LLM sub-calls (creative prompt refinement).
+ *  Thinking mode needs more time: the model generates a <think> block first. */
+export const LLM_THINKING_TIMEOUT_MS = 45_000;
 
 /** Race a promise against a timeout. Returns undefined on timeout. */
 export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T | undefined> {

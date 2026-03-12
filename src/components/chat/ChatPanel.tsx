@@ -12,6 +12,7 @@ import { QUALITY_PRESETS } from '@/config/qualityPresets';
 import { generateSuggestions, VIDEO_INTENT_SUGGESTIONS, EDIT_INTENT_SUGGESTIONS } from '@/utils/chatSuggestions';
 import { FullscreenBeforeAfter } from '@/components/FullscreenBeforeAfter';
 import { useLayout } from '@/layouts/AppLayout';
+import { getVariantById } from '@/config/modelVariants';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { SuggestionChips } from './SuggestionChips';
@@ -201,7 +202,7 @@ export function ChatPanel({
   onClearMediaFiles,
   onFileDrop,
 }: ChatPanelProps) {
-  const { selectedModelVariant } = useLayout();
+  const { selectedModelVariant, setSelectedModelVariant } = useLayout();
   const {
     messages,
     isLoading,
@@ -221,6 +222,15 @@ export function ChatPanel({
   const analysisTriggeredRef = useRef(false);
   const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
   const videoIntentSentRef = useRef(false);
+
+  // Wrap acceptModelSwitch to also update the header model selector
+  const handleAcceptModelSwitch = useCallback(() => {
+    // Pick the unrestricted variant that matches the current think setting
+    const current = getVariantById(selectedModelVariant);
+    const targetVariant = current.think ? 'thinking-unrestricted' : 'unrestricted';
+    setSelectedModelVariant(targetVariant);
+    chat.acceptModelSwitch();
+  }, [chat, selectedModelVariant, setSelectedModelVariant]);
 
   // Reset video intent ref when chat is cleared
   useEffect(() => {
@@ -673,7 +683,7 @@ export function ChatPanel({
                 imageUrl={imageUrl}
                 onImageClick={handleImageClick}
                 onCancelTool={msg.toolProgress ? chat.cancelToolExecution : undefined}
-                onAcceptModelSwitch={msg.modelRefusal ? chat.acceptModelSwitch : undefined}
+                onAcceptModelSwitch={msg.modelRefusal ? handleAcceptModelSwitch : undefined}
                 onDeclineModelSwitch={msg.modelRefusal ? chat.declineModelSwitch : undefined}
                 downloadSlug={downloadSlug}
               />

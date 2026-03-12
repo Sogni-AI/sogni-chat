@@ -212,7 +212,7 @@ function RenderProgressOverlay() {
   return (
     <div style={{
       position: 'absolute',
-      bottom: 56,
+      bottom: 20,
       right: 20,
       zIndex: 40,
       display: 'flex',

@@ -371,6 +371,10 @@ export function useChat(): UseChatResult {
       // Core request execution
       const runRequest = async () => {
         const thisRequest = { aborted: false };
+        // Register as the current request so isActiveSession() works when
+        // capturedSessionId is null (new chat before session ID assigned).
+        // Mirrors the same pattern used in analyzeImage().
+        abortRef.current = thisRequest;
         const capturedSessionId = sessionIdRef.current;
         // When capturedSessionId is null (first message before session ID assigned),
         // fall back to checking if this is still the current request via abortRef.

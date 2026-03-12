@@ -9,8 +9,6 @@
  * scene staging, and sensory detail.
  */
 
-import type { SogniClient } from '@sogni-ai/sogni-client';
-import type { ChatMessage } from '@sogni-ai/sogni-client';
 import type { ToolExecutionContext, ToolCallbacks } from '../types';
 import {
   preflightCreditCheck,
@@ -21,13 +19,13 @@ import {
   discardPending,
   formatCredits,
   withTimeout,
-  stripThinkBlocks,
-  LLM_SUBCALL_TIMEOUT_MS,
+  LLM_THINKING_TIMEOUT_MS,
+  needsCreativeRefinement,
+  refineVideoPrompt,
 } from '../shared';
 import type { TokenType } from '@/types/wallet';
 import { parseAspectRatio } from '@/utils/imageDimensions';
 import { fetchVideoCostEstimate } from '@/services/creditsService';
-import { CHAT_MODEL } from '@/config/chat';
 
 // ---------------------------------------------------------------------------
 // T2V model configurations (from MODELS.t2v in workflow-helpers.mjs)
@@ -147,124 +145,6 @@ const T2V_MODELS: Record<string, T2VModelConfig> = {
 };
 
 // ---------------------------------------------------------------------------
-// Creative prompt refinement
-// ---------------------------------------------------------------------------
-
-/**
- * Detect whether a prompt needs creative expansion via a thinking-mode LLM call.
- *
- * Triggers on:
- * - Dialogue or conversational elements (quoted text, "says", "argues", etc.)
- * - Named characters or references to specific people/media
- * - Narrative/story structure ("then", "suddenly", "argument", "fight")
- * - Short prompts for long videos (shallow intent that needs expansion)
- */
-function needsCreativeRefinement(prompt: string, duration: number): boolean {
-  const lower = prompt.toLowerCase();
-
-  // Dialogue indicators — quoted text or speech verbs
-  const hasDialogue = /["'].{3,}["']/.test(prompt)
-    || /\b(says?|said|argues?|tells?|asks?|responds?|replies|shouts?|whispers?|exclaims?|yells?|screams?|speaks?|talks?|conversation|dialogue|monologue)\b/.test(lower);
-
-  // Character/narrative references — specific people, characters from media
-  const hasCharacterRefs = /\b(from\s+(the\s+)?(movie|film|show|series|book|game|anime))\b/.test(lower)
-    || /\b(character|protagonist|antagonist|hero|villain|hitman|hitmen|detective|warrior|knight)\b/.test(lower);
-
-  // Narrative structure — story-like pacing cues
-  const hasNarrative = /\b(argument|fight|battle|chase|confrontation|debate|duel|encounter|scene|sketch|skit)\b/.test(lower)
-    && /\b(about|over|regarding|between)\b/.test(lower);
-
-  // Interaction between multiple subjects
-  const hasInteraction = /\b(they\s+(both|all|each)|together|each\s+other|one\s+another)\b/.test(lower)
-    || /\b(should\s+(both|all|then|start|begin))\b/.test(lower);
-
-  // Short prompt for a long video — likely needs expansion
-  // A 15s video with a 200-char prompt is almost certainly too shallow
-  const isTooShallow = duration > 8 && prompt.length < duration * 25;
-
-  return hasDialogue || hasCharacterRefs || hasNarrative || hasInteraction || isTooShallow;
-}
-
-/**
- * Use a thinking-mode LLM sub-call to expand a shallow or intent-level prompt
- * into a detailed, production-quality video prompt.
- *
- * Handles:
- * - Expanding summarized dialogue into actual spoken lines
- * - Describing characters by appearance (video models don't know names)
- * - Adding scene staging, lighting, camera, and audio direction
- * - Pacing action appropriately for the video duration
- */
-async function refineVideoPrompt(
-  sogniClient: SogniClient,
-  prompt: string,
-  duration: number,
-  tokenType: TokenType,
-): Promise<string> {
-  try {
-    console.log(`[GENERATE VIDEO] Refining prompt with thinking mode (${duration}s video, ${prompt.length} chars)`);
-
-    const messages: ChatMessage[] = [
-      {
-        role: 'system',
-        content: `You are a video prompt engineer. Expand the user's video concept into a detailed, production-quality prompt for an AI video generation model (LTX-2).
-
-CRITICAL RULES:
-1. DIALOGUE: If the concept implies conversation, argument, or speech, write out the ACTUAL DIALOGUE in double quotes. Never summarize dialogue — write the exact words each person says. Space dialogue naturally across ${duration} seconds with pauses, gestures, and reactions between lines.
-
-2. CHARACTERS: The video model does not recognize names. If the user references characters from movies, TV, games, or real people, describe their PHYSICAL APPEARANCE in vivid detail (clothing, hair, build, distinguishing features, mannerisms) so the model can generate them visually. Never rely on a name alone.
-
-3. ACTION: Describe what physically happens on screen moment by moment. Use temporal connectors: "begins by...", "then...", "as this happens...", "suddenly...", "after a beat...". For ${duration} seconds of video, pace the action so it fills the duration naturally without feeling rushed or empty.
-
-4. SENSORY DETAIL: Include concrete visual details — lighting direction, color palette, textures, environment. Describe audio: ambient sounds, music style, tone of voice for dialogue. End with camera movement ("slow push-in", "handheld tracking shot", "static wide angle").
-
-5. PRESENT TENSE only. Positive phrasing (describe what IS happening, not what isn't).
-
-6. End with: "The footage remains smooth and stabilised throughout."
-
-Return ONLY the refined prompt. No explanation, no commentary, no preamble.`,
-      },
-      {
-        role: 'user',
-        content: `Expand this into a detailed ${duration}-second video prompt:\n\n${prompt}`,
-      },
-    ];
-
-    const stream = await sogniClient.chat.completions.create({
-      model: CHAT_MODEL,
-      messages,
-      stream: true,
-      tokenType,
-      temperature: 0.7,
-      max_tokens: 16384,
-      think: true,
-    });
-
-    let refined = '';
-    let insideThink = false;
-    for await (const chunk of stream) {
-      if (chunk.content) {
-        const { cleaned, insideThink: still } = stripThinkBlocks(chunk.content, insideThink);
-        insideThink = still;
-        if (cleaned) refined += cleaned;
-      }
-    }
-
-    refined = refined.trim();
-    if (refined.length > 50) {
-      console.log(`[GENERATE VIDEO] Prompt refined (${refined.length} chars):`, refined);
-      return refined;
-    }
-
-    console.warn(`[GENERATE VIDEO] Refinement too short (${refined.length} chars), using original`);
-    return prompt;
-  } catch (err) {
-    console.error('[GENERATE VIDEO] Prompt refinement failed, using original:', err);
-    return prompt;
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -355,8 +235,8 @@ export async function execute(
       videoAspectRatio,
     });
     composedPrompt = await withTimeout(
-      refineVideoPrompt(context.sogniClient, prompt, duration, context.tokenType),
-      LLM_SUBCALL_TIMEOUT_MS,
+      refineVideoPrompt(context.sogniClient, prompt, duration, context.tokenType, '[GENERATE VIDEO]'),
+      LLM_THINKING_TIMEOUT_MS,
       'Video prompt refinement',
     ) ?? prompt;
   }

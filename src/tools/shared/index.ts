@@ -22,7 +22,9 @@ export {
 } from './billing';
 export {
   LLM_SUBCALL_TIMEOUT_MS,
+  LLM_THINKING_TIMEOUT_MS,
   withTimeout,
   stripThinkBlocks,
 } from './llmHelpers';
 export { uint8ArrayToDataUri } from './imageEncoding';
+export { needsCreativeRefinement, refineVideoPrompt } from './videoPromptRefinement';

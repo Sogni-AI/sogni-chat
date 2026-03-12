@@ -30,8 +30,7 @@ CRITICAL FOR CHARACTERS: If the user references specific characters (from movies
 CONSTRAINTS:
 - Present tense only. Positive phrasing.
 - No vague words ("beautiful", "nice") — use concrete sensory details.
-- Keep movements natural and physically plausible.
-- End with "The footage remains smooth and stabilised throughout."`,
+- Keep movements natural and physically plausible.`,
         },
         duration: {
           type: 'number',
