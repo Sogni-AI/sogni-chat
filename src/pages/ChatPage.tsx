@@ -629,6 +629,9 @@ export default function ChatPage() {
       clearUpload();
     }
 
+    // Switching sessions clears any pending upload intent
+    setUploadIntent(null);
+
     // Clear indicators for the newly selected session
     setUnreadSessionIds((prev) => {
       const next = new Set(prev);

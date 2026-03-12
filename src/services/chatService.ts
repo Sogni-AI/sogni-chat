@@ -50,6 +50,43 @@ export interface ChatStreamCallbacks {
 
 const MAX_TOOL_ROUNDS = 5;
 
+/** Token overhead for a vision image (matches IMAGE_TOKENS_HIGH in tokenEstimation.ts) */
+const VISION_IMAGE_TOKENS = 1_300;
+
+/**
+ * Prepare a vision-ready data URI from the most relevant image source.
+ * Uses resizeImageForVision (1024px max, JPEG 0.85) for compact payloads.
+ * Returns null if no image is available or preparation fails.
+ */
+async function prepareVisionDataUri(context: ToolExecutionContext): Promise<string | null> {
+  try {
+    // Priority: latest result > original upload > attached image
+    if (context.resultUrls.length > 0) {
+      return await resizeImageForVision(context.resultUrls[context.resultUrls.length - 1]);
+    }
+    if (context.imageData) {
+      const blobUrl = URL.createObjectURL(new Blob([context.imageData], { type: 'image/jpeg' }));
+      try {
+        return await resizeImageForVision(blobUrl);
+      } finally {
+        URL.revokeObjectURL(blobUrl);
+      }
+    }
+    const imgFile = context.uploadedFiles.find(f => f.type === 'image');
+    if (imgFile) {
+      const blobUrl = URL.createObjectURL(new Blob([imgFile.data], { type: imgFile.mimeType }));
+      try {
+        return await resizeImageForVision(blobUrl);
+      } finally {
+        URL.revokeObjectURL(blobUrl);
+      }
+    }
+  } catch (err) {
+    console.warn('[CHAT SERVICE] Vision image preparation failed:', err);
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // sendChatMessage
 // ---------------------------------------------------------------------------
@@ -83,14 +120,22 @@ export async function sendChatMessage(
     onGallerySaved: callbacks.onGallerySaved,
   };
 
+  // Prepare vision context once before the loop: resize the current image
+  // to a compact data URI so the VLM can "see" it on every round.
+  // Re-prepared inside the loop only when new results are generated.
+  let visionDataUri = await prepareVisionDataUri(context);
+  let visionResultCount = context.resultUrls.length;
+
   while (toolRound < MAX_TOOL_ROUNDS) {
     toolRound++;
     let insideThink = false;
 
     try {
-      // Sliding window: trim conversation if approaching context limit
+      // Sliding window: trim conversation if approaching context limit.
+      // Reserve token budget for the vision image that will be attached.
       const systemMessage: ChatMessage = { role: 'system', content: CHAT_SYSTEM_PROMPT };
-      const budget = getInputBudget(context.sogniClient);
+      const rawBudget = getInputBudget(context.sogniClient);
+      const budget = visionDataUri ? rawBudget - VISION_IMAGE_TOKENS : rawBudget;
       const trimResult = trimConversation(updatedMessages, systemMessage, budget);
       if (trimResult.trimmedCount > 0) {
         console.log(`[CHAT SERVICE] Trimmed ${trimResult.trimmedCount} messages to fit context window`);
@@ -104,34 +149,27 @@ export async function sendChatMessage(
         ...updatedMessages,
       ];
 
-      // Attach the most recent relevant image to the latest user message
-      // so the VLM can "see" it — matching the SDK vision chat pattern.
-      // Only enhances the copy sent to the API; stored history stays text-only.
-      let lastUserIdx = -1;
-      for (let i = allMessages.length - 1; i >= 0; i--) {
-        if (allMessages[i].role === 'user') {
-          lastUserIdx = i;
-          break;
-        }
+      // If a tool generated new results since last round, refresh the cached URI
+      if (context.resultUrls.length > visionResultCount) {
+        visionDataUri = await prepareVisionDataUri(context);
+        visionResultCount = context.resultUrls.length;
       }
-      if (lastUserIdx >= 0 && typeof allMessages[lastUserIdx].content === 'string') {
-        let visionImageUrl: string | null = null;
-        if (context.resultUrls.length > 0) {
-          visionImageUrl = context.resultUrls[context.resultUrls.length - 1];
-        } else if (context.imageData) {
-          visionImageUrl = uint8ArrayToDataUri(context.imageData);
-        } else {
-          const imgFile = context.uploadedFiles.find(f => f.type === 'image');
-          if (imgFile) {
-            visionImageUrl = uint8ArrayToDataUri(imgFile.data, imgFile.mimeType);
+
+      // Attach cached vision context to the latest user message.
+      // Only enhances the copy sent to the API; stored history stays text-only.
+      if (visionDataUri) {
+        let lastUserIdx = -1;
+        for (let i = allMessages.length - 1; i >= 0; i--) {
+          if (allMessages[i].role === 'user') {
+            lastUserIdx = i;
+            break;
           }
         }
-        if (visionImageUrl) {
-          console.log(`[CHAT SERVICE] Attaching vision context to user message (source: ${context.resultUrls.length > 0 ? 'result' : context.imageData ? 'upload' : 'attachment'})`);
+        if (lastUserIdx >= 0 && typeof allMessages[lastUserIdx].content === 'string') {
           allMessages[lastUserIdx] = {
             ...allMessages[lastUserIdx],
             content: [
-              { type: 'image_url', image_url: { url: visionImageUrl } },
+              { type: 'image_url', image_url: { url: visionDataUri } },
               { type: 'text', text: allMessages[lastUserIdx].content as string },
             ],
           };
