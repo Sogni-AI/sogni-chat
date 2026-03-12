@@ -176,6 +176,22 @@ export function AppLayout() {
       />
 
       <SogniTV />
+
+      {/* Alpha version badge */}
+      <div style={{
+        position: 'fixed',
+        bottom: '0.5rem',
+        right: '0.75rem',
+        fontSize: '0.6rem',
+        fontWeight: 500,
+        letterSpacing: '0.08em',
+        color: 'rgba(255,255,255,0.2)',
+        pointerEvents: 'none',
+        zIndex: 9999,
+        userSelect: 'none',
+      }}>
+        ALPHA V0.0.1
+      </div>
     </LayoutContext.Provider>
   );
 }

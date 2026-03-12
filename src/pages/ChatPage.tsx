@@ -738,7 +738,7 @@ export default function ChatPage() {
               What would you like to create?
             </h1>
             <p className="mb-8" style={{ color: 'var(--color-text-tertiary)', lineHeight: 1.6, fontSize: '0.9375rem' }}>
-              Generate images and videos, compose music, restore and transform photos — all powered by AI.
+              Generate images and videos, compose music, restore and transform photos — with the power of your Sogni Creative Agent.
             </p>
             <button
               onClick={() => showSignupModal()}

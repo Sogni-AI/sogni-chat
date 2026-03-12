@@ -22,6 +22,7 @@ export interface TVProgress {
 let isOpen = false;
 let autoCloseOnComplete = false;
 let currentProgress: TVProgress | null = null;
+let startVideoUrl: string | null = null;
 const listeners = new Set<Listener>();
 
 function notify() {
@@ -29,9 +30,10 @@ function notify() {
 }
 
 export const sogniTVController = {
-  open(autoClose = false) {
+  open(autoClose = false, videoUrl?: string) {
     isOpen = true;
     autoCloseOnComplete = autoClose;
+    startVideoUrl = videoUrl ?? null;
     notify();
   },
 
@@ -66,8 +68,15 @@ export const sogniTVController = {
     }
   },
 
+  /** Consume the start video URL (returns it once, then clears) */
+  consumeStartVideoUrl(): string | null {
+    const url = startVideoUrl;
+    startVideoUrl = null;
+    return url;
+  },
+
   getState() {
-    return { isOpen, autoCloseOnComplete, progress: currentProgress };
+    return { isOpen, autoCloseOnComplete, progress: currentProgress, startVideoUrl };
   },
 
   subscribe(fn: Listener) {

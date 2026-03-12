@@ -21,6 +21,8 @@ export const cdnAssets = {
     slothicornBeach: `${CDN_BASE}/videos/slothicorn-beach.mp4?v=961a9a50`,
     sogniYourInControl: `${CDN_BASE}/videos/sogni-your-in-control.mp4?v=d2c9e8f6`,
     squirrel: `${CDN_BASE}/videos/squirrel.mp4?v=ca4a773d`,
+    tears: `${CDN_BASE}/videos/tears.mp4?v=0e1ad268`,
+    vance: `${CDN_BASE}/videos/vance.mp4?v=cfa0ad7f`,
     woman: `${CDN_BASE}/videos/woman.mp4?v=2c21d26a`,
   },
 } as const;

@@ -5,7 +5,6 @@ import { sogniTVController } from '@/services/sogniTVController';
 import type { TVProgress } from '@/services/sogniTVController';
 
 const FIRST_TIME_KEY = 'sogni-tv-first-play-done';
-const SESSION_PLAYLIST_KEY = 'sogni-tv-session-playlist';
 const STATIC_MIN_MS = 2000;
 const STATIC_MAX_MS = 4000;
 
@@ -33,37 +32,21 @@ function shuffleArray<T>(arr: T[]): T[] {
   return shuffled;
 }
 
-function buildPlaylist(): string[] {
+export function buildPlaylist(): string[] {
   const isFirstTime = !localStorage.getItem(FIRST_TIME_KEY);
-
-  const cached = sessionStorage.getItem(SESSION_PLAYLIST_KEY);
-  if (cached) {
-    try {
-      const parsed = JSON.parse(cached);
-      // Don't reuse a stale first-time playlist after the flag has been set
-      if (!isFirstTime && parsed[0] === cdnAssets.videos[FIRST_TIME_ORDER[0]]) {
-        sessionStorage.removeItem(SESSION_PLAYLIST_KEY);
-      } else {
-        return parsed;
-      }
-    } catch {
-      // fall through to rebuild
-    }
-  }
-
-  let playlist: string[];
 
   if (isFirstTime) {
     const priorityUrls = FIRST_TIME_ORDER.map((key) => cdnAssets.videos[key]);
     const remaining = ALL_VIDEOS.filter((url) => !priorityUrls.includes(url));
-    playlist = [...priorityUrls, ...shuffleArray(remaining)];
-    localStorage.setItem(FIRST_TIME_KEY, 'true');
-  } else {
-    playlist = shuffleArray(ALL_VIDEOS);
+    return [...priorityUrls, ...shuffleArray(remaining)];
   }
 
-  sessionStorage.setItem(SESSION_PLAYLIST_KEY, JSON.stringify(playlist));
-  return playlist;
+  return shuffleArray(ALL_VIDEOS);
+}
+
+/** Mark first-time playlist as seen — call from useEffect, not during render */
+export function markFirstPlayDone() {
+  localStorage.setItem(FIRST_TIME_KEY, 'true');
 }
 
 function getVideoLabel(url: string): string {
@@ -316,8 +299,15 @@ function RenderProgressOverlay() {
 
 // --- Fullscreen Player ---
 
-function SogniTVPlayer({ onClose }: { onClose: () => void }) {
-  const [playlist] = useState<string[]>(() => buildPlaylist());
+function SogniTVPlayer({ onClose, startVideoUrl }: { onClose: () => void; startVideoUrl?: string | null }) {
+  const [playlist] = useState<string[]>(() => {
+    const list = buildPlaylist();
+    if (startVideoUrl) {
+      const filtered = list.filter((url) => url !== startVideoUrl);
+      return [startVideoUrl, ...filtered];
+    }
+    return list;
+  });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showStatic, setShowStatic] = useState(false);
   const pendingIndexRef = useRef<number | null>(null);
@@ -325,6 +315,9 @@ function SogniTVPlayer({ onClose }: { onClose: () => void }) {
   const preloadRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { canvasRef, startStatic, stopStatic } = useStaticEffect();
+
+  // Mark first-time playlist as seen (in effect, not during render, for StrictMode safety)
+  useEffect(() => { markFirstPlayDone(); }, []);
 
   const currentUrl = playlist[currentIndex];
   const nextIndex = (currentIndex + 1) % playlist.length;
@@ -688,7 +681,7 @@ function SogniTVPlayer({ onClose }: { onClose: () => void }) {
             color: 'rgba(255,255,255,0.7)',
             fontSize: '0.85rem',
           }}>
-            {label}
+            LTX-2.3 Video - {label}
           </span>
         )}
       </div>
@@ -705,23 +698,30 @@ function SogniTVPlayer({ onClose }: { onClose: () => void }) {
 export function SogniTV() {
   const [dismissed, setDismissed] = useState(false);
   const [playerOpen, setPlayerOpen] = useState(false);
+  const [startVideoUrl, setStartVideoUrl] = useState<string | null>(null);
+  const [playerKey, setPlayerKey] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
 
   // Listen for external open/close from the controller (chat offer integration)
   useEffect(() => {
     return sogniTVController.subscribe(() => {
-      const { isOpen } = sogniTVController.getState();
-      setPlayerOpen(isOpen);
+      const state = sogniTVController.getState();
+      if (state.isOpen && !playerOpen) {
+        setStartVideoUrl(state.startVideoUrl ?? null);
+        setPlayerKey((k) => k + 1);
+      }
+      setPlayerOpen(state.isOpen);
     });
-  }, []);
+  }, [playerOpen]);
 
   const handleClose = useCallback(() => {
     setPlayerOpen(false);
+    setStartVideoUrl(null);
     sogniTVController.close();
   }, []);
 
   if (playerOpen) {
-    return <SogniTVPlayer onClose={handleClose} />;
+    return <SogniTVPlayer key={playerKey} onClose={handleClose} startVideoUrl={startVideoUrl} />;
   }
 
   if (dismissed) return null;
