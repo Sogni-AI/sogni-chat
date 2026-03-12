@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Setup script for Sogni Chat local development
+# Setup script for Sogni Creative Agent local development
 # Configures HTTPS via nginx for local Sogni SDK authentication
 
-echo "🚀 Setting up Sogni Chat for local HTTPS development"
+echo "🚀 Setting up Sogni Creative Agent for local HTTPS development"
 echo ""
 
 # Check if running on macOS

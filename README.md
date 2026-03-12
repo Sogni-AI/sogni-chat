@@ -1,4 +1,4 @@
-# Sogni Chat
+# Sogni Creative Agent
 
 AI-powered creative studio with a conversational interface. Generate images, edit photos, create videos, and compose music -- all through natural language.
 
@@ -22,7 +22,7 @@ npm run server:dev   # Backend on port 3006
 
 ## Features
 
-Sogni Chat provides 11 AI tools accessible through natural conversation:
+Sogni Creative Agent provides 11 AI tools accessible through natural conversation:
 
 **Image**
 - **Generate Image** -- Create images from text descriptions (Flux)
@@ -56,7 +56,7 @@ src/tools/
   ...
 ```
 
-The LLM (Qwen3 via Sogni Chat API) receives all tool definitions and autonomously decides which tool to call based on the user's message. A tool calling loop handles multi-step workflows.
+The LLM (Qwen3 via Sogni Creative Agent API) receives all tool definitions and autonomously decides which tool to call based on the user's message. A tool calling loop handles multi-step workflows.
 
 **Key architectural decisions:**
 - Tool registry with self-registration -- adding a tool requires no changes to the chat service

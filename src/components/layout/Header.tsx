@@ -38,7 +38,7 @@ export function Header() {
               alt="Sogni"
               style={{ width: '24px', height: '24px', borderRadius: '50%' }}
             />
-            <span className="header-logo-text" style={{ fontWeight: 600 }}>Sogni Chat</span>
+            <span className="header-logo-text" style={{ fontWeight: 600 }}>Sogni Creative Agent</span>
           </span>
 
           <div className="flex items-center gap-3 header-buttons">

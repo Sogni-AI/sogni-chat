@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Sogni Chat - Staging Deployment
+# Sogni Creative Agent - Staging Deployment
 # Deploys frontend + backend to staging environment
 
 REMOTE_HOST="sogni-staging"
@@ -13,7 +13,7 @@ APP_DOMAIN="chat-staging.sogni.ai"
 API_DOMAIN="chat-staging.sogni.ai"
 
 echo "=========================================="
-echo "  Sogni Chat - Staging Deploy"
+echo "  Sogni Creative Agent - Staging Deploy"
 echo "=========================================="
 
 # Verify local env files exist

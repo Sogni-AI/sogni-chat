@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Sogni Chat is a standalone AI creative studio powered by the Sogni Client SDK. It provides a conversational interface where users interact with 11 AI tools spanning image generation/editing, video creation, and music composition. The app uses a tool registry architecture where each AI capability is a self-contained module that self-registers at import time.
+Sogni Creative Agent is a standalone AI creative studio powered by the Sogni Client SDK. It provides a conversational interface where users interact with 11 AI tools spanning image generation/editing, video creation, and music composition. The app uses a tool registry architecture where each AI capability is a self-contained module that self-registers at import time.
 
 ## Build & Development Commands
 
@@ -121,7 +121,7 @@ toolRegistry.register({ definition, execute, suggestions: [...] });
 
 ### Chat / LLM Architecture
 
-- **LLM**: Qwen3 via Sogni Chat API (`sogniClient.chat.completions.create()`)
+- **LLM**: Qwen3 via Sogni Creative Agent API (`sogniClient.chat.completions.create()`)
 - **Model**: `qwen3.5-35b-a3b-gguf-q4km` (abliterated variant available for refusals)
 - **Tool calling**: OpenAI-compatible format. Tools are auto-discovered from the registry.
 - **Streaming**: `for await (const chunk of stream)` then `stream.finalResult`

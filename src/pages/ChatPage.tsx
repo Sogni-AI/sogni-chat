@@ -1,5 +1,5 @@
 /**
- * Chat page — primary interface for Sogni Chat.
+ * Chat page — primary interface for Sogni Creative Agent.
  * Full-width conversational interface for AI-assisted photo operations.
  * Owns useChat state and passes it down to ChatPanel.
  * Integrates chat history sidebar on desktop (>=900px).
@@ -666,7 +666,7 @@ export default function ChatPage() {
     return (
       <>
         <SEOHead
-          title="AI Creative Studio | Sogni Chat"
+          title="AI Creative Studio | Sogni Creative Agent"
           description="Chat with AI to generate images, create videos, compose music, restore photos, and more."
           path="/"
         />
@@ -699,7 +699,7 @@ export default function ChatPage() {
   return (
     <>
       <SEOHead
-        title="AI Creative Studio | Sogni Chat"
+        title="AI Creative Studio | Sogni Creative Agent"
         description="Chat with AI to generate images, create videos, compose music, restore photos, and more."
         path="/"
       />
