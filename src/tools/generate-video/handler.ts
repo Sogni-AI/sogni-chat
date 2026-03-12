@@ -314,7 +314,7 @@ export async function execute(
       model: config.name,
       duration,
       creditsCost: formatCredits(estimatedCost),
-      message: `Successfully generated ${videoUrls.length} ${duration}-second video${videoUrls.length !== 1 ? 's' : ''} using ${config.name}${config.hasAudio ? ' (with audio)' : ''}. Cost: ~${formatCredits(estimatedCost)} credits.`,
+      message: `Successfully generated ${videoUrls.length} ${duration}-second video${videoUrls.length !== 1 ? 's' : ''} using ${config.name}${config.hasAudio ? ' (with audio)' : ''}. Cost: ~${formatCredits(estimatedCost)} credits. The user can now see and play the video${videoUrls.length !== 1 ? 's' : ''}.`,
     });
   } catch (err: unknown) {
     if (billingId) discardPending(billingId);

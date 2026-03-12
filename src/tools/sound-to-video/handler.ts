@@ -171,7 +171,7 @@ export async function execute(
   const audioIndex = audioSourceIndex ?? 0;
   const audioFile = audioFiles[audioIndex];
   if (!audioFile) {
-    return JSON.stringify({ error: 'no_audio', message: 'No audio file uploaded. This tool requires a pre-recorded audio file (mp3, wav, or m4a). If you want dialogue or audio generated from scratch, use animate_photo instead — LTX-2 generates audio natively.' });
+    return JSON.stringify({ error: 'no_audio', message: 'No audio file uploaded. This tool requires a pre-recorded audio file (mp3, wav, or m4a). Tell the user to upload an audio file to use this tool. Do not call any other tools.' });
   }
   if (!audioFile.data || audioFile.data.byteLength === 0) {
     return JSON.stringify({ error: 'invalid_audio', message: 'The audio file is empty or corrupted. Please upload a valid audio file.' });
@@ -292,7 +292,7 @@ export async function execute(
       model: config.name,
       duration,
       creditsCost: formatCredits(estimatedCost),
-      message: `Successfully generated ${videoUrls.length} audio-synchronized ${duration}-second video${videoUrls.length !== 1 ? 's' : ''} using ${config.name}. Cost: ~${formatCredits(estimatedCost)} credits.`,
+      message: `Successfully generated ${videoUrls.length} audio-synchronized ${duration}-second video${videoUrls.length !== 1 ? 's' : ''} using ${config.name}. Cost: ~${formatCredits(estimatedCost)} credits. The user can now see and play the video${videoUrls.length !== 1 ? 's' : ''}.`,
     });
   } catch (err: unknown) {
     if (billingId) discardPending(billingId);

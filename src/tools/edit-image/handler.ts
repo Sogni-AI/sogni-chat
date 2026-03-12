@@ -225,7 +225,7 @@ export async function execute(
       model: modelConfig.name,
       contextImageCount: cappedContextImages.length,
       creditsCost: formatCredits(estimatedCost),
-      message: `Successfully generated ${resultUrls.length} image${resultUrls.length !== 1 ? 's' : ''} using ${modelConfig.name} with ${cappedContextImages.length} reference image${cappedContextImages.length !== 1 ? 's' : ''}. Cost: ~${formatCredits(estimatedCost)} credits.`,
+      message: `Successfully generated ${resultUrls.length} image${resultUrls.length !== 1 ? 's' : ''} using ${modelConfig.name} with ${cappedContextImages.length} reference image${cappedContextImages.length !== 1 ? 's' : ''}. Cost: ~${formatCredits(estimatedCost)} credits. The user can now see the results.`,
     });
   } catch (err: unknown) {
     if (billingId) discardPending(billingId);

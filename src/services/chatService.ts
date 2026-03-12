@@ -184,11 +184,16 @@ export async function sendChatMessage(
         }
       }
 
+      // On the final allowed round, omit tools so the LLM is forced to produce
+      // a text summary instead of making another tool call that would exceed the limit.
+      const isLastRound = toolRound >= MAX_TOOL_ROUNDS;
       const stream = await sogniClient.chat.completions.create({
         model: context.model || CHAT_MODEL,
         messages: allMessages,
-        tools: toolRegistry.getDefinitions(),
-        tool_choice: 'auto',
+        ...(!isLastRound && {
+          tools: toolRegistry.getDefinitions(),
+          tool_choice: 'auto',
+        }),
         stream: true,
         tokenType: context.tokenType,
         ...CHAT_DEFAULT_PARAMS,
@@ -310,10 +315,6 @@ export async function sendChatMessage(
       callbacks.onError(err.message || 'Failed to get a response. Please try again.');
       break;
     }
-  }
-
-  if (toolRound >= MAX_TOOL_ROUNDS) {
-    callbacks.onError('The assistant made too many tool calls. Please try a simpler request.');
   }
 
   return updatedMessages;

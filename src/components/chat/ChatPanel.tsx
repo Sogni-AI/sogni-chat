@@ -14,6 +14,7 @@ import { VIDEO_VISION_ANALYSIS_SYSTEM_PROMPT } from '@/config/chat';
 import { FullscreenBeforeAfter } from '@/components/FullscreenBeforeAfter';
 import { useLayout } from '@/layouts/AppLayout';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useTypingPlaceholder } from '@/hooks/useTypingPlaceholder';
 import { getVariantById } from '@/config/modelVariants';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
@@ -383,6 +384,9 @@ export function ChatPanel({
   // True when the welcome empty state UI is showing (has its own category chips)
   const showWelcomeScreen = !hasImage && messages.length <= 1 && messages[0]?.id === 'welcome' && !isLoading;
 
+  // Rotating typewriter placeholder for the empty state
+  const typingPlaceholder = useTypingPlaceholder({ enabled: showWelcomeScreen });
+
   const showIntentCapture = useMemo(() => {
     if (!hasImage || isLoading || isAnalyzing) return false;
     if (uploadIntent !== 'restore') return false;
@@ -689,9 +693,33 @@ export function ChatPanel({
                 borderRadius: 'var(--radius-md)',
                 color: '#f87171',
                 fontSize: '0.8125rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '0.5rem',
               }}
             >
-              {error || mediaUploadError}
+              <span>{error || mediaUploadError}</span>
+              <button
+                onClick={() => chat.clearError()}
+                aria-label="Dismiss error"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#f87171',
+                  cursor: 'pointer',
+                  padding: '0.125rem',
+                  lineHeight: 1,
+                  fontSize: '1rem',
+                  flexShrink: 0,
+                  opacity: 0.7,
+                  transition: 'opacity 0.15s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+              >
+                ✕
+              </button>
             </div>
           )}
 
@@ -704,9 +732,10 @@ export function ChatPanel({
         onSend={handleSend}
         disabled={!canSend}
         placeholder={
-          isMobile
+          typingPlaceholder ||
+          (isMobile
             ? (hasImage ? 'What should I do with your photo?' : 'What do you want to create?')
-            : (hasImage ? 'Describe what you want to do with your photo...' : 'Describe what you want to create...')
+            : (hasImage ? 'Describe what you want to do with your photo...' : 'Describe what you want to create...'))
         }
         uploadedFiles={uploadedFiles}
         isMediaUploading={isMediaUploading}

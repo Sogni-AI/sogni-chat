@@ -98,6 +98,8 @@ export interface UseChatResult {
     galleryImageIds: string[],
     galleryVideoIds: string[],
   ) => void) | null) => void;
+  /** Dismiss the current error */
+  clearError: () => void;
 }
 
 const MAX_CONCURRENT_REQUESTS = 2;
@@ -354,6 +356,7 @@ export function useChat(): UseChatResult {
       },
     ) => {
       if (!content.trim()) return;
+      setError(null);
 
       // Add user message to UI immediately (even if queued)
       const userMsgId = `user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -980,5 +983,6 @@ export function useChat(): UseChatResult {
     getSessionId,
     setOnBackgroundComplete,
     setOnBackgroundGallerySaved,
+    clearError: useCallback(() => setError(null), []),
   };
 }

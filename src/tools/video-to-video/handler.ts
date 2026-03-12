@@ -232,7 +232,7 @@ export async function execute(
       controlMode,
       duration,
       creditsCost: formatCredits(estimatedCost),
-      message: `Successfully transformed ${videoUrls.length} video${videoUrls.length !== 1 ? 's' : ''} using ${config.name} with "${controlMode}" control. Cost: ~${formatCredits(estimatedCost)} credits.`,
+      message: `Successfully transformed ${videoUrls.length} video${videoUrls.length !== 1 ? 's' : ''} using ${config.name} with "${controlMode}" control. Cost: ~${formatCredits(estimatedCost)} credits. The user can now see and play the video${videoUrls.length !== 1 ? 's' : ''}.`,
     });
   } catch (err: unknown) {
     if (billingId) discardPending(billingId);
