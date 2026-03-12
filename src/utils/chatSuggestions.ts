@@ -17,7 +17,8 @@ type ChatToolName =
   | 'generate_video'
   | 'sound_to_video'
   | 'video_to_video'
-  | 'generate_music';
+  | 'generate_music'
+  | 'analyze_image';
 
 /** A suggestion chip with display label and prompt text sent on click */
 export interface Suggestion {
@@ -34,10 +35,10 @@ const WELCOME_SUGGESTIONS: Suggestion[] = [
 
 /** Suggestions shown when no image is uploaded — text-to-image/video/music prompts */
 const NO_IMAGE_SUGGESTIONS: Suggestion[] = [
-  { label: 'Generate an image', prompt: 'Generate an image of a sunset over a mountain lake' },
-  { label: 'Create a video', prompt: 'Generate a video of ocean waves crashing on a rocky shore' },
-  { label: 'Compose music', prompt: 'Generate a chill lo-fi beat, 80 BPM, with soft piano and vinyl crackle' },
-  { label: 'Upload a photo to edit', prompt: 'What can you do with my photos?' },
+  { label: 'Generate an image', prompt: 'Generate an image of a magical forest with bioluminescent mushrooms, soft fog, and moonlight filtering through ancient trees' },
+  { label: 'Create a video', prompt: 'Generate a video of a cozy cafe on a rainy night, warm light inside, gentle camera push-in' },
+  { label: 'Compose a song', prompt: 'Generate a dreamy indie pop track, 110 BPM, with reverb-heavy guitars and atmospheric synth pads' },
+  { label: 'Make a music video', prompt: 'Generate a video of abstract colorful paint swirling in water, synchronized to a deep electronic beat' },
 ];
 
 const SUGGESTIONS_BY_TOOL: Record<ChatToolName, Suggestion[]> = {
@@ -95,6 +96,11 @@ const SUGGESTIONS_BY_TOOL: Record<ChatToolName, Suggestion[]> = {
     { label: 'Try a different genre', prompt: 'Generate another track in a different genre' },
     { label: 'Sync to video', prompt: 'Create a video synced to this music' },
     { label: 'Adjust the tempo', prompt: 'Generate a similar track but faster tempo' },
+  ],
+  analyze_image: [
+    { label: 'Read the text', prompt: 'Extract all visible text from this image' },
+    { label: 'Edit based on analysis', prompt: 'Edit this image to improve it' },
+    { label: 'Generate something similar', prompt: 'Generate a new image inspired by this one' },
   ],
 };
 

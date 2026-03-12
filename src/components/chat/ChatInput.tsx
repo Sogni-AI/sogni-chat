@@ -1,5 +1,6 @@
 /**
- * Chat input component with auto-resizing textarea, file attachment, and send button.
+ * Chat input component — ChatGPT-inspired rounded pill style.
+ * Auto-resizing textarea with file attachment and send button inside the pill.
  */
 import { memo, useState, useCallback, useRef, useEffect } from 'react';
 import type { UploadedFile } from '@/tools/types';
@@ -46,7 +47,6 @@ function FileTypeIcon({ type }: { type: UploadedFile['type'] }) {
       </svg>
     );
   }
-  // image
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
@@ -82,7 +82,6 @@ export const ChatInput = memo(function ChatInput({
     if (!trimmed || disabled) return;
     onSend(trimmed);
     setValue('');
-    // Reset height after clearing
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -115,237 +114,197 @@ export const ChatInput = memo(function ChatInput({
   );
 
   const hasFiles = uploadedFiles && uploadedFiles.length > 0;
+  const canSendNow = !disabled && value.trim().length > 0;
 
   return (
     <div
       className="chat-input-wrap"
       style={{
+        padding: '0.75rem 1rem 1rem',
         display: 'flex',
-        flexDirection: 'column',
-        padding: '0.75rem 1rem',
-        background: 'var(--color-bg-elevated)',
-        borderTop: '1px solid var(--color-border)',
-        borderRadius: '0 0 var(--radius-lg) var(--radius-lg)',
-        gap: '0.5rem',
+        justifyContent: 'center',
       }}
     >
-      {/* Attached files preview */}
-      {hasFiles && (
+      <div style={{ maxWidth: '48rem', width: '100%' }}>
+        {/* Attached files preview */}
+        {hasFiles && (
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '0.375rem',
+              marginBottom: '0.5rem',
+            }}
+          >
+            {uploadedFiles.map((f, i) => (
+              <div
+                key={`${f.filename}-${i}`}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.375rem',
+                  padding: '0.25rem 0.5rem',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: 'var(--radius-lg)',
+                  fontSize: '0.75rem',
+                  color: '#b4b4b4',
+                  maxWidth: '200px',
+                }}
+              >
+                <FileTypeIcon type={f.type} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {fileLabel(f)}
+                </span>
+                {onRemoveMediaFile && (
+                  <button
+                    onClick={() => onRemoveMediaFile(i)}
+                    aria-label={`Remove ${f.filename}`}
+                    style={{
+                      flexShrink: 0,
+                      width: '1rem',
+                      height: '1rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#8e8e8e',
+                      padding: 0,
+                      borderRadius: '50%',
+                      transition: 'color 0.15s',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = '#f87171'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = '#8e8e8e'; }}
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            ))}
+            {isMediaUploading && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#8e8e8e' }}>
+                Processing...
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Rounded pill input container */}
         <div
           style={{
             display: 'flex',
-            flexWrap: 'wrap',
-            gap: '0.375rem',
+            alignItems: 'flex-end',
+            gap: '0',
+            background: '#2f2f2f',
+            borderRadius: 'var(--radius-pill)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            padding: '0.5rem 0.75rem',
+            transition: 'border-color 0.2s',
           }}
         >
-          {uploadedFiles.map((f, i) => (
-            <div
-              key={`${f.filename}-${i}`}
+          {/* Hidden file input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPT_ALL_MEDIA}
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+          />
+
+          {/* Attach button */}
+          {onAddMediaFile && (
+            <button
+              onClick={handleAttachClick}
+              disabled={disabled || isMediaUploading}
+              aria-label="Attach a file"
+              title="Attach audio, video, or image file"
               style={{
-                display: 'inline-flex',
+                flexShrink: 0,
+                width: '2rem',
+                height: '2rem',
+                borderRadius: '50%',
+                border: 'none',
+                background: 'transparent',
+                color: '#8e8e8e',
+                cursor: disabled || isMediaUploading ? 'not-allowed' : 'pointer',
+                display: 'flex',
                 alignItems: 'center',
-                gap: '0.375rem',
-                padding: '0.25rem 0.5rem',
-                background: 'rgba(var(--rgb-primary), 0.06)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-sm)',
-                fontSize: '0.75rem',
-                color: 'var(--color-text-secondary)',
-                maxWidth: '200px',
+                justifyContent: 'center',
+                transition: 'color 0.15s',
+                opacity: disabled || isMediaUploading ? 0.4 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (!disabled && !isMediaUploading) e.currentTarget.style.color = '#ececec';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = '#8e8e8e';
               }}
             >
-              <FileTypeIcon type={f.type} />
-              <span
-                style={{
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {fileLabel(f)}
-              </span>
-              {onRemoveMediaFile && (
-                <button
-                  onClick={() => onRemoveMediaFile(i)}
-                  aria-label={`Remove ${f.filename}`}
-                  style={{
-                    flexShrink: 0,
-                    width: '1rem',
-                    height: '1rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: 'var(--color-text-tertiary)',
-                    padding: 0,
-                    borderRadius: '50%',
-                    transition: 'color 0.15s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = '#dc2626';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = 'var(--color-text-tertiary)';
-                  }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              )}
-            </div>
-          ))}
-          {isMediaUploading && (
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.375rem',
-                padding: '0.25rem 0.5rem',
-                fontSize: '0.75rem',
-                color: 'var(--color-text-tertiary)',
-              }}
-            >
-              Processing...
-            </div>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+            </button>
           )}
-        </div>
-      )}
 
-      {/* Input row: attach button + textarea + send button */}
-      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
-        {/* Hidden file input */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={ACCEPT_ALL_MEDIA}
-          onChange={handleFileChange}
-          className="hidden"
-          style={{ display: 'none' }}
-        />
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            disabled={disabled}
+            rows={1}
+            aria-label="Chat message"
+            style={{
+              flex: 1,
+              resize: 'none',
+              border: 'none',
+              borderRadius: 0,
+              padding: '0.375rem 0.5rem',
+              fontSize: '0.9375rem',
+              lineHeight: '1.5',
+              fontFamily: 'var(--font-primary)',
+              color: '#ececec',
+              background: 'transparent',
+              outline: 'none',
+              maxHeight: '160px',
+              overflow: 'auto',
+              opacity: disabled ? 0.5 : 1,
+            }}
+          />
 
-        {/* Attach button */}
-        {onAddMediaFile && (
+          {/* Send button */}
           <button
-            onClick={handleAttachClick}
-            disabled={disabled || isMediaUploading}
-            aria-label="Attach a file"
-            title="Attach audio, video, or image file"
+            onClick={handleSend}
+            disabled={!canSendNow}
             style={{
               flexShrink: 0,
-              width: '2.5rem',
-              height: '2.5rem',
+              width: '2rem',
+              height: '2rem',
               borderRadius: '50%',
-              border: '1px solid var(--color-border)',
-              background: 'var(--color-bg)',
-              color: 'var(--color-text-secondary)',
-              cursor: disabled || isMediaUploading ? 'not-allowed' : 'pointer',
+              border: 'none',
+              background: canSendNow ? '#ffffff' : 'rgba(255, 255, 255, 0.1)',
+              color: canSendNow ? '#0a0a0a' : '#666666',
+              cursor: canSendNow ? 'pointer' : 'not-allowed',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              transition: 'all 0.2s',
-              opacity: disabled || isMediaUploading ? 0.5 : 1,
+              transition: 'all 0.15s',
             }}
-            onMouseEnter={(e) => {
-              if (!disabled && !isMediaUploading) {
-                e.currentTarget.style.borderColor = 'var(--color-accent)';
-                e.currentTarget.style.color = 'var(--color-primary)';
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = 'var(--color-border)';
-              e.currentTarget.style.color = 'var(--color-text-secondary)';
-            }}
+            title="Send message"
           >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="19" x2="12" y2="5" />
+              <polyline points="5 12 12 5 19 12" />
             </svg>
           </button>
-        )}
-
-        <textarea
-          ref={textareaRef}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-          disabled={disabled}
-          rows={1}
-          aria-label="Chat message"
-          style={{
-            flex: 1,
-            resize: 'none',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-md)',
-            padding: '0.625rem 0.875rem',
-            fontSize: '0.875rem',
-            lineHeight: '1.5',
-            fontFamily: 'var(--font-primary)',
-            color: 'var(--color-text-primary)',
-            background: 'var(--color-bg)',
-            outline: 'none',
-            transition: 'border-color 0.2s',
-            maxHeight: '160px',
-            overflow: 'auto',
-            opacity: disabled ? 0.6 : 1,
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.borderColor = 'var(--color-accent)';
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.borderColor = 'var(--color-border)';
-          }}
-        />
-
-        <button
-          onClick={handleSend}
-          disabled={disabled || !value.trim()}
-          style={{
-            flexShrink: 0,
-            width: '2.5rem',
-            height: '2.5rem',
-            borderRadius: '50%',
-            border: 'none',
-            background:
-              disabled || !value.trim()
-                ? 'rgba(var(--rgb-primary), 0.1)'
-                : 'var(--sogni-gradient)',
-            color: disabled || !value.trim() ? 'var(--color-text-secondary)' : '#fff',
-            cursor: disabled || !value.trim() ? 'not-allowed' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.2s',
-            opacity: disabled || !value.trim() ? 0.5 : 1,
-          }}
-          title="Send message"
-        >
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <line x1="22" y1="2" x2="11" y2="13" />
-            <polygon points="22 2 15 22 11 13 2 9 22 2" />
-          </svg>
-        </button>
+        </div>
       </div>
     </div>
   );

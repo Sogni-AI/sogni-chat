@@ -215,17 +215,18 @@ export function DailyCreditsPopup({ isAuthenticated, sogniClient, onClaim }: Dai
       onClick={handleClose}
     >
       <div
-        className="bg-white max-w-sm w-full relative overflow-hidden"
+        className="max-w-sm w-full relative overflow-hidden"
         style={{
           borderRadius: '20px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+          background: '#2f2f2f'
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Decorative gradient header */}
         <div
           style={{
-            background: 'linear-gradient(135deg, var(--sogni-pink), var(--sogni-purple))',
+            background: '#171717',
             padding: '2rem 1.5rem 3rem',
             position: 'relative',
             overflow: 'hidden'
@@ -256,8 +257,8 @@ export function DailyCreditsPopup({ isAuthenticated, sogniClient, onClaim }: Dai
             onClick={handleClose}
             className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full transition-colors"
             style={{
-              background: 'rgba(255, 255, 255, 0.2)',
-              color: 'white'
+              background: 'rgba(255, 255, 255, 0.1)',
+              color: '#b4b4b4'
             }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -271,8 +272,8 @@ export function DailyCreditsPopup({ isAuthenticated, sogniClient, onClaim }: Dai
             <div
               className="w-16 h-16 rounded-full flex items-center justify-center"
               style={{
-                background: 'rgba(255,255,255,0.2)',
-                boxShadow: '0 4px 14px rgba(0,0,0,0.1)'
+                background: 'rgba(255,255,255,0.1)',
+                boxShadow: '0 4px 14px rgba(0,0,0,0.2)'
               }}
             >
               <span style={{ fontSize: '2rem' }}>🎁</span>
@@ -280,8 +281,8 @@ export function DailyCreditsPopup({ isAuthenticated, sogniClient, onClaim }: Dai
           </div>
 
           <h2
-            className="text-center text-white font-bold text-xl"
-            style={{ textShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
+            className="text-center font-bold text-xl"
+            style={{ color: '#ececec' }}
           >
             Daily Credits Available!
           </h2>
@@ -292,8 +293,8 @@ export function DailyCreditsPopup({ isAuthenticated, sogniClient, onClaim }: Dai
           <div
             className="rounded-xl p-4 text-center"
             style={{
-              background: 'linear-gradient(135deg, rgba(var(--rgb-primary),0.05) 0%, rgba(var(--rgb-accent),0.1) 100%)',
-              border: '1px solid rgba(var(--rgb-primary),0.1)'
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.08)'
             }}
           >
             {claimed ? (
@@ -318,12 +319,12 @@ export function DailyCreditsPopup({ isAuthenticated, sogniClient, onClaim }: Dai
             ) : (
               <>
                 <div className="flex items-center justify-center gap-2 mb-2">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--sogni-purple)" strokeWidth="2">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ececec" strokeWidth="2">
                     <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                   </svg>
                   <span
                     className="font-bold text-3xl"
-                    style={{ color: 'var(--sogni-purple)' }}
+                    style={{ color: '#ececec' }}
                   >
                     50
                   </span>
@@ -378,10 +379,11 @@ export function DailyCreditsPopup({ isAuthenticated, sogniClient, onClaim }: Dai
             <button
               onClick={handleClaim}
               disabled={isClaiming || showTurnstile}
-              className="w-full mt-4 inline-flex items-center justify-center gap-2 px-6 py-3.5 text-white font-semibold rounded-xl transition-all hover:scale-[1.02] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="w-full mt-4 inline-flex items-center justify-center gap-2 px-6 py-3.5 font-semibold rounded-xl transition-all hover:scale-[1.02] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100"
               style={{
-                background: 'linear-gradient(135deg, var(--sogni-pink), var(--sogni-purple))',
-                boxShadow: '0 4px 14px rgba(var(--rgb-accent), 0.4)'
+                background: '#ffffff',
+                color: '#0a0a0a',
+                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.3)'
               }}
             >
               {isClaiming ? (

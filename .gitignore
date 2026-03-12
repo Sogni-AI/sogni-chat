@@ -12,7 +12,11 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
+.env.staging
 server/.env
+server/.env.production
+server/.env.staging
 
 # IDE
 .idea/

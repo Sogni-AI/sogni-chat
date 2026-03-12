@@ -39,6 +39,11 @@ Default elevation to "eye-level shot" and distance to "medium shot" when not spe
           description:
             'Which result image to use as source (0-based index). Omit to use the latest result automatically (or the original if no results exist). Only set explicitly when the user specifies a particular image number or explicitly says "original" (use -1 for original).',
         },
+        loraStrength: {
+          type: 'number',
+          description:
+            'LoRA strength for angle generation (0.1-1.0). Default: 0.9. Lower values preserve more of the original appearance, higher values produce stronger angle changes. Only set when the user wants to control the transformation intensity.',
+        },
         aspectRatio: {
           type: 'string',
           description: ASPECT_RATIO_DESCRIPTION,

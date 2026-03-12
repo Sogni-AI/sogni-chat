@@ -1,5 +1,5 @@
 /**
- * Full-width chat panel for the chat restoration mode.
+ * Full-width chat panel — ChatGPT-inspired dark design.
  * Renders message history, handles auto-scroll, and manages input.
  * State is owned by the parent (ChatPage) and passed in as props.
  */
@@ -112,7 +112,6 @@ export function ChatPanel({
   const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
 
   // Auto-trigger vision analysis when image is available and chat is at welcome state.
-  // Gated on allowAutoAnalysis to prevent firing during session restoration.
   useEffect(() => {
     if (
       allowAutoAnalysis &&
@@ -136,7 +135,7 @@ export function ChatPanel({
     }
   }, [allowAutoAnalysis, imageData, imageUrl, sogniClient, isLoading, messages, tokenType, balances, onTokenSwitch, onInsufficientCredits, analyzeImage]);
 
-  // Reset analysis trigger when chat is reset (messages go back to welcome)
+  // Reset analysis trigger when chat is reset
   useEffect(() => {
     if (messages.length === 1 && messages[0].id === 'welcome') {
       analysisTriggeredRef.current = false;
@@ -148,23 +147,18 @@ export function ChatPanel({
     [messages, isLoading, analysisSuggestions, imageData],
   );
 
-  // Smart auto-scroll: scroll to bottom when new messages arrive, during streaming,
-  // or when suggestion chips appear — but only when user is already near the bottom.
+  // Smart auto-scroll
   useEffect(() => {
     if (!isUserNearBottomRef.current) return;
-
     const isNewMessage = messages.length !== prevMessageCountRef.current;
     const hasStreamingMessage = messages.some((m) => m.isStreaming);
-
     if (isNewMessage || hasStreamingMessage || suggestions.length > 0) {
       prevMessageCountRef.current = messages.length;
       messagesEndRef.current?.scrollIntoView({ behavior: isNewMessage ? 'smooth' : 'instant' });
     }
   }, [messages, suggestions]);
 
-  // ResizeObserver-based auto-scroll: when content grows (image loads, progress→results swap),
-  // keep the view pinned to the bottom. This catches height changes that don't trigger
-  // React state updates (e.g. image onload expanding the DOM).
+  // ResizeObserver-based auto-scroll
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -176,12 +170,10 @@ export function ChatPanel({
       }
       prevHeight = newHeight;
     });
-    // Observe the scroll container itself — fires when children resize (images load, etc.)
     observer.observe(container);
     return () => observer.disconnect();
   }, []);
 
-  // Track user scroll position to decide if auto-scroll should fire
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -189,12 +181,10 @@ export function ChatPanel({
       container.scrollHeight - container.scrollTop - container.clientHeight < 150;
   }, []);
 
-  // Notify parent of loading state changes
   useEffect(() => {
     onLoadingChange?.(isLoading);
   }, [isLoading, onLoadingChange]);
 
-  // Notify parent of new results
   useEffect(() => {
     if (allResultUrls.length !== prevResultCountRef.current) {
       prevResultCountRef.current = allResultUrls.length;
@@ -204,7 +194,7 @@ export function ChatPanel({
 
   const handleSend = useCallback(
     (content: string) => {
-      if (!sogniClient || !imageData) return;
+      if (!sogniClient) return;
       sendMessage(content, {
         sogniClient,
         imageData,
@@ -217,7 +207,6 @@ export function ChatPanel({
         onTokenSwitch,
         onInsufficientCredits,
       });
-      // Clear attached files after sending so they don't carry over to the next message
       onClearMediaFiles?.();
     },
     [sogniClient, imageData, width, height, tokenType, balances, qualityTier, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, onClearMediaFiles],
@@ -228,7 +217,6 @@ export function ChatPanel({
     setFullscreenIndex(globalIndex >= 0 ? globalIndex : 0);
   }, [allResultUrls]);
 
-  // Inject current imageUrl into the user-upload message (blob URLs don't survive page refresh)
   const processedMessages = useMemo(() => {
     if (!imageUrl) return messages;
     return messages.map((msg) =>
@@ -241,7 +229,6 @@ export function ChatPanel({
     [allResultUrls, imageUrl],
   );
 
-  // Collect all gallery image IDs across messages (parallel to allResultUrls)
   const allGalleryImageIds = useMemo(() => {
     const ids: string[] = [];
     for (const msg of messages) {
@@ -253,12 +240,13 @@ export function ChatPanel({
   }, [messages]);
 
   const hasImage = !!imageData && !!imageUrl;
-  const canSend = isAuthenticated && hasImage && !!sogniClient;
+  const canSend = isAuthenticated && !!sogniClient;
 
-  // Show the intent capture card after analysis completes, before user sends first message
+  // True when the welcome empty state UI is showing (has its own category chips)
+  const showWelcomeScreen = !hasImage && messages.length <= 1 && messages[0]?.id === 'welcome' && !isLoading;
+
   const showIntentCapture = useMemo(() => {
     if (!hasImage || isLoading || isAnalyzing) return false;
-    // Check that no user text messages exist (only welcome + analysis messages)
     const hasUserTextMessage = messages.some(
       (m) => m.role === 'user' && m.id !== 'user-upload' && m.content?.trim(),
     );
@@ -277,23 +265,20 @@ export function ChatPanel({
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        background: 'var(--color-bg)',
-        borderRadius: 'var(--radius-lg)',
-        border: '1px solid var(--color-border)',
+        background: '#212121',
         overflow: 'hidden',
       }}
     >
-      {/* Header */}
+      {/* Minimal top bar — hamburger (mobile) + quality toggle + clear */}
       <div
         className="chat-panel-header"
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0.75rem 1rem',
-          borderBottom: '1px solid var(--color-border)',
-          background: 'var(--color-bg-elevated)',
+          padding: '0.5rem 1rem',
           flexShrink: 0,
+          borderBottom: (hasImage || messages.length > 1) ? '1px solid rgba(255, 255, 255, 0.06)' : 'none',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -308,232 +293,275 @@ export function ChatPanel({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: 'rgba(var(--rgb-primary), 0.06)',
+                background: 'transparent',
                 border: 'none',
                 borderRadius: 'var(--radius-sm)',
                 cursor: 'pointer',
-                color: 'var(--color-text-primary)',
+                color: '#b4b4b4',
                 flexShrink: 0,
-                transition: 'background 0.15s',
+                transition: 'color 0.15s',
               }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = '#ececec'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#b4b4b4'; }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="3" y1="6" x2="21" y2="6" />
                 <line x1="3" y1="12" x2="21" y2="12" />
                 <line x1="3" y1="18" x2="21" y2="18" />
               </svg>
             </button>
           )}
-          <div
-            style={{
-              width: '1.75rem',
-              height: '1.75rem',
-              borderRadius: '50%',
-              background: 'var(--sogni-gradient)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 20h9" />
-              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-            </svg>
-          </div>
-          <span
-            style={{
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              color: 'var(--color-text-primary)',
-              fontFamily: 'var(--font-display)',
-            }}
-          >
-            AI Assistant
-          </span>
         </div>
 
         <div className="chat-panel-quality" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          {/* Quality toggle */}
-          <span className="chat-quality-label" style={{ fontSize: '0.6875rem', color: 'var(--color-text-secondary)', fontWeight: 500 }}>
-            Image Quality:
-          </span>
-          <div style={{
-            display: 'inline-flex',
-            borderRadius: '0.375rem',
-            border: '1px solid var(--color-border)',
-            overflow: 'hidden',
-          }}>
-            {(['fast', 'hq'] as const).map((tier) => {
-              const isSelected = qualityTier === tier;
-              const showCost = isSelected && estimatedCost != null && !costLoading;
-              return (
-              <button
-                key={tier}
-                type="button"
-                onClick={() => onQualityTierChange(tier)}
-                style={{
-                  padding: '0.25rem 0.5rem',
-                  fontSize: '0.6875rem',
-                  fontWeight: isSelected ? 600 : 400,
-                  background: isSelected ? 'var(--sogni-gradient-subtle)' : 'transparent',
-                  color: isSelected ? 'var(--color-primary)' : 'var(--color-text-tertiary)',
-                  border: 'none',
-                  borderRight: tier === 'fast' ? '1px solid var(--color-border)' : 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                }}
-                title={QUALITY_PRESETS[tier].description}
-              >
-                {QUALITY_PRESETS[tier].label}{showCost ? `: ~${estimatedCost.toFixed(1)} credits` : ''}
-              </button>
-              );
-            })}
-          </div>
+          {(hasImage || messages.length > 1) && (
+            <>
+              <span className="chat-quality-label" style={{ fontSize: '0.75rem', color: '#8e8e8e', fontWeight: 500 }}>
+                Quality:
+              </span>
+              <div style={{
+                display: 'inline-flex',
+                borderRadius: 'var(--radius-lg)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                overflow: 'hidden',
+              }}>
+                {(['fast', 'hq'] as const).map((tier) => {
+                  const isSelected = qualityTier === tier;
+                  const showCost = isSelected && estimatedCost != null && !costLoading;
+                  return (
+                  <button
+                    key={tier}
+                    type="button"
+                    onClick={() => onQualityTierChange(tier)}
+                    style={{
+                      padding: '0.25rem 0.625rem',
+                      fontSize: '0.75rem',
+                      fontWeight: isSelected ? 600 : 400,
+                      background: isSelected ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
+                      color: isSelected ? '#ececec' : '#8e8e8e',
+                      border: 'none',
+                      borderRight: tier === 'fast' ? '1px solid rgba(255, 255, 255, 0.1)' : 'none',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title={QUALITY_PRESETS[tier].description}
+                  >
+                    {QUALITY_PRESETS[tier].label}{showCost ? `: ~${estimatedCost.toFixed(1)}` : ''}
+                  </button>
+                  );
+                })}
+              </div>
 
-        {messages.length > 1 && (
-          <button
-            onClick={onClearAll || (() => reset())}
-            title="Clear conversation and start fresh"
-            style={{
-              padding: '0.25rem 0.5rem',
-              fontSize: '0.6875rem',
-              fontWeight: 500,
-              color: 'var(--color-text-secondary)',
-              background: 'rgba(var(--rgb-primary), 0.05)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-sm)',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(var(--rgb-primary), 0.1)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(var(--rgb-primary), 0.05)';
-            }}
-          >
-            Clear Chat
-          </button>
-        )}
+              {messages.length > 1 && (
+                <button
+                  onClick={onClearAll || (() => reset())}
+                  title="Clear conversation and start fresh"
+                  style={{
+                    padding: '0.25rem 0.625rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 500,
+                    color: '#8e8e8e',
+                    background: 'transparent',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: 'var(--radius-lg)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#ececec';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = '#8e8e8e';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </>
+          )}
         </div>
       </div>
 
-      {/* Upload prompt when no image */}
-      {!hasImage && (
-        <button
-          onClick={onUploadClick}
-          className="radiant-orb-hover"
-          style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '1.5rem 1rem',
-            textAlign: 'center',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            transition: 'background 0.2s',
-            minHeight: 0,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(var(--rgb-primary), 0.02)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'none';
-          }}
-          aria-label="Upload a photo"
-        >
-          <div className="radiant-orb-wrapper" style={{ width: '80px', height: '80px', marginBottom: '0.75rem' }}>
-            <div className="sparkle-dot" />
-            <div className="sparkle-dot" />
-            <div className="sparkle-dot" />
-            <div className="sparkle-dot" />
-            <div className="sparkle-dot" />
-            <div className="sparkle-dot" />
-            <div className="orb-icon" style={{
-              width: '52px',
-              height: '52px',
-              borderRadius: '50%',
-              background: 'var(--sogni-gradient)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <polyline points="21 15 16 10 5 21" />
-              </svg>
+      {/* Messages area — always visible */}
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          padding: '1rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '0.75rem',
+        }}
+      >
+        <div style={{ maxWidth: '48rem', width: '100%', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', flex: 1 }}>
+          {/* Empty state — welcome screen with category chips */}
+          {showWelcomeScreen && (
+            <div
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '2rem 0',
+                textAlign: 'center',
+              }}
+            >
+              <h1
+                style={{
+                  fontSize: '1.75rem',
+                  fontWeight: 600,
+                  color: '#ececec',
+                  letterSpacing: '-0.02em',
+                  marginBottom: '2rem',
+                }}
+              >
+                What would you like to create?
+              </h1>
+
+              {/* Category chips */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'center', marginBottom: '2rem' }}>
+                {[
+                  { label: 'Generate an image', prompt: 'Generate an image of a magical forest with bioluminescent mushrooms, soft fog, and moonlight filtering through ancient trees', icon: 'image' },
+                  { label: 'Create a video', prompt: 'Generate a video of a cozy cafe on a rainy night, raindrops on the window, warm light inside, gentle camera push-in', icon: 'video' },
+                  { label: 'Compose music', prompt: 'Generate a dreamy indie pop track, 110 BPM, with reverb-heavy guitars, soft vocals, and atmospheric synth pads', icon: 'music' },
+                ].map((chip) => (
+                  <button
+                    key={chip.label}
+                    onClick={() => handleSend(chip.prompt)}
+                    disabled={!canSend}
+                    className="radiant-orb-hover"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.625rem 1.25rem',
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      borderRadius: 'var(--radius-pill)',
+                      cursor: canSend ? 'pointer' : 'default',
+                      color: '#ececec',
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      transition: 'all 0.2s',
+                      opacity: canSend ? 1 : 0.5,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!canSend) return;
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.14)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
+                    }}
+                  >
+                    {chip.icon === 'image' && (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <polyline points="21 15 16 10 5 21" />
+                      </svg>
+                    )}
+                    {chip.icon === 'video' && (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="23 7 16 12 23 17 23 7" />
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+                      </svg>
+                    )}
+                    {chip.icon === 'music' && (
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M9 18V5l12-2v13" />
+                        <circle cx="6" cy="18" r="3" />
+                        <circle cx="18" cy="16" r="3" />
+                      </svg>
+                    )}
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Upload row */}
+              <button
+                onClick={onUploadClick}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.5rem 1rem',
+                  background: 'transparent',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: 'var(--radius-pill)',
+                  cursor: 'pointer',
+                  color: '#8e8e8e',
+                  fontSize: '0.8125rem',
+                  fontWeight: 500,
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = '#ececec';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = '#8e8e8e';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
+                }}
+                aria-label="Upload a photo to edit"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                Upload a photo to edit
+              </button>
+
+              <p style={{ color: '#555555', fontSize: '0.75rem', marginTop: '0.5rem' }}>
+                or drag &amp; drop a file anywhere
+              </p>
             </div>
-          </div>
-          <p style={{
-            color: 'var(--color-text-primary)',
-            fontSize: '0.9375rem',
-            fontWeight: 600,
-            fontFamily: 'var(--font-display)',
-            marginBottom: '0.25rem',
-            letterSpacing: '-0.01em',
-          }}>
-            Upload a Photo to Get Started
-          </p>
-          <p style={{ color: 'var(--color-text-tertiary)', fontSize: '0.8125rem', lineHeight: '1.4' }}>
-            Tap here, drag &amp; drop, or use the button above
-          </p>
-        </button>
-      )}
+          )}
 
-      {/* Messages */}
-      {hasImage && (
-        <div
-          ref={scrollContainerRef}
-          onScroll={handleScroll}
-          style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '1rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.75rem',
-          }}
-        >
-          {processedMessages.map((msg) => (
-            <ChatMessage
-              key={msg.id}
-              message={msg}
-              imageUrl={imageUrl}
-              onImageClick={handleImageClick}
-              onCancelTool={msg.toolProgress ? chat.cancelToolExecution : undefined}
-              onAcceptModelSwitch={msg.modelRefusal ? chat.acceptModelSwitch : undefined}
-              onDeclineModelSwitch={msg.modelRefusal ? chat.declineModelSwitch : undefined}
-              downloadSlug={downloadSlug}
-            />
-          ))}
+          {/* Chat messages — skip welcome message when in no-image empty state */}
+          {processedMessages.map((msg) => {
+            // Hide the welcome sentinel message when the empty state UI is showing
+            if (msg.id === 'welcome' && showWelcomeScreen) return null;
+            return (
+              <ChatMessage
+                key={msg.id}
+                message={msg}
+                imageUrl={imageUrl}
+                onImageClick={handleImageClick}
+                onCancelTool={msg.toolProgress ? chat.cancelToolExecution : undefined}
+                onAcceptModelSwitch={msg.modelRefusal ? chat.acceptModelSwitch : undefined}
+                onDeclineModelSwitch={msg.modelRefusal ? chat.declineModelSwitch : undefined}
+                downloadSlug={downloadSlug}
+              />
+            );
+          })}
 
-          {/* Analysis loading indicator (shown after image, before first tokens arrive) */}
           {isAnalyzing && <ChatAnalysisIndicator />}
 
-          {/* Intent capture card — guided damage selection after analysis, before first user message */}
           {showIntentCapture && canSend && (
             <IntentCaptureCard onSubmit={handleSend} disabled={isLoading} />
           )}
 
-          {/* Suggestion chips */}
-          {canSend && suggestions.length > 0 && (
+          {canSend && suggestions.length > 0 && !showWelcomeScreen && (
             <SuggestionChips suggestions={suggestions} onSelect={handleSend} />
           )}
 
-          {/* Error display */}
           {(error || mediaUploadError) && (
             <div
               style={{
                 padding: '0.625rem 0.875rem',
-                background: 'rgba(239, 68, 68, 0.05)',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
                 borderRadius: 'var(--radius-md)',
-                color: '#dc2626',
+                color: '#f87171',
                 fontSize: '0.8125rem',
               }}
             >
@@ -543,7 +571,7 @@ export function ChatPanel({
 
           <div ref={messagesEndRef} />
         </div>
-      )}
+      </div>
 
       {/* Input */}
       <ChatInput
@@ -551,8 +579,8 @@ export function ChatPanel({
         disabled={!canSend}
         placeholder={
           !hasImage
-            ? 'Upload a photo first...'
-            : 'Describe what you want done with your photo...'
+            ? 'Describe what you want to create...'
+            : 'Describe what you want to do with your photo...'
         }
         uploadedFiles={uploadedFiles}
         isMediaUploading={isMediaUploading}

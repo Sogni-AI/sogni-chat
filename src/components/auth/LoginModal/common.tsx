@@ -53,11 +53,11 @@ export function FormContent({ children, noHeading, subHeading }: FormContentProp
           <div
             className="w-14 h-14 mx-auto mb-4 flex items-center justify-center rounded-full"
             style={{
-              background: 'linear-gradient(135deg, var(--sogni-pink), var(--sogni-purple))',
-              boxShadow: '0 4px 14px rgba(var(--rgb-accent), 0.4)'
+              background: 'rgba(255, 255, 255, 0.08)',
+              boxShadow: '0 4px 14px rgba(0, 0, 0, 0.2)'
             }}
           >
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ececec" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M15 4V2" />
               <path d="M15 16v-2" />
               <path d="M8 9h2" />
@@ -94,9 +94,9 @@ export function FormContent({ children, noHeading, subHeading }: FormContentProp
           <div
             className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-full text-xs font-semibold"
             style={{
-              background: 'linear-gradient(135deg, var(--sogni-pink), var(--sogni-purple))',
-              color: 'white',
-              boxShadow: '0 2px 8px rgba(var(--rgb-accent), 0.3)'
+              background: 'rgba(255, 255, 255, 0.1)',
+              color: '#ececec',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
             }}
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -144,7 +144,7 @@ export function LinkButton({ children, onClick }: LinkButtonProps) {
   return (
     <button
       className="font-medium hover:underline transition-colors"
-      style={{ color: 'var(--sogni-purple)' }}
+      style={{ color: 'var(--color-text-secondary)' }}
       onClick={onClick}
       type="button"
     >

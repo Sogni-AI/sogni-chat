@@ -69,13 +69,13 @@ export function AppLayout() {
 
   if (authLoading) {
     return (
-      <div className="w-screen flex items-center justify-center" style={{ background: 'var(--color-bg)', height: '100dvh' }}>
+      <div className="w-screen flex items-center justify-center" style={{ background: '#212121', height: '100dvh' }}>
         <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-10 w-10 border-2 border-transparent mb-4" style={{
-            borderTopColor: 'var(--color-accent)',
-            borderRightColor: 'var(--color-primary)'
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-2 border-transparent mb-4" style={{
+            borderTopColor: 'rgba(255,255,255,0.6)',
+            borderRightColor: 'rgba(255,255,255,0.2)'
           }}></div>
-          <p style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>Loading...</p>
+          <p style={{ color: '#8e8e8e', fontWeight: 500, fontSize: '0.875rem' }}>Loading...</p>
         </div>
       </div>
     );

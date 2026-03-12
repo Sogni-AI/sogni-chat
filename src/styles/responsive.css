@@ -40,7 +40,7 @@ img {
 
 /* ===== SAFE AREA INSETS FOR NOTCHED DEVICES ===== */
 @supports (padding: env(safe-area-inset-bottom)) {
-  .app-footer {
+  .chat-input-wrap {
     padding-bottom: calc(1rem + env(safe-area-inset-bottom)) !important;
   }
 }

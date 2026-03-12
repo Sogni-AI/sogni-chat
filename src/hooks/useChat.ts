@@ -32,7 +32,7 @@ export interface UseChatResult {
     content: string,
     context: {
       sogniClient: SogniClient;
-      imageData: Uint8Array;
+      imageData: Uint8Array | null;
       width: number;
       height: number;
       tokenType: TokenType;
@@ -331,7 +331,7 @@ export function useChat(): UseChatResult {
       content: string,
       context: {
         sogniClient: SogniClient;
-        imageData: Uint8Array;
+        imageData: Uint8Array | null;
         width: number;
         height: number;
         tokenType: TokenType;

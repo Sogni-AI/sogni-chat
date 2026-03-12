@@ -60,6 +60,42 @@ const T2V_MODELS: Record<string, T2VModelConfig> = {
     scheduler: 'simple',
     hasAudio: true,
   },
+  'ltx2-hq': {
+    id: 'ltx2-19b-fp8_t2v',
+    name: 'LTX-2 19B T2V HQ',
+    defaultWidth: 1920,
+    defaultHeight: 1088,
+    dimensionStep: 64,
+    minDimension: 640,
+    maxDimension: 3840,
+    defaultSteps: 20,
+    defaultGuidance: 1.0,
+    defaultFps: 24,
+    frameStep: 8,
+    minFrames: 25,
+    maxFrames: 505,
+    sampler: 'euler_ancestral',
+    scheduler: 'simple',
+    hasAudio: true,
+  },
+  ltx23: {
+    id: 'ltx23-22b-fp8_t2v_distilled',
+    name: 'LTX 2.3 22B T2V Distilled',
+    defaultWidth: 1920,
+    defaultHeight: 1088,
+    dimensionStep: 64,
+    minDimension: 640,
+    maxDimension: 3840,
+    defaultSteps: 8,
+    defaultGuidance: 1.0,
+    defaultFps: 24,
+    frameStep: 8,
+    minFrames: 25,
+    maxFrames: 505,
+    sampler: 'euler_ancestral',
+    scheduler: 'simple',
+    hasAudio: true,
+  },
   wan22: {
     id: 'wan_v2.2-14b-fp8_t2v_lightx2v',
     name: 'WAN 2.2 T2V LightX2V',
@@ -69,6 +105,24 @@ const T2V_MODELS: Record<string, T2VModelConfig> = {
     minDimension: 480,
     maxDimension: 1536,
     defaultSteps: 4,
+    defaultGuidance: 1.0,
+    defaultFps: 16,
+    frameStep: 1,
+    minFrames: 17,
+    maxFrames: 161,
+    sampler: 'euler',
+    scheduler: 'simple',
+    shift: 5.0,
+  },
+  'wan22-hq': {
+    id: 'wan_v2.2-14b-fp8_t2v',
+    name: 'WAN 2.2 T2V HQ',
+    defaultWidth: 640,
+    defaultHeight: 640,
+    dimensionStep: 16,
+    minDimension: 480,
+    maxDimension: 1536,
+    defaultSteps: 20,
     defaultGuidance: 1.0,
     defaultFps: 16,
     frameStep: 1,
@@ -138,7 +192,8 @@ export async function execute(
   callbacks: ToolCallbacks,
 ): Promise<string> {
   const prompt = args.prompt as string;
-  const modelKey = (args.videoModel as string) === 'wan22' ? 'wan22' : 'ltx2';
+  const rawModelKey = (args.videoModel as string) || 'ltx2';
+  const modelKey = T2V_MODELS[rawModelKey] ? rawModelKey : 'ltx2';
   const duration = Math.max(2, Math.min(20, (args.duration as number) || 5));
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
   const aspectRatio = args.aspectRatio as string | undefined;

@@ -24,6 +24,8 @@ export interface AngleGenerationParams {
   qualityTier?: QualityTier;
   /** Target aspect ratio or exact dimensions (e.g. "16:9", "1920x1080") */
   aspectRatio?: string;
+  /** LoRA strength override (0.1-1.0). Lower = preserve original, higher = stronger angle changes. */
+  loraStrength?: number;
 }
 
 export interface AngleGenerationProgress {
@@ -56,6 +58,7 @@ export async function generateAngle(
     description,
     qualityTier = 'fast',
     aspectRatio,
+    loraStrength,
   } = params;
 
   const preset = QUALITY_PRESETS[qualityTier];
@@ -66,11 +69,15 @@ export async function generateAngle(
   // Build prompt with LoRA activation keyword
   const fullPrompt = `<sks> ${description}`;
 
+  const effectiveLoraStrength = loraStrength !== undefined
+    ? Math.max(0.1, Math.min(1.0, loraStrength))
+    : DEFAULT_LORA_STRENGTH;
+
   console.log('[ANGLE SERVICE] Starting angle generation...', {
     prompt: fullPrompt,
     model: preset.model,
     qualityTier,
-    loraStrength: DEFAULT_LORA_STRENGTH,
+    loraStrength: effectiveLoraStrength,
     inputDimensions: `${width}x${height}`,
     outputDimensions: `${outputDims.width}x${outputDims.height}`,
   });
@@ -95,7 +102,7 @@ export async function generateAngle(
     scheduler: 'simple',
     // LoRA configuration
     loras: [LORA_ID],
-    loraStrengths: [DEFAULT_LORA_STRENGTH],
+    loraStrengths: [effectiveLoraStrength],
   };
 
   const startTime = Date.now();

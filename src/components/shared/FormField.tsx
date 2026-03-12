@@ -56,7 +56,7 @@ const FormField: React.FC<FormFieldProps> = ({
 
   return (
     <div className={`form-field form-field-${size} mb-4`}>
-      <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-1">
+      <label htmlFor={name} className="block text-sm font-medium mb-1" style={{ color: '#b4b4b4' }}>
         {label}
       </label>
       <input
@@ -68,9 +68,15 @@ const FormField: React.FC<FormFieldProps> = ({
         autoComplete={autoComplete}
         onChange={handleInputChange}
         disabled={disabled}
-        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-          error ? 'border-red-500' : 'border-gray-300'
-        } ${disabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+        className={`w-full px-4 py-2 rounded-lg ${
+          error ? '' : ''
+        } ${disabled ? 'cursor-not-allowed' : ''}`}
+        style={{
+          background: disabled ? '#1a1a1a' : '#212121',
+          border: error ? '1px solid #f87171' : '1px solid rgba(255, 255, 255, 0.1)',
+          color: '#ececec',
+          outline: 'none',
+        }}
       />
       {error && <div className="text-red-500 text-sm mt-1">{error}</div>}
     </div>

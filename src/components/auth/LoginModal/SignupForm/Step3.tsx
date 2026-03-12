@@ -71,8 +71,8 @@ function Step3({ step1, step2, onReturn, onContinue }: Props) {
 
         {isCreating ? (
           <div className="text-center py-8">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <p className="mt-4 text-gray-600">Please wait while we create your account...</p>
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: '#ececec' }}></div>
+            <p className="mt-4" style={{ color: 'var(--color-text-secondary)' }}>Please wait while we create your account...</p>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-4 py-4">

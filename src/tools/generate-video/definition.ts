@@ -46,9 +46,9 @@ CONSTRAINTS:
         },
         videoModel: {
           type: 'string',
-          enum: ['ltx2', 'wan22'],
+          enum: ['ltx2', 'wan22', 'ltx2-hq', 'wan22-hq', 'ltx23'],
           description:
-            'Video model. "ltx2" (default): Higher quality, generates audio, supports up to 20s, best for detailed/cinematic prompts with sound. "wan22": Faster, simpler motion, no audio, up to 10s. Default: "ltx2".',
+            'Video model. "ltx2" (default): Fast 8-step distilled, generates audio, good balance of speed and quality. "ltx2-hq": High quality 20-step, generates audio, best for cinematic detail. "ltx23": Latest LTX 2.3 distilled, 8-step, fast + high quality with audio. "wan22": Fast 4-step, simple motion, no audio. "wan22-hq": High quality 20-step, better motion fidelity, no audio. Default: "ltx2".',
         },
         width: {
           type: 'number',

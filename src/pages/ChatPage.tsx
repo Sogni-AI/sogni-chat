@@ -18,7 +18,7 @@ import { SEOHead } from '@/components/seo/SEOHead';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { ChatHistorySidebar } from '@/components/chat/ChatHistorySidebar';
 import { MobileChatDrawer } from '@/components/chat/MobileChatDrawer';
-import { Footer } from '@/components/layout/Footer';
+// Footer removed for clean ChatGPT-inspired layout
 import { saveRestorationToGallery } from '@/services/galleryService';
 import { generateSessionTitle } from '@/services/chatService';
 import { slugify } from '@/utils/downloadFilename';
@@ -671,23 +671,20 @@ export default function ChatPage() {
           path="/"
         />
         <main className="flex-1 flex items-center justify-center page-enter">
-          <div className="text-center px-6" style={{ maxWidth: '28rem' }}>
+          <div className="text-center px-6" style={{ maxWidth: '32rem' }}>
             <h1
-              className="font-display text-3xl font-bold mb-3"
+              className="text-3xl font-semibold mb-3"
               style={{ color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}
             >
-              Welcome to Sogni Chat
+              What would you like to create?
             </h1>
-            <p className="mb-6" style={{ color: 'var(--color-text-secondary)', lineHeight: 1.6 }}>
-              Generate images, create videos, compose music, restore photos, and more — all powered by AI. Sign in to get started.
+            <p className="mb-8" style={{ color: 'var(--color-text-tertiary)', lineHeight: 1.6, fontSize: '0.9375rem' }}>
+              Generate images and videos, compose music, restore and transform photos — all powered by AI.
             </p>
             <button
               onClick={() => showSignupModal()}
-              className="btn-primary px-6 py-3 rounded-xl font-semibold text-base"
+              className="btn-primary px-6 py-3 font-semibold text-base"
               style={{
-                background: 'var(--color-primary)',
-                color: '#fff',
-                border: 'none',
                 cursor: 'pointer',
               }}
             >
@@ -707,30 +704,7 @@ export default function ChatPage() {
         path="/"
       />
       <main className="flex-1 flex flex-col min-h-0 page-enter">
-        <div className="flex flex-col flex-1 min-h-0 px-4 py-2 lg:py-3">
-          {/* Header bar */}
-          <div
-            className="chat-page-header flex justify-between items-center flex-shrink-0"
-            style={{
-              maxWidth: isDesktop ? 'none' : '48rem',
-              width: '100%',
-              marginLeft: isDesktop ? undefined : 'auto',
-              marginRight: isDesktop ? undefined : 'auto',
-              marginBottom: '0.375rem',
-            }}
-          >
-            <h2
-              className="chat-page-title font-display text-lg font-bold"
-              style={{
-                color: 'var(--color-text-primary)',
-                letterSpacing: '-0.02em',
-                fontFamily: 'var(--font-display)',
-              }}
-            >
-              AI Creative Studio
-            </h2>
-          </div>
-
+        <div className="flex flex-col flex-1 min-h-0">
           {/* Hidden file input */}
           <input
             ref={fileInputRef}
@@ -743,15 +717,11 @@ export default function ChatPage() {
           {/* Upload error */}
           {uploadError && (
             <div
-              className="card-premium px-5 py-3 flex-shrink-0"
+              className="card-premium px-5 py-3 flex-shrink-0 mx-4"
               style={{
-                background: 'rgba(239, 68, 68, 0.05)',
-                borderColor: 'rgba(239, 68, 68, 0.2)',
-                color: '#dc2626',
-                maxWidth: isDesktop ? 'none' : '48rem',
-                width: '100%',
-                marginLeft: isDesktop ? undefined : 'auto',
-                marginRight: isDesktop ? undefined : 'auto',
+                background: 'rgba(239, 68, 68, 0.1)',
+                borderColor: 'rgba(239, 68, 68, 0.3)',
+                color: '#f87171',
               }}
             >
               {uploadError}
@@ -765,10 +735,7 @@ export default function ChatPage() {
               flex: 1,
               minHeight: 0,
               gap: 0,
-              maxWidth: isDesktop ? 'none' : '48rem',
               width: '100%',
-              marginLeft: isDesktop ? undefined : 'auto',
-              marginRight: isDesktop ? undefined : 'auto',
             }}
           >
             {/* Desktop sidebar */}
@@ -839,8 +806,7 @@ export default function ChatPage() {
           />
         )}
 
-        {/* Footer only when no image — hidden on mobile to keep input visible */}
-        {!imageUrl && <div className="chat-footer-wrap"><Footer /></div>}
+        {/* Footer removed for clean layout */}
       </main>
     </>
   );

@@ -29,16 +29,17 @@ After results appear, ask one focused follow-up. Use 1 variation by default unle
  */
 export const VISION_ANALYSIS_SYSTEM_PROMPT = `You are an expert AI creative studio assistant. Examine this image and provide a brief, friendly analysis (2-3 sentences max).
 
-Look for: damage (scratches, tears, stains, fading), color info (B&W, sepia, faded, vibrant), quality issues (blur, noise), and content (people, objects, backgrounds, landscapes).
+Analyze: content (people, objects, backgrounds, landscapes), style (artistic, photographic, digital), quality (blur, noise, damage), colors (B&W, sepia, faded, vibrant), and composition.
 
-Be encouraging — you can do anything: restore, colorize, apply artistic styles, animate into video, change camera angles, edit details, and more. After your analysis, add suggestion tags on separate lines:
+Be encouraging — you can do anything: restore, colorize, apply artistic styles, animate into video, generate variations, change camera angles, edit details, and more. After your analysis, add suggestion tags on separate lines:
 [SUGGEST:Label|Detailed description for the tool]
 
-Include 2-4 relevant suggestions. Mix restoration, creative, and transformation suggestions based on what fits the image. Examples:
+Include 2-4 relevant suggestions. Mix restoration, creative, editing, and transformation suggestions based on what fits the image. Examples:
 [SUGGEST:Full Restoration|Restore photo by removing all visible damage, enhancing clarity, and improving overall quality]
 [SUGGEST:Apply Artistic Style|Transform this photo with a painterly artistic style]
 [SUGGEST:Animate This Photo|Bring this photo to life with gentle movement and animation]
-[SUGGEST:Enhance Clarity|Sharpen details, reduce noise, and improve overall image quality]`;
+[SUGGEST:Generate Variations|Generate new images inspired by this one with different styles]
+[SUGGEST:Edit Details|Edit specific details in this image to improve or change them]`;
 
 export const CHAT_MODEL = 'qwen3.5-35b-a3b-gguf-q4km';
 
@@ -99,7 +100,7 @@ export const CONTEXT_WINDOW_CONFIG = {
   DEFAULT_CONTEXT_LENGTH: 32_768,  // Conservative for llamacpp worker slots
   MAX_OUTPUT_TOKENS: 4_096,
   SAFETY_MARGIN: 2_048,
-  TOOL_SCHEMA_TOKENS: 1_500,
+  TOOL_SCHEMA_TOKENS: 2_500,
   MIN_PROTECTED_GROUPS: 2,
 } as const;
 

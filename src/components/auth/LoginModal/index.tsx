@@ -62,24 +62,25 @@ function LoginModal({ open, mode, onModeChange, onClose, textOverrides = emptyOb
         onClick={handleOverlayClick}
       >
         <div
-          className="bg-white max-w-md w-full max-h-[90vh] overflow-y-auto relative"
+          className="max-w-md w-full max-h-[90vh] overflow-y-auto relative"
           style={{
+            background: '#2f2f2f',
             borderRadius: 'var(--radius-xl, 16px)',
-            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06)'
           }}
           onClick={(e) => e.stopPropagation()}
         >
           <button
             className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full transition-colors z-10"
             style={{
-              background: 'rgba(0, 0, 0, 0.05)',
+              background: 'rgba(255, 255, 255, 0.08)',
               color: 'var(--color-text-secondary)'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.1)';
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)';
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
             }}
             onClick={onClose}
           >

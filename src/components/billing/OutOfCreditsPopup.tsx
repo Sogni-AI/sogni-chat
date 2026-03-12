@@ -54,7 +54,7 @@ export const OutOfCreditsPopup: React.FC<OutOfCreditsPopupProps> = ({ isOpen, on
           <div
             ref={modalRef}
             style={{
-              background: 'white',
+              background: '#2f2f2f',
               borderRadius: '20px',
               maxWidth: '420px',
               width: '100%',
@@ -66,7 +66,7 @@ export const OutOfCreditsPopup: React.FC<OutOfCreditsPopupProps> = ({ isOpen, on
           >
             {/* Gradient header */}
             <div style={{
-              background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent))',
+              background: '#171717',
               padding: '28px 24px 22px',
               textAlign: 'center',
               position: 'relative',
@@ -82,8 +82,8 @@ export const OutOfCreditsPopup: React.FC<OutOfCreditsPopupProps> = ({ isOpen, on
                   width: '44px',
                   height: '44px',
                   borderRadius: '50%',
-                  background: 'rgba(255, 255, 255, 0.12)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  background: 'rgba(255, 255, 255, 0.06)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
                   left: '0',
                   top: '3px',
                 }} />
@@ -92,8 +92,8 @@ export const OutOfCreditsPopup: React.FC<OutOfCreditsPopupProps> = ({ isOpen, on
                   width: '36px',
                   height: '36px',
                   borderRadius: '50%',
-                  background: 'rgba(255, 255, 255, 0.18)',
-                  border: '1px solid rgba(255, 255, 255, 0.25)',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.12)',
                   left: '22px',
                   top: '0',
                 }} />
@@ -102,14 +102,14 @@ export const OutOfCreditsPopup: React.FC<OutOfCreditsPopupProps> = ({ isOpen, on
                   width: '28px',
                   height: '28px',
                   borderRadius: '50%',
-                  background: 'rgba(255, 255, 255, 0.25)',
-                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  background: 'rgba(255, 255, 255, 0.10)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
                   left: '48px',
                   top: '10px',
                 }} />
               </div>
               <h2 style={{
-                color: 'white',
+                color: '#ececec',
                 fontSize: '1.25rem',
                 fontWeight: 700,
                 marginBottom: '4px',
@@ -117,7 +117,7 @@ export const OutOfCreditsPopup: React.FC<OutOfCreditsPopupProps> = ({ isOpen, on
                 Out of Credits
               </h2>
               <p style={{
-                color: 'rgba(255, 255, 255, 0.85)',
+                color: '#b4b4b4',
                 fontSize: '0.8125rem',
               }}>
                 Top up your credits or switch payment methods to continue.
@@ -135,8 +135,8 @@ export const OutOfCreditsPopup: React.FC<OutOfCreditsPopupProps> = ({ isOpen, on
                     alignItems: 'center',
                     gap: '14px',
                     padding: '14px 16px',
-                    background: 'linear-gradient(135deg, rgba(var(--rgb-primary), 0.04), rgba(var(--rgb-accent), 0.08))',
-                    border: '1px solid rgba(var(--rgb-accent), 0.3)',
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '12px',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
@@ -144,14 +144,14 @@ export const OutOfCreditsPopup: React.FC<OutOfCreditsPopupProps> = ({ isOpen, on
                     width: '100%',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(var(--rgb-primary), 0.08), rgba(var(--rgb-accent), 0.15))';
-                    e.currentTarget.style.borderColor = 'rgba(var(--rgb-accent), 0.5)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.10)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
                     e.currentTarget.style.transform = 'translateY(-1px)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(var(--rgb-primary), 0.1)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.2)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(var(--rgb-primary), 0.04), rgba(var(--rgb-accent), 0.08))';
-                    e.currentTarget.style.borderColor = 'rgba(var(--rgb-accent), 0.3)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
                     e.currentTarget.style.transform = 'translateY(0)';
                     e.currentTarget.style.boxShadow = 'none';
                   }}
@@ -159,14 +159,14 @@ export const OutOfCreditsPopup: React.FC<OutOfCreditsPopupProps> = ({ isOpen, on
                   <div style={{
                     width: '36px',
                     height: '36px',
-                    background: 'var(--sogni-gradient)',
+                    background: '#ffffff',
                     borderRadius: '10px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexShrink: 0,
                   }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="2" y="5" width="20" height="14" rx="2" />
                       <line x1="2" y1="10" x2="22" y2="10" />
                     </svg>
@@ -192,8 +192,8 @@ export const OutOfCreditsPopup: React.FC<OutOfCreditsPopupProps> = ({ isOpen, on
                     alignItems: 'center',
                     gap: '14px',
                     padding: '14px 16px',
-                    background: 'linear-gradient(135deg, rgba(var(--rgb-primary), 0.04), rgba(var(--rgb-accent), 0.08))',
-                    border: '1px solid rgba(var(--rgb-accent), 0.3)',
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '12px',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
@@ -201,14 +201,14 @@ export const OutOfCreditsPopup: React.FC<OutOfCreditsPopupProps> = ({ isOpen, on
                     width: '100%',
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(var(--rgb-primary), 0.08), rgba(var(--rgb-accent), 0.15))';
-                    e.currentTarget.style.borderColor = 'rgba(var(--rgb-accent), 0.5)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.10)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
                     e.currentTarget.style.transform = 'translateY(-1px)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(var(--rgb-primary), 0.1)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.2)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(var(--rgb-primary), 0.04), rgba(var(--rgb-accent), 0.08))';
-                    e.currentTarget.style.borderColor = 'rgba(var(--rgb-accent), 0.3)';
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
                     e.currentTarget.style.transform = 'translateY(0)';
                     e.currentTarget.style.boxShadow = 'none';
                   }}
@@ -216,14 +216,14 @@ export const OutOfCreditsPopup: React.FC<OutOfCreditsPopupProps> = ({ isOpen, on
                   <div style={{
                     width: '36px',
                     height: '36px',
-                    background: 'var(--sogni-gradient)',
+                    background: '#ffffff',
                     borderRadius: '10px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     flexShrink: 0,
                   }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0a0a0a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="17 1 21 5 17 9" />
                       <path d="M3 11V9a4 4 0 0 1 4-4h14" />
                       <polyline points="7 23 3 19 7 15" />

@@ -1,5 +1,5 @@
 /**
- * Individual chat message component.
+ * Individual chat message component — ChatGPT-inspired dark theme.
  * Renders user messages, assistant messages (with streaming indicator),
  * system notifications, inline image results, and tool execution progress.
  */
@@ -37,57 +37,32 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
   const hasAudios = message.audioResults && message.audioResults.length > 0;
   const hasUploadedImage = !!message.uploadedImageUrl;
 
-  // Don't render empty assistant messages (streaming placeholder before tool call)
+  // Don't render empty assistant messages
   if (isAssistant && !hasVisibleContent && !hasProgress && !hasImages && !hasVideos && !hasAudios && message.isStreaming) {
     return null;
   }
 
-  // User's uploaded image (shown as a right-aligned thumbnail)
+  // User's uploaded image
   if (isUser && hasUploadedImage && !hasVisibleContent) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'flex-end',
-          maxWidth: '100%',
-        }}
-      >
-        <div
-          style={{
-            maxWidth: '280px',
-            borderRadius: 'var(--radius-md)',
-            overflow: 'hidden',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <img
-            src={message.uploadedImageUrl}
-            alt="Uploaded photo"
-            style={{ width: '100%', height: 'auto', display: 'block' }}
-          />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', maxWidth: '100%' }}>
+        <div style={{
+          maxWidth: '280px',
+          borderRadius: 'var(--radius-lg)',
+          overflow: 'hidden',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+        }}>
+          <img src={message.uploadedImageUrl} alt="Uploaded photo" style={{ width: '100%', height: 'auto', display: 'block' }} />
         </div>
       </div>
     );
   }
 
-  // System notification (e.g. context trimmed)
+  // System notification
   if (isSystem && hasVisibleContent) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          padding: '0.25rem 0',
-        }}
-      >
-        <span
-          style={{
-            fontSize: '0.75rem',
-            color: 'var(--color-text-muted, #999)',
-            fontStyle: 'italic',
-          }}
-        >
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '0.25rem 0' }}>
+        <span style={{ fontSize: '0.75rem', color: '#666666', fontStyle: 'italic' }}>
           {message.content.trim()}
         </span>
       </div>
@@ -110,19 +85,13 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
           style={{
             maxWidth: isUser ? '75%' : '85%',
             padding: '0.75rem 1rem',
-            borderRadius: isUser ? '1rem 1rem 0.25rem 1rem' : '1rem 1rem 1rem 0.25rem',
-            background: isUser
-              ? 'var(--sogni-gradient)'
-              : 'var(--color-bg-elevated)',
-            color: isUser ? '#fff' : 'var(--color-text-primary)',
-            border: isUser ? 'none' : '1px solid var(--color-border)',
-            fontSize: '0.875rem',
-            lineHeight: '1.5',
+            borderRadius: isUser ? '1.25rem 1.25rem 0.25rem 1.25rem' : '1.25rem 1.25rem 1.25rem 0.25rem',
+            background: isUser ? '#2f2f2f' : 'transparent',
+            color: '#ececec',
+            fontSize: '0.9375rem',
+            lineHeight: '1.6',
             wordBreak: 'break-word',
             whiteSpace: 'pre-wrap',
-            boxShadow: isUser
-              ? '0 2px 8px rgba(var(--rgb-primary), 0.2)'
-              : '0 1px 4px rgba(0,0,0,0.04)',
           }}
         >
           {message.content.trim()}
@@ -133,7 +102,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
                 width: '0.5rem',
                 height: '1rem',
                 marginLeft: '0.125rem',
-                background: 'var(--color-accent)',
+                background: '#8e8e8e',
                 borderRadius: '1px',
                 animation: 'chatCursorBlink 1s ease-in-out infinite',
                 verticalAlign: 'text-bottom',
@@ -149,17 +118,17 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
           style={{
             maxWidth: '85%',
             padding: '0.75rem 1rem',
-            borderRadius: '0.75rem',
-            background: 'var(--color-bg-elevated)',
-            border: '1px solid var(--color-border)',
-            fontSize: '0.8125rem',
+            borderRadius: 'var(--radius-lg)',
+            background: '#2f2f2f',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            fontSize: '0.875rem',
             lineHeight: '1.5',
             display: 'flex',
             flexDirection: 'column',
             gap: '0.5rem',
           }}
         >
-          <span style={{ color: 'var(--color-text-secondary)' }}>
+          <span style={{ color: '#b4b4b4' }}>
             The model declined this request. Switch to unrestricted mode?
           </span>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -167,10 +136,10 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
               onClick={onAcceptModelSwitch}
               style={{
                 padding: '0.375rem 0.875rem',
-                borderRadius: '0.5rem',
+                borderRadius: 'var(--radius-pill)',
                 border: 'none',
-                background: 'var(--sogni-gradient)',
-                color: '#fff',
+                background: '#ffffff',
+                color: '#0a0a0a',
                 fontSize: '0.8125rem',
                 fontWeight: 500,
                 cursor: 'pointer',
@@ -182,10 +151,10 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
               onClick={onDeclineModelSwitch}
               style={{
                 padding: '0.375rem 0.875rem',
-                borderRadius: '0.5rem',
-                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-pill)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
                 background: 'transparent',
-                color: 'var(--color-text-secondary)',
+                color: '#b4b4b4',
                 fontSize: '0.8125rem',
                 fontWeight: 500,
                 cursor: 'pointer',
@@ -216,7 +185,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
         </div>
       )}
 
-      {/* Video results — suppressed while toolProgress is active to avoid duplication with ProgressVideo */}
+      {/* Video results */}
       {message.videoResults && message.videoResults.length > 0 && !message.toolProgress && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
           <ChatVideoResults urls={message.videoResults} galleryVideoIds={message.galleryVideoIds} downloadSlug={downloadSlug} videoAspectRatio={message.videoAspectRatio} />

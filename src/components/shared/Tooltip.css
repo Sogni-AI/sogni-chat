@@ -1,6 +1,6 @@
 .tooltip {
   position: fixed;
-  background: var(--color-dark-navy);
+  background: #3a3a3a;
   color: white;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
@@ -36,26 +36,26 @@
   bottom: -12px;
   left: 50%;
   transform: translateX(-50%);
-  border-top-color: var(--color-dark-navy);
+  border-top-color: #3a3a3a;
 }
 
 .tooltip-bottom::before {
   top: -12px;
   left: 50%;
   transform: translateX(-50%);
-  border-bottom-color: var(--color-dark-navy);
+  border-bottom-color: #3a3a3a;
 }
 
 .tooltip-left::before {
   right: -12px;
   top: 50%;
   transform: translateY(-50%);
-  border-left-color: var(--color-dark-navy);
+  border-left-color: #3a3a3a;
 }
 
 .tooltip-right::before {
   left: -12px;
   top: 50%;
   transform: translateY(-50%);
-  border-right-color: var(--color-dark-navy);
+  border-right-color: #3a3a3a;
 }

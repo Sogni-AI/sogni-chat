@@ -45,7 +45,7 @@
 .mobile-drawer-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.7);
   z-index: 1000;
   animation: drawerBackdropIn 0.2s ease-out forwards;
 }
@@ -81,8 +81,8 @@
 
 /* Background job spinner for sidebar session items */
 .chat-session-spinner {
-  border: 2px solid rgba(var(--rgb-primary), 0.15);
-  border-top-color: var(--color-accent);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-top-color: rgba(255, 255, 255, 0.6);
   border-radius: 50%;
   animation: chat-session-spin 0.8s linear infinite;
 }

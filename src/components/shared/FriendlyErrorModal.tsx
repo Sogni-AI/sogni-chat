@@ -63,7 +63,7 @@ const FriendlyErrorModal: React.FC<FriendlyErrorModalProps> = ({ error, onClose,
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.6)',
+      backgroundColor: 'rgba(0, 0, 0, 0.75)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -72,13 +72,13 @@ const FriendlyErrorModal: React.FC<FriendlyErrorModalProps> = ({ error, onClose,
       backdropFilter: 'blur(4px)'
     }}>
       <div style={{
-        background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+        background: '#2f2f2f',
         borderRadius: '16px',
         maxWidth: '90%',
         width: '500px',
         padding: '0',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
-        border: '1px solid rgba(255,255,255,0.2)',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
+        border: '1px solid rgba(255,255,255,0.08)',
         overflow: 'hidden',
         animation: 'slideIn 0.3s ease-out'
       }}>
@@ -106,7 +106,7 @@ const FriendlyErrorModal: React.FC<FriendlyErrorModalProps> = ({ error, onClose,
         <div style={{ padding: '24px 32px' }}>
           <p style={{ 
             margin: '0 0 24px 0',
-            color: '#555',
+            color: '#b4b4b4',
             fontSize: '1rem',
             lineHeight: '1.5',
             textAlign: 'center'
@@ -119,23 +119,23 @@ const FriendlyErrorModal: React.FC<FriendlyErrorModalProps> = ({ error, onClose,
             <div style={{ 
               marginBottom: '24px',
               padding: '16px',
-              backgroundColor: '#fff3cd',
+              backgroundColor: 'rgba(255,255,255,0.06)',
               borderRadius: '8px',
-              border: '1px solid #ffeaa7'
+              border: '1px solid rgba(255,255,255,0.08)'
             }}>
               <p style={{ 
                 margin: '0 0 12px 0',
                 fontSize: '0.9rem',
-                color: '#856404',
+                color: '#b4b4b4',
                 fontWeight: '500'
               }}>
                 💡 Want to enable automatic sharing?
               </p>
-              <ul style={{ 
+              <ul style={{
                 margin: '0',
                 paddingLeft: '20px',
                 fontSize: '0.85rem',
-                color: '#856404',
+                color: '#b4b4b4',
                 lineHeight: '1.4'
               }}>
                 <li>Click the popup blocker icon in your browser's address bar</li>
@@ -150,14 +150,14 @@ const FriendlyErrorModal: React.FC<FriendlyErrorModalProps> = ({ error, onClose,
             <details style={{ 
               marginBottom: '24px',
               padding: '12px',
-              backgroundColor: '#f8f9fa',
+              backgroundColor: '#212121',
               borderRadius: '8px',
-              border: '1px solid #e9ecef'
+              border: '1px solid rgba(255,255,255,0.08)'
             }}>
               <summary style={{ 
                 cursor: 'pointer',
                 fontWeight: '500',
-                color: '#666',
+                color: '#b4b4b4',
                 fontSize: '0.9rem'
               }}>
                 Technical Details
@@ -165,7 +165,7 @@ const FriendlyErrorModal: React.FC<FriendlyErrorModalProps> = ({ error, onClose,
               <p style={{ 
                 margin: '8px 0 0 0',
                 fontSize: '0.85rem',
-                color: '#777',
+                color: '#8e8e8e',
                 fontFamily: 'monospace',
                 wordBreak: 'break-word'
               }}>
@@ -283,9 +283,9 @@ const FriendlyErrorModal: React.FC<FriendlyErrorModalProps> = ({ error, onClose,
             <button
               onClick={onClose}
               style={{
-                background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
-                color: '#495057',
-                border: '1px solid #dee2e6',
+                background: 'rgba(255,255,255,0.08)',
+                color: '#ececec',
+                border: '1px solid rgba(255,255,255,0.08)',
                 padding: '12px 24px',
                 borderRadius: '25px',
                 cursor: 'pointer',
@@ -295,11 +295,11 @@ const FriendlyErrorModal: React.FC<FriendlyErrorModalProps> = ({ error, onClose,
                 minWidth: '100px'
               }}
               onMouseOver={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%)';
+                e.currentTarget.style.background = 'rgba(255,255,255,0.12)';
                 e.currentTarget.style.transform = 'translateY(-1px)';
               }}
               onMouseOut={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)';
+                e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
                 e.currentTarget.style.transform = 'translateY(0)';
               }}
             >

@@ -7,9 +7,10 @@
   position: absolute;
   bottom: calc(100% + 8px);
   right: 0;
-  background: white;
+  background: #2f2f2f;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
   min-width: 200px;
   z-index: 9999999;
   animation: shareMenuSlideUp 0.2s ease-out;
@@ -35,8 +36,8 @@
   width: 100%;
   padding: 14px 18px;
   border: none;
-  background: white;
-  color: #333;
+  background: transparent;
+  color: #ececec;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -45,11 +46,11 @@
 }
 
 .share-menu-option:hover {
-  background: #f0f0f0;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .share-menu-option:active {
-  background: #e0e0e0;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .share-menu-option svg {
@@ -67,5 +68,5 @@
 
 /* Add a subtle divider between options when both are present */
 .share-menu-option + .share-menu-option {
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }

@@ -186,10 +186,11 @@ function LoginForm({ onSignup, onClose }: Props) {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full text-white py-3 px-4 rounded-xl font-semibold transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            className="w-full py-3 px-4 rounded-xl font-semibold transition-all hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             style={{
-              background: 'linear-gradient(135deg, var(--sogni-pink), var(--sogni-purple))',
-              boxShadow: '0 4px 14px rgba(var(--rgb-accent), 0.4)'
+              background: '#ffffff',
+              color: '#0a0a0a',
+              boxShadow: '0 4px 14px rgba(0, 0, 0, 0.2)'
             }}
           >
             {isLoading ? 'Signing in...' : 'Sign In'}

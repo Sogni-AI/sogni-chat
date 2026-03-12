@@ -26,6 +26,7 @@ export async function execute(
   const description = args.description as string;
   const rawSourceIndex = args.sourceImageIndex as number | undefined;
   const aspectRatio = args.aspectRatio as string | undefined;
+  const loraStrength = args.loraStrength as number | undefined;
   const qualityTier = context.qualityTier || 'fast';
   const preset = QUALITY_PRESETS[qualityTier];
 
@@ -102,6 +103,7 @@ export async function execute(
           description,
           qualityTier: context.qualityTier,
           aspectRatio,
+          loraStrength,
         },
         (progress) => {
           if (progress.type === 'progress' || progress.type === 'completed') {

@@ -13,6 +13,7 @@ import {
   recordCompletion,
   discardPending,
   formatCredits,
+  fetchImageAsUint8Array,
 } from '../shared';
 import type { TokenType } from '@/types/wallet';
 import { parseAspectRatio } from '@/utils/imageDimensions';
@@ -33,6 +34,7 @@ interface ImageModelConfig {
   defaultGuidance?: number;
   sampler: string;
   scheduler: string;
+  supportsImg2Img: boolean;
 }
 
 const IMAGE_MODELS: Record<string, ImageModelConfig> = {
@@ -47,6 +49,20 @@ const IMAGE_MODELS: Record<string, ImageModelConfig> = {
     defaultGuidance: 1.0,
     sampler: 'res_multistep',
     scheduler: 'simple',
+    supportsImg2Img: true,
+  },
+  'z-image': {
+    id: 'z_image_bf16',
+    name: 'Z-Image',
+    defaultWidth: 1024,
+    defaultHeight: 1024,
+    maxWidth: 2048,
+    maxHeight: 2048,
+    defaultSteps: 30,
+    defaultGuidance: 3.5,
+    sampler: 'res_multistep',
+    scheduler: 'simple',
+    supportsImg2Img: true,
   },
   'chroma-v46-flash': {
     id: 'chroma-v.46-flash_fp8',
@@ -59,6 +75,46 @@ const IMAGE_MODELS: Record<string, ImageModelConfig> = {
     defaultGuidance: 1.0,
     sampler: 'euler',
     scheduler: 'simple',
+    supportsImg2Img: true,
+  },
+  'chroma-detail': {
+    id: 'chroma_v48_detail_svd',
+    name: 'Chroma Detail',
+    defaultWidth: 1024,
+    defaultHeight: 1024,
+    maxWidth: 2048,
+    maxHeight: 2048,
+    defaultSteps: 30,
+    defaultGuidance: 3.0,
+    sampler: 'euler',
+    scheduler: 'simple',
+    supportsImg2Img: true,
+  },
+  'flux1-schnell': {
+    id: 'flux1_schnell_bf16',
+    name: 'Flux.1 Schnell',
+    defaultWidth: 1024,
+    defaultHeight: 1024,
+    maxWidth: 2048,
+    maxHeight: 2048,
+    defaultSteps: 4,
+    defaultGuidance: 1.0,
+    sampler: 'euler',
+    scheduler: 'simple',
+    supportsImg2Img: false,
+  },
+  'flux1-dev': {
+    id: 'flux1_krea_dev_bf16',
+    name: 'Flux.1 Dev',
+    defaultWidth: 1024,
+    defaultHeight: 1024,
+    maxWidth: 2048,
+    maxHeight: 2048,
+    defaultSteps: 25,
+    defaultGuidance: 3.5,
+    sampler: 'euler',
+    scheduler: 'simple',
+    supportsImg2Img: true,
   },
   flux2: {
     id: 'flux2_dev_fp8',
@@ -71,6 +127,7 @@ const IMAGE_MODELS: Record<string, ImageModelConfig> = {
     defaultGuidance: 4.0,
     sampler: 'euler',
     scheduler: 'simple',
+    supportsImg2Img: true,
   },
 };
 
@@ -124,6 +181,10 @@ export async function execute(
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
   const negativePrompt = args.negativePrompt as string | undefined;
   const aspectRatio = args.aspectRatio as string | undefined;
+  const startingImageStrength = args.starting_image_strength as number | undefined;
+  const rawSourceIndex = args.sourceImageIndex as number | undefined;
+  const seedArg = args.seed as number | undefined;
+  const guidanceArg = args.guidance as number | undefined;
 
   const modelConfig = IMAGE_MODELS[modelKey] ?? IMAGE_MODELS['z-turbo'];
   const { width, height } = computeDimensions(
@@ -134,7 +195,31 @@ export async function execute(
   );
 
   const steps = modelConfig.defaultSteps;
-  const guidance = modelConfig.defaultGuidance;
+  const guidance = guidanceArg ?? modelConfig.defaultGuidance;
+  const seed = seedArg ?? -1;
+
+  // Resolve starting image for img2img
+  let startingImageData: Uint8Array | undefined;
+  if (startingImageStrength !== undefined && startingImageStrength > 0 && modelConfig.supportsImg2Img) {
+    const useOriginal = rawSourceIndex === -1;
+    const effectiveSourceIndex = useOriginal
+      ? undefined
+      : rawSourceIndex ?? (context.resultUrls.length > 0 ? context.resultUrls.length - 1 : undefined);
+
+    if (effectiveSourceIndex !== undefined && context.resultUrls[effectiveSourceIndex]) {
+      try {
+        console.log(`[GENERATE IMAGE] Using result image #${effectiveSourceIndex} as starting image`);
+        const fetched = await fetchImageAsUint8Array(context.resultUrls[effectiveSourceIndex]);
+        startingImageData = fetched.data;
+      } catch (err) {
+        console.error('[GENERATE IMAGE] Failed to fetch starting image from results, trying original:', err);
+      }
+    }
+    if (!startingImageData && context.imageData) {
+      console.log('[GENERATE IMAGE] Using original uploaded image as starting image');
+      startingImageData = context.imageData;
+    }
+  }
 
   // Cost estimation & pre-flight
   const originalToken = context.tokenType;
@@ -173,6 +258,9 @@ export async function execute(
           tokenType,
           sampler: modelConfig.sampler,
           scheduler: modelConfig.scheduler,
+          seed,
+          startingImage: startingImageData,
+          startingImageStrength: startingImageStrength,
         },
         (progress) => {
           callbacks.onToolProgress({
@@ -228,6 +316,9 @@ interface ImageGenParams {
   tokenType: TokenType;
   sampler: string;
   scheduler: string;
+  seed?: number;
+  startingImage?: Uint8Array;
+  startingImageStrength?: number;
 }
 
 interface ImageProgress {
@@ -251,7 +342,7 @@ async function runImageGeneration(
     positivePrompt: params.prompt,
     numberOfMedia: params.numberOfMedia,
     steps: params.steps,
-    seed: -1,
+    seed: params.seed ?? -1,
     tokenType: params.tokenType,
     width: params.width,
     height: params.height,
@@ -264,6 +355,10 @@ async function runImageGeneration(
   }
   if (params.guidance !== undefined) {
     projectParams.guidance = params.guidance;
+  }
+  if (params.startingImage && params.startingImageStrength !== undefined) {
+    projectParams.startingImage = new Blob([params.startingImage as BlobPart], { type: 'image/jpeg' });
+    projectParams.startingImageStrength = params.startingImageStrength;
   }
 
   const project = await (sogniClient as unknown as { projects: { create: (p: Record<string, unknown>) => Promise<{ id: string }>; on: (e: string, h: (ev: Record<string, unknown>) => void) => void; off: (e: string, h: (ev: Record<string, unknown>) => void) => void } }).projects.create(projectParams);

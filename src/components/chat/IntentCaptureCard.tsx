@@ -110,7 +110,7 @@ export function IntentCaptureCard({ onSubmit, disabled }: IntentCaptureCardProps
                   border: isSelected
                     ? '2px solid var(--color-accent)'
                     : '2px solid var(--color-border)',
-                  background: isSelected ? 'var(--color-accent)' : 'transparent',
+                  background: isSelected ? '#ececec' : 'transparent',
                   flexShrink: 0,
                   transition: 'all 0.15s ease',
                 }}
@@ -119,7 +119,7 @@ export function IntentCaptureCard({ onSubmit, disabled }: IntentCaptureCardProps
                   <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
                     <path
                       d="M2.5 6L5 8.5L9.5 3.5"
-                      stroke="#fff"
+                      stroke="#0a0a0a"
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -172,12 +172,12 @@ export function IntentCaptureCard({ onSubmit, disabled }: IntentCaptureCardProps
             fontSize: '0.8125rem',
             fontWeight: 600,
             fontFamily: 'var(--font-body)',
-            color: '#fff',
+            color: '#0a0a0a',
             background: selectedIds.size > 0
-              ? 'var(--sogni-gradient)'
-              : 'var(--color-border)',
+              ? '#ffffff'
+              : 'rgba(255, 255, 255, 0.1)',
             border: 'none',
-            borderRadius: 'var(--radius-md)',
+            borderRadius: 'var(--radius-pill)',
             cursor: disabled || selectedIds.size === 0 ? 'default' : 'pointer',
             opacity: disabled || selectedIds.size === 0 ? 0.5 : 1,
             transition: 'all 0.2s',

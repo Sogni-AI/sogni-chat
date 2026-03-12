@@ -73,13 +73,13 @@ function ProductListView({
                   key={product.id}
                   style={{
                     position: 'relative',
-                    border: product.isDefault ? '2px solid var(--color-blue-gray)' : '1px solid var(--color-border)',
+                    border: product.isDefault ? '2px solid rgba(255, 255, 255, 0.2)' : '1px solid var(--color-border)',
                     borderRadius: '12px',
                     padding: '16px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    background: product.isDefault ? 'rgba(var(--rgb-primary), 0.04)' : 'white',
+                    background: product.isDefault ? 'rgba(255, 255, 255, 0.06)' : '#2f2f2f',
                     transition: 'all 0.2s ease',
                   }}
                 >
@@ -89,8 +89,8 @@ function ProductListView({
                       top: '-10px',
                       left: '50%',
                       transform: 'translateX(-50%)',
-                      background: 'var(--color-blue-gray)',
-                      color: 'white',
+                      background: '#ececec',
+                      color: '#0a0a0a',
                       fontSize: '0.6875rem',
                       fontWeight: 700,
                       padding: '2px 10px',
@@ -138,8 +138,8 @@ function ProductListView({
                       onClick={() => onPurchase(product.id)}
                       disabled={loading}
                       style={{
-                        background: product.isDefault ? 'var(--sogni-gradient)' : 'var(--color-blue-gray)',
-                        color: 'white',
+                        background: '#ffffff',
+                        color: '#0a0a0a',
                         border: 'none',
                         borderRadius: '8px',
                         padding: '10px 20px',
@@ -207,7 +207,7 @@ function PurchaseProgressView({
           borderRadius: '50%',
           background: isCompleted
             ? 'linear-gradient(135deg, #4CAF50, #66BB6A)'
-            : 'linear-gradient(135deg, var(--color-primary), var(--color-accent))',
+            : '#171717',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -243,8 +243,8 @@ function PurchaseProgressView({
             style={{
               width: '100%',
               padding: '12px',
-              background: 'var(--sogni-gradient)',
-              color: 'white',
+              background: '#ffffff',
+              color: '#0a0a0a',
               border: 'none',
               borderRadius: '10px',
               fontSize: '0.875rem',
@@ -261,8 +261,8 @@ function PurchaseProgressView({
             style={{
               width: '100%',
               padding: '12px',
-              background: 'var(--color-blue-gray)',
-              color: 'white',
+              background: '#ffffff',
+              color: '#0a0a0a',
               border: 'none',
               borderRadius: '10px',
               fontSize: '0.875rem',
@@ -369,8 +369,8 @@ export const PackPurchaseModal: React.FC<PackPurchaseModalProps> = ({ isOpen, on
       <div
         className="relative w-full rounded-2xl overflow-hidden"
         style={{
-          background: '#ffffff',
-          boxShadow: '0 25px 60px rgba(0, 0, 0, 0.2)',
+          background: '#2f2f2f',
+          boxShadow: '0 25px 60px rgba(0, 0, 0, 0.5)',
           maxWidth: '480px',
           maxHeight: '90vh',
           display: 'flex',
@@ -382,7 +382,7 @@ export const PackPurchaseModal: React.FC<PackPurchaseModalProps> = ({ isOpen, on
       >
         {/* Header */}
         <div style={{
-          background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent))',
+          background: '#171717',
           padding: '20px 24px 16px',
           textAlign: 'center',
           flexShrink: 0,
@@ -393,12 +393,12 @@ export const PackPurchaseModal: React.FC<PackPurchaseModalProps> = ({ isOpen, on
               position: 'absolute',
               top: '12px',
               right: '12px',
-              background: 'rgba(255,255,255,0.2)',
+              background: 'rgba(255,255,255,0.1)',
               border: 'none',
               borderRadius: '50%',
               width: '28px',
               height: '28px',
-              color: 'white',
+              color: '#b4b4b4',
               fontSize: '1rem',
               cursor: 'pointer',
               display: 'flex',
@@ -408,10 +408,10 @@ export const PackPurchaseModal: React.FC<PackPurchaseModalProps> = ({ isOpen, on
           >
             {'\u00d7'}
           </button>
-          <h2 style={{ color: 'white', fontSize: '1.375rem', fontWeight: 700, marginBottom: '4px' }}>
+          <h2 style={{ color: '#ececec', fontSize: '1.375rem', fontWeight: 700, marginBottom: '4px' }}>
             {purchaseId ? 'Purchase Status' : 'Buy Spark Points'}
           </h2>
-          <p style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.875rem' }}>
+          <p style={{ color: '#b4b4b4', fontSize: '0.875rem' }}>
             {purchaseId
               ? 'Completing your purchase'
               : 'Power your creations with Spark Points'}

@@ -72,7 +72,7 @@ function Step4({ onClose, onSignupComplete }: Props) {
               border: '1px solid rgba(var(--rgb-primary), 0.1)'
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--sogni-purple)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ececec" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
             </svg>
             <span style={{ color: 'var(--color-text-primary)', fontWeight: 600, fontSize: '0.875rem' }}>
@@ -84,10 +84,11 @@ function Step4({ onClose, onSignupComplete }: Props) {
       <FormFooter>
         <button
           type="button"
-          className="w-full text-white py-3 px-4 rounded-xl font-semibold transition-all hover:scale-[1.02]"
+          className="w-full py-3 px-4 rounded-xl font-semibold transition-all hover:scale-[1.02]"
           style={{
-            background: 'linear-gradient(135deg, var(--sogni-pink), var(--sogni-purple))',
-            boxShadow: '0 4px 14px rgba(var(--rgb-accent), 0.4)'
+            background: '#ffffff',
+            color: '#0a0a0a',
+            boxShadow: '0 4px 14px rgba(0, 0, 0, 0.2)'
           }}
           onClick={onClose}
         >

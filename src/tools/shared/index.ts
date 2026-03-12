@@ -25,3 +25,4 @@ export {
   withTimeout,
   stripThinkBlocks,
 } from './llmHelpers';
+export { uint8ArrayToDataUri } from './imageEncoding';

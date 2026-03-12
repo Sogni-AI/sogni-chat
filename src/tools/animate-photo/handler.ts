@@ -26,6 +26,7 @@ import {
   withTimeout,
   stripThinkBlocks,
   LLM_SUBCALL_TIMEOUT_MS,
+  uint8ArrayToDataUri,
 } from '../shared';
 import { generateVideo } from '@/services/sdk/videoGeneration';
 import { fetchVideoCostEstimate } from '@/services/creditsService';
@@ -36,15 +37,6 @@ import { CHAT_MODEL } from '@/config/chat';
 // ---------------------------------------------------------------------------
 // Private helpers
 // ---------------------------------------------------------------------------
-
-/** Convert a Uint8Array (JPEG) to a base64 data URI for vision calls. */
-function uint8ArrayToDataUri(data: Uint8Array, mimeType = 'image/jpeg'): string {
-  let binary = '';
-  for (let i = 0; i < data.length; i++) {
-    binary += String.fromCharCode(data[i]);
-  }
-  return `data:${mimeType};base64,${btoa(binary)}`;
-}
 
 /** Detect if a prompt contains quoted dialogue (text in quotes) */
 function hasDialogue(prompt: string): boolean {
@@ -190,10 +182,14 @@ export async function execute(
   const prompt = args.prompt as string;
   const rawSourceIndex = args.sourceImageIndex as number | undefined;
   const duration = Math.max(2, Math.min(20, (args.duration as number) || 5));
-  const videoModelId: VideoModelId = (args.videoModel as string) === 'wan22' ? 'wan22' : 'ltx2';
+  const rawVideoModel = (args.videoModel as string) || 'ltx2';
+  const validVideoModels: VideoModelId[] = ['ltx2', 'wan22', 'ltx2-hq', 'wan22-hq', 'ltx23'];
+  const videoModelId: VideoModelId = validVideoModels.includes(rawVideoModel as VideoModelId)
+    ? (rawVideoModel as VideoModelId)
+    : 'ltx2';
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
   const aspectRatio = args.aspectRatio as string | undefined;
-  const isLTX2 = videoModelId === 'ltx2';
+  const isLTX = videoModelId.startsWith('ltx');
 
   if (!context.imageData) {
     return JSON.stringify({ error: 'no_image', message: 'Please upload an image first.' });
@@ -201,7 +197,7 @@ export async function execute(
 
   // Quality-based resolution: Standard (fast) -> 720p (768), High (hq) -> 1080p (1088)
   const qualityTier = context.qualityTier || 'fast';
-  const targetResolution = isLTX2
+  const targetResolution = isLTX
     ? (qualityTier === 'hq' ? 1088 : 768)
     : undefined;
 
@@ -247,7 +243,7 @@ export async function execute(
 
   // Compose the final video prompt based on model
   let composedPrompt: string;
-  if (isLTX2) {
+  if (isLTX) {
     // Step 1: Use vision LLM to describe the source image for rich first-frame anchoring
     callbacks.onToolProgress({
       type: 'started',
@@ -465,7 +461,7 @@ export async function execute(
       resultCount: videoUrls.length,
       mediaType: 'video',
       creditsCost: formatCredits(estimatedCost),
-      message: `Successfully generated ${videoUrls.length} ${duration}-second video${videoUrls.length !== 1 ? 's' : ''} using ${isLTX2 ? 'LTX-2' : 'WAN 2.2'}${isLTX2 ? ' (with audio)' : ''}. Cost: ~${formatCredits(estimatedCost)} credits. The user can now see and play the video${videoUrls.length !== 1 ? 's' : ''}.`,
+      message: `Successfully generated ${videoUrls.length} ${duration}-second video${videoUrls.length !== 1 ? 's' : ''} using ${isLTX ? 'LTX-2' : 'WAN 2.2'}${isLTX ? ' (with audio)' : ''}. Cost: ~${formatCredits(estimatedCost)} credits. The user can now see and play the video${videoUrls.length !== 1 ? 's' : ''}.`,
     });
   } catch (err: unknown) {
     if (billingId) discardPending(billingId);

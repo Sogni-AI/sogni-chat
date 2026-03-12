@@ -49,9 +49,9 @@ CONSTRAINTS (both models):
         },
         videoModel: {
           type: 'string',
-          enum: ['ltx2', 'wan22'],
+          enum: ['ltx2', 'wan22', 'ltx2-hq', 'wan22-hq', 'ltx23'],
           description:
-            'Which video model to use. "ltx2" (default): Higher quality, generates audio, supports elaborate cinematic prompts with atmosphere, sound design, and camera work. Use for detailed/creative requests, any request mentioning sound or audio, or longer videos. "wan22": Faster, simpler motion, no audio. Use for short simple actions like "make her wave", "make him smile", "bring this to life" where the user just wants basic motion without cinematic detail. Default: "ltx2".',
+            'Which video model to use. "ltx2" (default): Fast 8-step distilled, generates audio, good balance of speed and quality. "ltx2-hq": High quality 20-step, generates audio, better detail for cinematic results. "ltx23": Latest LTX 2.3 distilled, 8-step, fast + high quality with audio (same engine as ltx2 default). "wan22": Fast 4-step, simple motion, no audio. "wan22-hq": High quality 20-step, better motion fidelity, no audio. Use ltx2 for most requests. Use ltx2-hq or wan22-hq when user asks for "high quality", "best quality", or "detailed". Use wan22 for quick simple motions. Default: "ltx2".',
         },
         duration: {
           type: 'number',

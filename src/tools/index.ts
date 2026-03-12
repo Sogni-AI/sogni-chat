@@ -21,6 +21,9 @@ import './sound-to-video';
 import './video-to-video';
 import './generate-music';
 
+// Phase 5: Vision analysis tool
+import './analyze-image';
+
 export { toolRegistry } from './registry';
 export type {
   ToolHandler,

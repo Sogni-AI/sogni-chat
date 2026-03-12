@@ -1,6 +1,5 @@
 /**
- * Pill-shaped suggestion chip buttons shown after assistant messages.
- * Each chip is a single-click action — restoration modes are individual chips.
+ * Suggestion chip buttons — ChatGPT-inspired subtle bordered style.
  */
 import type { Suggestion } from '@/utils/chatSuggestions';
 import './chat.css';
@@ -17,27 +16,27 @@ function ChipButton({ suggestion, onSelect }: { suggestion: Suggestion; onSelect
       onClick={() => onSelect(suggestion.prompt)}
       title={suggestion.prompt}
       style={{
-        padding: '0.375rem 0.875rem',
+        padding: '0.5rem 1rem',
         fontSize: '0.8125rem',
-        fontWeight: 500,
-        fontFamily: 'var(--font-body, Inter, sans-serif)',
-        color: 'var(--color-text-secondary)',
-        background: 'rgba(var(--rgb-primary), 0.04)',
-        border: '1px solid var(--color-border)',
-        borderRadius: '999px',
+        fontWeight: 400,
+        fontFamily: 'var(--font-primary)',
+        color: '#b4b4b4',
+        background: 'transparent',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        borderRadius: 'var(--radius-pill)',
         cursor: 'pointer',
-        transition: 'all 0.2s ease',
+        transition: 'all 0.15s ease',
         whiteSpace: 'nowrap',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = 'rgba(var(--rgb-accent), 0.1)';
-        e.currentTarget.style.borderColor = 'var(--color-accent)';
-        e.currentTarget.style.color = 'var(--color-accent)';
+        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)';
+        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+        e.currentTarget.style.color = '#ececec';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'rgba(var(--rgb-primary), 0.04)';
-        e.currentTarget.style.borderColor = 'var(--color-border)';
-        e.currentTarget.style.color = 'var(--color-text-secondary)';
+        e.currentTarget.style.background = 'transparent';
+        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+        e.currentTarget.style.color = '#b4b4b4';
       }}
     >
       {suggestion.label}

@@ -1,5 +1,5 @@
 /**
- * Chat History Sidebar — shows all chat sessions.
+ * Chat History Sidebar — ChatGPT-inspired dark flat design.
  * Desktop: Fixed ~260px width alongside chat panel.
  * Mobile: Rendered inside MobileChatDrawer with full-width + close button.
  */
@@ -78,18 +78,15 @@ export function ChatHistorySidebar({
         display: 'flex',
         flexDirection: 'column',
         height: '100%',
-        borderRight: '1px solid var(--color-border)',
-        background: 'var(--color-bg-elevated)',
-        borderRadius: 'var(--radius-lg) 0 0 var(--radius-lg)',
+        background: '#171717',
         overflow: 'hidden',
         ...style,
       }}
     >
-      {/* Header with close button (mobile) + New Photo button */}
+      {/* Header with close button (mobile) + New Chat button */}
       <div
         style={{
           padding: '0.75rem',
-          borderBottom: '1px solid var(--color-border)',
           flexShrink: 0,
           display: 'flex',
           alignItems: 'center',
@@ -106,14 +103,16 @@ export function ChatHistorySidebar({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              background: 'rgba(var(--rgb-primary), 0.06)',
+              background: 'transparent',
               border: 'none',
               borderRadius: 'var(--radius-sm)',
               cursor: 'pointer',
-              color: 'var(--color-text-secondary)',
+              color: '#b4b4b4',
               flexShrink: 0,
-              transition: 'background 0.15s',
+              transition: 'color 0.15s',
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = '#ececec'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = '#b4b4b4'; }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
@@ -130,29 +129,26 @@ export function ChatHistorySidebar({
             flex: 1,
             padding: '0.5rem 0.75rem',
             fontSize: '0.8125rem',
-            fontWeight: 600,
-            color: '#fff',
-            background: 'var(--sogni-gradient)',
-            border: dragOver ? '2px dashed #fff' : 'none',
-            borderRadius: 'var(--radius-sm)',
+            fontWeight: 500,
+            color: '#ececec',
+            background: 'transparent',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: 'var(--radius-lg)',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.375rem',
-            transition: 'opacity 0.2s, transform 0.15s',
-            fontFamily: 'var(--font-display)',
-            opacity: dragOver ? 0.9 : undefined,
-            transform: dragOver ? 'scale(1.04)' : undefined,
+            gap: '0.5rem',
+            transition: 'background 0.15s, border-color 0.15s',
+            opacity: dragOver ? 0.8 : undefined,
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.9'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" />
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
-          New Photo
+          New chat
         </button>
       </div>
 
@@ -161,7 +157,7 @@ export function ChatHistorySidebar({
         style={{
           flex: 1,
           overflowY: 'auto',
-          padding: '0.375rem',
+          padding: '0.25rem 0.5rem',
         }}
       >
         {sessions.length === 0 ? (
@@ -169,12 +165,11 @@ export function ChatHistorySidebar({
             style={{
               padding: '1.5rem 0.75rem',
               textAlign: 'center',
-              fontSize: '0.75rem',
-              color: 'var(--color-text-secondary)',
-              opacity: 0.6,
+              fontSize: '0.8125rem',
+              color: '#8e8e8e',
             }}
           >
-            No sessions yet. Upload a photo to get started.
+            No chats yet
           </div>
         ) : (
           sessions.map((session) => (

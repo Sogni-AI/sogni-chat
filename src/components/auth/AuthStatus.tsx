@@ -1,6 +1,5 @@
 /**
- * Authentication status indicator for the header.
- * Shows login button when unauthenticated, user info when authenticated.
+ * Authentication status indicator for the header — dark theme.
  */
 
 import { useSogniAuth } from '@/services/sogniAuth';
@@ -16,8 +15,11 @@ export function AuthStatus() {
         onClick={() => showSignupModal('login')}
         className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
         style={{
-          background: 'var(--color-primary)',
-          color: 'white',
+          background: '#ffffff',
+          color: '#0a0a0a',
+          border: 'none',
+          borderRadius: 'var(--radius-pill)',
+          cursor: 'pointer',
         }}
       >
         Sign In
@@ -27,16 +29,18 @@ export function AuthStatus() {
 
   return (
     <div className="flex items-center gap-3">
-      <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+      <span className="text-sm" style={{ color: '#b4b4b4' }}>
         {user?.username}
       </span>
       <button
         onClick={logout}
         className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
         style={{
-          background: 'var(--color-surface)',
-          color: 'var(--color-text-secondary)',
-          border: '1px solid var(--color-border)',
+          background: 'transparent',
+          color: '#8e8e8e',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: 'var(--radius-pill)',
+          cursor: 'pointer',
         }}
       >
         Sign Out

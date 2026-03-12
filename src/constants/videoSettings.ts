@@ -8,7 +8,7 @@ import { parseAspectRatio } from '@/utils/imageDimensions';
 // Model IDs & Types
 // ============================================================================
 
-export type VideoModelId = 'wan22' | 'ltx2';
+export type VideoModelId = 'wan22' | 'ltx2' | 'wan22-hq' | 'ltx2-hq' | 'ltx23';
 
 export interface VideoModelConfig {
   model: string;
@@ -43,6 +43,18 @@ export const VIDEO_MODEL_CONFIGS: Record<VideoModelId, VideoModelConfig> = {
     scheduler: 'simple',
     shift: 8.0,
   },
+  'wan22-hq': {
+    model: 'wan_v2.2-14b-fp8_i2v',
+    fps: 16,
+    steps: 20,
+    guidance: 5.0,
+    dimensionDivisor: 16,
+    minDimension: 480,
+    maxDimension: 1536,
+    sampler: 'euler',
+    scheduler: 'simple',
+    shift: 8.0,
+  },
   ltx2: {
     model: 'ltx23-22b-fp8_i2v_distilled',
     fps: 24,
@@ -57,6 +69,34 @@ export const VIDEO_MODEL_CONFIGS: Record<VideoModelId, VideoModelConfig> = {
     // LTX-2 snaps shorter side to 1088 (HD) or 768 (720p)
     resolutionTiers: [1088, 768],
     resolutionThreshold: 720, // source shorter side < 720 -> use 768 tier
+  },
+  'ltx2-hq': {
+    model: 'ltx2-19b-fp8_i2v',
+    fps: 24,
+    steps: 20,
+    guidance: 1.0,
+    dimensionDivisor: 64,
+    minDimension: 640,
+    maxDimension: 3840,
+    sampler: 'euler',
+    scheduler: 'simple',
+    strength: 0.90,
+    resolutionTiers: [1088, 768],
+    resolutionThreshold: 720,
+  },
+  ltx23: {
+    model: 'ltx23-22b-fp8_i2v_distilled',
+    fps: 24,
+    steps: 8,
+    guidance: 1.0,
+    dimensionDivisor: 64,
+    minDimension: 640,
+    maxDimension: 3840,
+    sampler: 'euler',
+    scheduler: 'simple',
+    strength: 0.90,
+    resolutionTiers: [1088, 768],
+    resolutionThreshold: 720,
   },
 };
 
