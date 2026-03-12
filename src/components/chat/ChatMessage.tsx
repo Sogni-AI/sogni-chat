@@ -40,8 +40,8 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
   const hasAudios = message.audioResults && message.audioResults.length > 0;
   const hasUploadedImage = !!message.uploadedImageUrl;
 
-  // Don't render empty assistant messages
-  if (isAssistant && !hasVisibleContent && !hasProgress && !hasImages && !hasVideos && !hasAudios && message.isStreaming) {
+  // Don't render empty assistant messages (but keep streaming ones visible for the cursor)
+  if (isAssistant && !hasVisibleContent && !hasProgress && !hasImages && !hasVideos && !hasAudios && !message.isStreaming) {
     return null;
   }
 
@@ -83,7 +83,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
       }}
     >
       {/* Message bubble */}
-      {hasVisibleContent && (
+      {(hasVisibleContent || (isAssistant && message.isStreaming && !hasProgress)) && (
         <div
           style={{
             maxWidth: isUser ? '75%' : '85%',
@@ -99,20 +99,22 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
         >
           {isAssistant ? (
             <>
-              <ReactMarkdown
-                components={{
-                  p: ({ children }) => <span className="chat-md-p" style={{ display: 'block' }}>{children}</span>,
-                  strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
-                  ol: ({ children }) => <ol style={{ margin: '0.5em 0', paddingLeft: '1.5em' }}>{children}</ol>,
-                  ul: ({ children }) => <ul style={{ margin: '0.5em 0', paddingLeft: '1.5em' }}>{children}</ul>,
-                  li: ({ children }) => <li style={{ marginBottom: '0.25em' }}>{children}</li>,
-                  a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent)', textDecoration: 'underline' }}>{children}</a>,
-                  pre: ({ children }) => <pre style={{ background: 'rgba(255,255,255,0.06)', padding: '0.75em 1em', borderRadius: '6px', overflowX: 'auto', margin: '0.5em 0', fontSize: '0.875em' }}>{children}</pre>,
-                  code: ({ children }) => <code style={{ background: 'rgba(255,255,255,0.08)', padding: '0.125em 0.375em', borderRadius: '4px', fontSize: '0.875em' }}>{children}</code>,
-                }}
-              >
-                {message.content.trim()}
-              </ReactMarkdown>
+              {hasVisibleContent && (
+                <ReactMarkdown
+                  components={{
+                    p: ({ children }) => <span className="chat-md-p" style={{ display: 'block' }}>{children}</span>,
+                    strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
+                    ol: ({ children }) => <ol style={{ margin: '0.5em 0', paddingLeft: '1.5em' }}>{children}</ol>,
+                    ul: ({ children }) => <ul style={{ margin: '0.5em 0', paddingLeft: '1.5em' }}>{children}</ul>,
+                    li: ({ children }) => <li style={{ marginBottom: '0.25em' }}>{children}</li>,
+                    a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent)', textDecoration: 'underline' }}>{children}</a>,
+                    pre: ({ children }) => <pre style={{ background: 'rgba(255,255,255,0.06)', padding: '0.75em 1em', borderRadius: '6px', overflowX: 'auto', margin: '0.5em 0', fontSize: '0.875em' }}>{children}</pre>,
+                    code: ({ children }) => <code style={{ background: 'rgba(255,255,255,0.08)', padding: '0.125em 0.375em', borderRadius: '4px', fontSize: '0.875em' }}>{children}</code>,
+                  }}
+                >
+                  {message.content.trim()}
+                </ReactMarkdown>
+              )}
               {message.isStreaming && !message.toolProgress && (
                 <span className="chat-streaming-cursor" />
               )}

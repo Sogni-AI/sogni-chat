@@ -17,25 +17,21 @@ export const definition: ToolDefinition = {
       properties: {
         prompt: {
           type: 'string',
-          description: `Detailed text description of the video to generate. 2-4 present-tense sentences recommended.
+          description: `Text description of the video to generate. Capture the user's creative intent as faithfully and completely as possible.
 
-Structure your prompt:
-1. SCENE (1 sentence): Describe the setting, subjects, and visual style in detail.
-2. ACTION (1-2 sentences): Describe motion, movement, and what happens over time. Use temporal connectors ("as", "then", "while").
-3. ATMOSPHERE & SOUND (1 sentence): Environmental motion, ambient sounds, music.
-4. CAMERA (append): Camera movement ("slow push-in", "gentle pan right", "static tripod").
+For SIMPLE scenes (landscape, abstract, single action): Write 2-4 present-tense sentences with scene, action, atmosphere, and camera movement.
 
---- AUDIO & DIALOGUE (LTX-2 only) ---
-LTX-2 generates audio natively. Describe audio clearly:
-- Ambient sounds: "the sound of waves crashing", "birds chirping".
-- Music: "soft piano melody playing in the background".
-- Dialogue: Place spoken text in quotes. E.g., A narrator says "Welcome to the future."
-- End with "The footage remains smooth and stabilised throughout."
+For COMPLEX/CREATIVE scenes (characters talking, arguments, fights, skits, stories, scenes from movies/shows): Capture the FULL creative intent — who the characters are, what they say, what happens, the tone and style. Include specific details the user mentioned. The system will automatically expand this into a detailed video prompt, so focus on accurately representing what the user wants rather than summarizing.
+
+CRITICAL FOR DIALOGUE: If the user's request involves people talking, arguing, or any spoken words, you MUST write out the actual dialogue in double quotes. NEVER summarize dialogue as "they argue about X" — instead write what they actually say. If the user didn't specify exact words, create appropriate dialogue that matches their intent.
+
+CRITICAL FOR CHARACTERS: If the user references specific characters (from movies, TV, etc.), describe their visual appearance (clothing, hair, build, features) so they can be recognized. Do not rely on names alone.
 
 CONSTRAINTS:
 - Present tense only. Positive phrasing.
 - No vague words ("beautiful", "nice") — use concrete sensory details.
-- Keep movements natural and physically plausible.`,
+- Keep movements natural and physically plausible.
+- End with "The footage remains smooth and stabilised throughout."`,
         },
         duration: {
           type: 'number',

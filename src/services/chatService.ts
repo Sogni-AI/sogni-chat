@@ -65,7 +65,11 @@ async function prepareVisionDataUri(context: ToolExecutionContext): Promise<stri
       return await resizeImageForVision(context.resultUrls[context.resultUrls.length - 1]);
     }
     if (context.imageData) {
-      const blobUrl = URL.createObjectURL(new Blob([context.imageData], { type: 'image/jpeg' }));
+      const buf = context.imageData.buffer.slice(
+        context.imageData.byteOffset,
+        context.imageData.byteOffset + context.imageData.byteLength,
+      ) as ArrayBuffer;
+      const blobUrl = URL.createObjectURL(new Blob([buf], { type: 'image/jpeg' }));
       try {
         return await resizeImageForVision(blobUrl);
       } finally {
@@ -74,7 +78,11 @@ async function prepareVisionDataUri(context: ToolExecutionContext): Promise<stri
     }
     const imgFile = context.uploadedFiles.find(f => f.type === 'image');
     if (imgFile) {
-      const blobUrl = URL.createObjectURL(new Blob([imgFile.data], { type: imgFile.mimeType }));
+      const buf = imgFile.data.buffer.slice(
+        imgFile.data.byteOffset,
+        imgFile.data.byteOffset + imgFile.data.byteLength,
+      ) as ArrayBuffer;
+      const blobUrl = URL.createObjectURL(new Blob([buf], { type: imgFile.mimeType }));
       try {
         return await resizeImageForVision(blobUrl);
       } finally {

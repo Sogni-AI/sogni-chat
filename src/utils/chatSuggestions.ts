@@ -43,12 +43,12 @@ export const VIDEO_INTENT_SUGGESTIONS: Suggestion[] = [
 ];
 
 /** Suggestions shown when uploadIntent is 'edit' and an image has been uploaded */
-export const EDIT_INTENT_SUGGESTIONS: string[] = [
-  'Apply artistic style',
-  'Change the background',
-  'Edit specific details',
-  'Generate variations',
-  'Change the viewing angle',
+export const EDIT_INTENT_SUGGESTIONS: Suggestion[] = [
+  { label: 'Apply artistic style', prompt: 'Apply an artistic style to this photo' },
+  { label: 'Change the background', prompt: 'Change the background of this photo' },
+  { label: 'Edit specific details', prompt: 'Edit specific details in this photo' },
+  { label: 'Generate variations', prompt: 'Generate variations of this photo' },
+  { label: 'Change the viewing angle', prompt: 'Change the viewing angle of this photo' },
 ];
 
 /** Suggestions shown when no image is uploaded — short prompts that trigger LLM conversation */

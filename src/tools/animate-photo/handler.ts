@@ -38,10 +38,30 @@ import { CHAT_MODEL } from '@/config/chat';
 // Private helpers
 // ---------------------------------------------------------------------------
 
-/** Detect if a prompt contains quoted dialogue (text in quotes) */
-function hasDialogue(prompt: string): boolean {
-  // Match double or single quoted strings that look like speech
-  return /["'].{3,}["']/.test(prompt);
+/** Detect if a prompt needs creative refinement (dialogue, character refs, narrative) */
+function needsCreativeRefinement(prompt: string, duration: number): boolean {
+  const lower = prompt.toLowerCase();
+
+  // Dialogue indicators — quoted text or speech verbs
+  const hasDialogue = /["'].{3,}["']/.test(prompt)
+    || /\b(says?|said|argues?|tells?|asks?|responds?|replies|shouts?|whispers?|exclaims?|yells?|screams?|speaks?|talks?|conversation|dialogue|monologue)\b/.test(lower);
+
+  // Character/narrative references
+  const hasCharacterRefs = /\b(from\s+(the\s+)?(movie|film|show|series|book|game|anime))\b/.test(lower)
+    || /\b(character|protagonist|antagonist|hero|villain|hitman|hitmen|detective|warrior|knight)\b/.test(lower);
+
+  // Narrative interactions
+  const hasNarrative = /\b(argument|fight|battle|chase|confrontation|debate|duel|encounter|scene|sketch|skit)\b/.test(lower)
+    && /\b(about|over|regarding|between)\b/.test(lower);
+
+  // Interaction between multiple subjects
+  const hasInteraction = /\b(they\s+(both|all|each)|together|each\s+other|one\s+another)\b/.test(lower)
+    || /\b(should\s+(both|all|then|start|begin))\b/.test(lower);
+
+  // Short prompt for a long video
+  const isTooShallow = duration > 8 && prompt.length < duration * 25;
+
+  return hasDialogue || hasCharacterRefs || hasNarrative || hasInteraction || isTooShallow;
 }
 
 /** System prompt for the /describe vision call used to anchor LTX-2 video prompts */
@@ -52,33 +72,42 @@ const VIDEO_DESCRIBE_SYSTEM_PROMPT =
   'Do NOT mention what to animate or any motion. Just describe the static scene exactly as it appears.';
 
 /**
- * Use the LLM with thinking mode to generate or refine dialogue for video prompts.
- * Thinking mode helps the model produce more natural, well-paced dialogue,
- * especially for longer videos where dialogue needs to span the duration.
+ * Use a thinking-mode LLM sub-call to expand a prompt into a detailed,
+ * production-quality video prompt. Handles dialogue expansion, character
+ * descriptions, scene staging, and action pacing.
  */
-async function refineDialogueWithThinking(
+async function refineVideoPrompt(
   sogniClient: SogniClient,
   originalPrompt: string,
   duration: number,
   tokenType: TokenType,
 ): Promise<string> {
   try {
-    console.log(`[ANIMATE] Refining dialogue with thinking mode (${duration}s video)`);
+    console.log(`[ANIMATE] Refining prompt with thinking mode (${duration}s video)`);
 
     const messages: ChatMessage[] = [
       {
         role: 'system',
-        content: `You refine video prompts that contain dialogue. Your job is to improve the dialogue and action pacing for a ${duration}-second video clip. Rules:
-- Keep all quoted dialogue in double quotes
-- Space dialogue naturally across the ${duration}s duration using temporal cues ("begins by saying...", "then turns and says...", "after a pause, responds with...")
-- Add natural pauses, gestures, and expressions between lines
-- Preserve the user's intended meaning and any specific quoted words exactly
-- Include audio/sound descriptions (ambient sounds, tone of voice)
-- Return ONLY the refined prompt, no explanation`,
+        content: `You are a video prompt engineer. Expand the user's video concept into a detailed, production-quality prompt for an AI video generation model (LTX-2).
+
+CRITICAL RULES:
+1. DIALOGUE: If the concept implies conversation, argument, or speech, write out the ACTUAL DIALOGUE in double quotes. Never summarize dialogue — write the exact words each person says. Space dialogue naturally across ${duration} seconds with pauses, gestures, and reactions between lines.
+
+2. CHARACTERS: The video model does not recognize names. If the user references characters from movies, TV, games, or real people, describe their PHYSICAL APPEARANCE in vivid detail (clothing, hair, build, distinguishing features, mannerisms) so the model can generate them visually. Never rely on a name alone.
+
+3. ACTION: Describe what physically happens on screen moment by moment. Use temporal connectors: "begins by...", "then...", "as this happens...", "suddenly...", "after a beat...". For ${duration} seconds of video, pace the action so it fills the duration naturally without feeling rushed or empty.
+
+4. SENSORY DETAIL: Include concrete visual details — lighting direction, color palette, textures, environment. Describe audio: ambient sounds, music style, tone of voice for dialogue. End with camera movement ("slow push-in", "handheld tracking shot", "static wide angle").
+
+5. PRESENT TENSE only. Positive phrasing (describe what IS happening, not what isn't).
+
+6. End with: "The footage remains smooth and stabilised throughout."
+
+Return ONLY the refined prompt. No explanation, no commentary, no preamble.`,
       },
       {
         role: 'user',
-        content: `Refine this video prompt for a ${duration}-second clip:\n\n${originalPrompt}`,
+        content: `Expand this into a detailed ${duration}-second video prompt:\n\n${originalPrompt}`,
       },
     ];
 
@@ -103,16 +132,15 @@ async function refineDialogueWithThinking(
     }
 
     refined = refined.trim();
-    if (refined.length > 20) {
-      console.log(`[ANIMATE] Dialogue refined (${refined.length} chars):`, refined);
+    if (refined.length > 50) {
+      console.log(`[ANIMATE] Prompt refined (${refined.length} chars):`, refined);
       return refined;
     }
 
-    // Fallback to original if refinement failed
-    console.warn(`[CHAT SERVICE] Dialogue refinement too short (${refined.length} chars), using original prompt. Refined result was:`, refined || '(empty)');
+    console.warn(`[ANIMATE] Refinement too short (${refined.length} chars), using original prompt`);
     return originalPrompt;
   } catch (err) {
-    console.error('[ANIMATE] Dialogue refinement failed, using original prompt:', err);
+    console.error('[ANIMATE] Prompt refinement failed, using original prompt:', err);
     return originalPrompt;
   }
 }
@@ -268,20 +296,21 @@ export async function execute(
       'Image description',
     ) ?? '';
 
-    // Step 2: For prompts with dialogue in longer videos, use thinking mode to refine pacing
+    // Step 2: For prompts needing creative expansion (dialogue, characters, narrative),
+    // use thinking mode to generate a detailed, production-quality prompt
     let refinedPrompt = prompt;
-    if (hasDialogue(prompt) && duration > 10) {
+    if (needsCreativeRefinement(prompt, duration)) {
       callbacks.onToolProgress({
         type: 'started',
         toolName: 'animate_photo',
         totalCount: numberOfMedia,
-        stepLabel: 'Refining dialogue',
+        stepLabel: 'Crafting detailed prompt',
         videoAspectRatio,
       });
       refinedPrompt = await withTimeout(
-        refineDialogueWithThinking(context.sogniClient, prompt, duration, context.tokenType),
+        refineVideoPrompt(context.sogniClient, prompt, duration, context.tokenType),
         LLM_SUBCALL_TIMEOUT_MS,
-        'Dialogue refinement',
+        'Video prompt refinement',
       ) ?? prompt;
     }
 

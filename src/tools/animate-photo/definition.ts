@@ -35,17 +35,18 @@ The scene description is automatically generated from the image — you only nee
 
 --- AUDIO & DIALOGUE (LTX-2 only) ---
 LTX-2 generates audio natively. Describe audio clearly in your prompt:
-- Ambient sounds: "the sound of waves crashing on shore", "birds chirping in the background", "a bustling city street with distant traffic".
+- Ambient sounds: "the sound of waves crashing on shore", "birds chirping in the background".
 - Music: "soft piano melody playing", "upbeat jazz music in the background".
-- Dialogue: Place the EXACT spoken text between quotation marks. E.g., The subject says "Hello, how are you today?" with a warm, friendly tone.
-- Language/accent: If relevant, specify: "speaking in French with a Parisian accent", "saying 'gracias' in Spanish".
-- For longer dialogue (10s+ video), write natural conversational lines. Space dialogue across the duration.
+- Dialogue: Write out the ACTUAL spoken words in double quotes. NEVER summarize dialogue as "they argue about X" — write what they say. E.g., The subject says "Hello, how are you today?" with a warm, friendly tone.
+- If the user implies a conversation/argument but doesn't specify exact words, CREATE appropriate dialogue that matches their intent.
+
+CRITICAL FOR CHARACTERS: If the user references specific characters (from movies, TV, etc.), describe their visual appearance (clothing, hair, build, features) so they can be recognized visually. Do not rely on names alone.
 
 CONSTRAINTS (both models):
 - Present tense only. Positive phrasing.
 - No vague words ("beautiful", "nice") — use concrete sensory details.
 - Keep movements subtle and natural — small gestures look more realistic than dramatic actions.
-- SPEECH: If the user specifies dialogue or speech in quotes (e.g., "make them say 'hello'"), include the exact quoted text in the prompt (e.g., 'The subject says "hello"'). Preserve the user's exact words.`,
+- For complex/creative scenes (characters talking, arguments, skits), capture the full creative intent. The system will automatically expand it into a detailed prompt.`,
         },
         videoModel: {
           type: 'string',
