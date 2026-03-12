@@ -28,7 +28,7 @@ Rules:
         sourceImageIndex: {
           type: 'number',
           description:
-            'Which result image to refine (0-based index). If the user specifies an image number, use that index. If they do not specify, default to 0 (the most recent or only result). When multiple results exist and the user previously referenced a specific one, use that one.',
+            'Which result image to refine (0-based index). If the user specifies an image number, use that index. If omitted, the latest result is used automatically. When multiple results exist and the user previously referenced a specific one, use that one.',
         },
         numberOfVariations: {
           type: 'number',

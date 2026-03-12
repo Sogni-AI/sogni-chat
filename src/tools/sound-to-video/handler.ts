@@ -171,7 +171,10 @@ export async function execute(
   const audioIndex = audioSourceIndex ?? 0;
   const audioFile = audioFiles[audioIndex];
   if (!audioFile) {
-    return JSON.stringify({ error: 'no_audio', message: 'Please upload an audio file first (mp3, wav, or m4a).' });
+    return JSON.stringify({ error: 'no_audio', message: 'No audio file uploaded. This tool requires a pre-recorded audio file (mp3, wav, or m4a). If you want dialogue or audio generated from scratch, use animate_photo instead — LTX-2 generates audio natively.' });
+  }
+  if (!audioFile.data || audioFile.data.byteLength === 0) {
+    return JSON.stringify({ error: 'invalid_audio', message: 'The audio file is empty or corrupted. Please upload a valid audio file.' });
   }
 
   // Locate the reference image (if required or specified)
@@ -384,11 +387,11 @@ async function runS2VGeneration(
       return;
     }
 
-    // Safety timeout: 10 minutes
+    // Safety timeout: 3 minutes
     const safetyTimeout = setTimeout(() => {
       cleanup();
-      reject(new Error('Sound-to-video generation timed out'));
-    }, 600_000);
+      reject(new Error('Sound-to-video generation timed out. The audio file may be invalid or the service is unavailable.'));
+    }, 180_000);
 
     const abortHandler = () => {
       cleanup();

@@ -41,6 +41,7 @@ class ToolRegistry {
   ): Promise<string> {
     const handler = this.handlers.get(name);
     if (!handler) {
+      console.error(`[TOOL REGISTRY] Unknown tool: "${name}". Available: ${Array.from(this.handlers.keys()).join(', ')}`);
       return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
     try {

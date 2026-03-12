@@ -216,6 +216,21 @@ export async function sendChatMessage(
 
       // Check for tool calls
       if (result.finishReason === 'tool_calls' && result.tool_calls?.length) {
+        // Safety: if the LLM's text ends with a confirmation question but also emits
+        // tool calls, suppress the tool calls and treat as a text-only response.
+        // This prevents the "Shall I proceed?" + immediate execution bug.
+        // Only match question patterns near the END of the response (last 200 chars)
+        // to avoid false positives from phrases like "this should improve quality".
+        if (result.content) {
+          const tail = result.content.slice(-200).toLowerCase();
+          if (/\bshall i\b|\bshould i\b|\bdo you want\b|\bwould you like\b|\bwant me to\b|\bready to proceed\b/.test(tail) && /\?/.test(tail)) {
+            console.log('[CHAT SERVICE] Suppressed tool calls — response ends with confirmation question');
+            updatedMessages.push({ role: 'assistant', content: result.content });
+            callbacks.onComplete(result.content);
+            break;
+          }
+        }
+
         // Add assistant message with tool calls to conversation
         updatedMessages.push({
           role: 'assistant',

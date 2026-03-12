@@ -11,7 +11,7 @@ export const definition: ToolDefinition = {
   function: {
     name: 'sound_to_video',
     description:
-      'Generate video synchronized to audio. The video motion and lip movements follow the audio. Requires an uploaded audio file. Use when the user has uploaded an audio file and wants to create a video that matches or reacts to the sound — such as lip-sync, music visualization, or audio-reactive motion.',
+      'Generate video synchronized to a PRE-RECORDED audio file that the user has already uploaded. REQUIRES an uploaded audio file (mp3, wav, m4a) — do NOT use this tool if no audio file has been uploaded. If the user wants dialogue, speaking, or audio in their video WITHOUT a pre-recorded audio file, use animate_photo instead (LTX-2 generates audio natively). Only use this tool when the user has explicitly uploaded an audio file and wants video synced to it — such as lip-sync, music visualization, or audio-reactive motion.',
     parameters: {
       type: 'object',
       properties: {
@@ -69,7 +69,7 @@ CONSTRAINTS:
           description: ASPECT_RATIO_DESCRIPTION,
         },
       },
-      required: ['prompt'],
+      required: ['prompt', 'audioSourceIndex'],
     },
   },
 };

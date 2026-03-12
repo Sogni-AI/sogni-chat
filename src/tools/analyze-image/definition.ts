@@ -10,7 +10,7 @@ export const definition: ToolDefinition = {
   function: {
     name: 'analyze_image',
     description:
-      'Analyze an image using AI vision — describe contents, read text (OCR), identify objects, answer questions about an image, or compare images. Use when the user asks "what is in this image?", "read the text", "describe this", "what does this show?", or any question about image content. Does NOT generate or modify images.',
+      'Analyze an image using AI vision — describe contents, read text (OCR), identify objects, or answer questions about an image. Use when the user asks "what is in this image?", "read the text", "describe this", "what does this show?", or any question about image content. Does NOT generate or modify images.',
     parameters: {
       type: 'object',
       properties: {
@@ -21,9 +21,9 @@ export const definition: ToolDefinition = {
         },
         analysisType: {
           type: 'string',
-          enum: ['describe', 'ocr', 'objects', 'document', 'compare', 'general'],
+          enum: ['describe', 'ocr', 'objects', 'document', 'general'],
           description:
-            'Type of analysis. "describe": detailed visual description. "ocr": extract all visible text. "objects": identify and list objects. "document": analyze document structure and content. "compare": compare with another image. "general" (default): answer the user\'s specific question.',
+            'Type of analysis. "describe": detailed visual description. "ocr": extract all visible text. "objects": identify and list objects. "document": analyze document structure and content. "general" (default): answer the user\'s specific question.',
         },
         sourceImageIndex: {
           type: 'number',

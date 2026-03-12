@@ -22,8 +22,6 @@ const SYSTEM_PROMPTS: Record<string, string> = {
     'You are an object detection specialist. Identify and list all distinct objects visible in this image. For each object, note its position (left/center/right, top/middle/bottom) and approximate size relative to the image.',
   document:
     'You are a document analysis specialist. Analyze this document image: identify its type, extract key information, describe its structure, and note any formatting, signatures, stamps, or annotations.',
-  compare:
-    'You are an image comparison specialist. Compare the provided images in detail, noting similarities and differences in composition, content, style, colors, and quality.',
   general:
     'You are a helpful AI vision assistant. Answer the user\'s question about this image accurately and concisely.',
 };
