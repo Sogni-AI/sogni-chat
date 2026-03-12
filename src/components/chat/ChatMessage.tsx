@@ -171,7 +171,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
       {message.toolProgress && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
           <ChatProgressIndicator progress={message.toolProgress} imageUrl={imageUrl} onCancel={onCancelTool} />
-          <SogniTVOffer executionId={message.id} />
+          <SogniTVOffer executionId={message.id} etaSeconds={message.toolProgress?.etaSeconds} />
         </div>
       )}
 

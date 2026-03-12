@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { cdnAssets } from '@/assets/cdn';
 import { sogniTVController } from '@/services/sogniTVController';
+import type { TVProgress } from '@/services/sogniTVController';
 
 const FIRST_TIME_KEY = 'sogni-tv-first-play-done';
 const SESSION_PLAYLIST_KEY = 'sogni-tv-session-playlist';
@@ -173,6 +174,143 @@ function TVIcon({ size = 24 }: { size?: number }) {
       <polyline points="8 3 12 7 16 3" />
       <line x1="7" y1="17" x2="7" y2="17.01" />
     </svg>
+  );
+}
+
+// --- Render Progress Overlay (bottom-right countdown / percentage) ---
+
+function useRenderProgress(): TVProgress | null {
+  const [progress, setProgress] = useState<TVProgress | null>(
+    () => sogniTVController.getState().progress,
+  );
+
+  useEffect(() => {
+    return sogniTVController.subscribe(() => {
+      setProgress(sogniTVController.getState().progress);
+    });
+  }, []);
+
+  return progress;
+}
+
+function formatEta(seconds: number): string {
+  const s = Math.max(0, Math.ceil(seconds));
+  if (s >= 60) {
+    const m = Math.floor(s / 60);
+    const rem = s % 60;
+    return rem > 0 ? `${m}m ${rem}s` : `${m}m`;
+  }
+  return `${s}s`;
+}
+
+function RenderProgressOverlay() {
+  const progress = useRenderProgress();
+  if (!progress) return null;
+
+  const pct = Math.round(Math.min(1, Math.max(0, progress.progress)) * 100);
+  const hasEta = progress.etaSeconds != null && progress.etaSeconds > 0;
+  const almostDone = pct >= 90;
+
+  return (
+    <div style={{
+      position: 'absolute',
+      bottom: 56,
+      right: 20,
+      zIndex: 40,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'flex-end',
+      gap: 4,
+      animation: 'sogniTvProgressIn 0.4s ease-out',
+      pointerEvents: 'none',
+    }}>
+      <style>{`
+        @keyframes sogniTvProgressIn {
+          from { opacity: 0; transform: translateY(8px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes sogniTvProgressPulse {
+          0%, 100% { opacity: 0.85; }
+          50% { opacity: 1; }
+        }
+      `}</style>
+
+      {/* Main pill */}
+      <div style={{
+        background: almostDone
+          ? 'rgba(34, 197, 94, 0.2)'
+          : 'rgba(0, 0, 0, 0.65)',
+        backdropFilter: 'blur(12px)',
+        border: almostDone
+          ? '1px solid rgba(34, 197, 94, 0.4)'
+          : '1px solid rgba(255, 255, 255, 0.12)',
+        borderRadius: 12,
+        padding: '8px 14px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        animation: almostDone ? 'sogniTvProgressPulse 1.5s ease-in-out infinite' : undefined,
+      }}>
+        {/* Circular progress ring */}
+        <svg width="28" height="28" viewBox="0 0 28 28" style={{ flexShrink: 0 }}>
+          <circle
+            cx="14" cy="14" r="11"
+            fill="none"
+            stroke="rgba(255,255,255,0.1)"
+            strokeWidth="2.5"
+          />
+          <circle
+            cx="14" cy="14" r="11"
+            fill="none"
+            stroke={almostDone ? '#22c55e' : '#a78bfa'}
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeDasharray={`${2 * Math.PI * 11}`}
+            strokeDashoffset={`${2 * Math.PI * 11 * (1 - pct / 100)}`}
+            transform="rotate(-90 14 14)"
+            style={{ transition: 'stroke-dashoffset 0.6s ease-out, stroke 0.3s' }}
+          />
+          <text
+            x="14" y="15"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill="#fff"
+            fontSize="8"
+            fontWeight="700"
+            fontFamily="Inter, sans-serif"
+          >
+            {pct}%
+          </text>
+        </svg>
+
+        {/* Text */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <span style={{
+            fontSize: '0.8125rem',
+            fontWeight: 600,
+            color: '#fff',
+            lineHeight: 1.2,
+            fontFamily: 'Inter, sans-serif',
+          }}>
+            {hasEta
+              ? formatEta(progress.etaSeconds!)
+              : `${pct}%`
+            }
+          </span>
+          <span style={{
+            fontSize: '0.6875rem',
+            color: 'rgba(255,255,255,0.5)',
+            lineHeight: 1.2,
+            fontFamily: 'Inter, sans-serif',
+          }}>
+            {almostDone
+              ? 'Almost ready!'
+              : 'Your render is in progress'
+            }
+          </span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -554,6 +692,9 @@ function SogniTVPlayer({ onClose }: { onClose: () => void }) {
           </span>
         )}
       </div>
+
+      {/* Render progress overlay (bottom-right countdown) */}
+      <RenderProgressOverlay />
     </div>,
     document.body,
   );

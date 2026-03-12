@@ -476,6 +476,17 @@ export function useChat(): UseChatResult {
 
               onToolProgress: (progress: ToolExecutionProgress) => {
                 if (thisRequest.aborted) return;
+                // Push progress to SogniTV overlay (countdown / percentage)
+                if (progress.type === 'progress' && progress.progress != null) {
+                  sogniTVController.updateProgress({
+                    progress: progress.progress,
+                    etaSeconds: progress.etaSeconds,
+                    toolName: progress.toolName,
+                    stepLabel: progress.stepLabel,
+                  });
+                } else if (progress.type === 'started' || progress.type === 'error' || progress.type === 'completed') {
+                  sogniTVController.clearProgress();
+                }
                 // Always accumulate URLs even for background sessions
                 if (progress.type === 'started') {
                   currentToolResultUrls = [];
@@ -773,6 +784,8 @@ export function useChat(): UseChatResult {
     // Actually abort all active SDK tool executions (e.g. video generation projects)
     toolAbortControllersRef.current.forEach((c) => c.abort());
     toolAbortControllersRef.current.clear();
+    // Clear SogniTV progress overlay
+    sogniTVController.clearProgress();
     // Clear progress from any in-progress messages
     setUIMessages((prev) =>
       prev.map((msg) =>

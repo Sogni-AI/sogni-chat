@@ -7,38 +7,48 @@ import { sogniTVController } from '@/services/sogniTVController';
 
 const DONT_ASK_KEY = 'sogni-tv-dont-ask';
 
+/** Minimum initial ETA (seconds) before showing the offer */
+const MIN_INITIAL_ETA = 20;
+/** Hide offer once remaining time drops to this (seconds) */
+const MIN_REMAINING_ETA = 12;
+
 interface SogniTVOfferProps {
   /** Unique ID for this tool execution (e.g. message ID) to show offer only once per run */
   executionId: string;
+  /** Current ETA in seconds from tool progress (undefined if not yet estimated) */
+  etaSeconds?: number;
 }
 
 // Track which executions have already shown the offer (session-scoped)
 const shownOffers = new Set<string>();
 
-export function SogniTVOffer({ executionId }: SogniTVOfferProps) {
+export function SogniTVOffer({ executionId, etaSeconds }: SogniTVOfferProps) {
   const [visible, setVisible] = useState(false);
   const [accepted, setAccepted] = useState(false);
-  const mountedRef = useRef(true);
+  // Track whether the initial ETA threshold was met for this execution
+  const qualifiedRef = useRef(false);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => { mountedRef.current = false; };
-  }, []);
-
-  // Show after a brief delay so it doesn't flash for fast tools
+  // Show once an ETA arrives that exceeds the initial threshold
   useEffect(() => {
     if (shownOffers.has(executionId)) return;
     if (localStorage.getItem(DONT_ASK_KEY)) return;
+    if (etaSeconds == null) return; // no estimate yet
+    if (qualifiedRef.current) return; // already shown
 
-    const timer = setTimeout(() => {
-      if (mountedRef.current) {
-        shownOffers.add(executionId);
-        setVisible(true);
-      }
-    }, 1500);
+    if (etaSeconds > MIN_INITIAL_ETA) {
+      qualifiedRef.current = true;
+      shownOffers.add(executionId);
+      setVisible(true);
+    }
+  }, [executionId, etaSeconds]);
 
-    return () => clearTimeout(timer);
-  }, [executionId]);
+  // Hide once remaining time drops below threshold
+  useEffect(() => {
+    if (!visible || accepted) return;
+    if (etaSeconds != null && etaSeconds <= MIN_REMAINING_ETA) {
+      setVisible(false);
+    }
+  }, [etaSeconds, visible, accepted]);
 
   if (!visible || accepted) return null;
 
