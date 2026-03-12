@@ -19,6 +19,8 @@ export interface UIChatMessage {
   isStreaming?: boolean;
   lastCompletedTool?: string;
   uploadedImageUrl?: string;
+  /** Multiple uploaded image preview URLs (for multi-image sessions) */
+  uploadedImageUrls?: string[];
   sourceImageUrl?: string;
   modelRefusal?: boolean;
   galleryImageIds?: string[];

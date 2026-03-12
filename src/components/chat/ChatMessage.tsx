@@ -39,13 +39,40 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
   const hasVideos = message.videoResults && message.videoResults.length > 0;
   const hasAudios = message.audioResults && message.audioResults.length > 0;
   const hasUploadedImage = !!message.uploadedImageUrl;
+  const hasUploadedImages = message.uploadedImageUrls && message.uploadedImageUrls.length > 0;
 
   // Don't render empty assistant messages (but keep streaming ones visible for the cursor)
   if (isAssistant && !hasVisibleContent && !hasProgress && !hasImages && !hasVideos && !hasAudios && !message.isStreaming) {
     return null;
   }
 
-  // User's uploaded image
+  // User's uploaded images (multiple)
+  if (isUser && hasUploadedImages && !hasVisibleContent) {
+    const urls = message.uploadedImageUrls!;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', maxWidth: '100%' }}>
+        <div style={{
+          display: 'flex',
+          gap: '0.5rem',
+          flexWrap: 'wrap',
+          justifyContent: 'flex-end',
+        }}>
+          {urls.map((url, i) => (
+            <div key={i} style={{
+              maxWidth: urls.length === 1 ? '280px' : '200px',
+              borderRadius: 'var(--radius-lg)',
+              overflow: 'hidden',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+            }}>
+              <img src={url} alt={`Uploaded photo${urls.length > 1 ? ` ${i + 1}` : ''}`} style={{ width: '100%', height: 'auto', display: 'block' }} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // User's uploaded image (legacy single-image)
   if (isUser && hasUploadedImage && !hasVisibleContent) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', maxWidth: '100%' }}>

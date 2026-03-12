@@ -7,6 +7,7 @@ import { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import type { SogniClient } from '@sogni-ai/sogni-client';
 import type { TokenType, Balances } from '@/types/wallet';
 import type { UseChatResult } from '@/hooks/useChat';
+import type { UIChatMessage } from '@/types/chat';
 import type { UploadedFile } from '@/tools/types';
 import { QUALITY_PRESETS } from '@/config/qualityPresets';
 import { generateSuggestions, EDIT_INTENT_SUGGESTIONS } from '@/utils/chatSuggestions';
@@ -315,11 +316,45 @@ export function ChatPanel({
   }, [allResultUrls]);
 
   const processedMessages = useMemo(() => {
-    if (!imageUrl) return messages;
-    return messages.map((msg) =>
-      msg.id === 'user-upload' ? { ...msg, uploadedImageUrl: imageUrl } : msg,
-    );
-  }, [messages, imageUrl]);
+    let msgs = messages;
+
+    // Synthesize a user-upload entry at the top of the conversation when
+    // image files are attached but no upload message exists in chat history.
+    // This is purely presentational — the synthetic message is never persisted.
+    const hasUploadEntry = msgs.some((m) => m.id === 'user-upload');
+    if (!hasUploadEntry && uploadedFiles && getPreviewUrl) {
+      const imageUrls: string[] = [];
+      uploadedFiles.forEach((f, i) => {
+        if (f.type === 'image') {
+          const url = getPreviewUrl(i);
+          if (url) imageUrls.push(url);
+        }
+      });
+      if (imageUrls.length > 0) {
+        const uploadMsg: UIChatMessage = {
+          id: 'user-upload',
+          role: 'user',
+          content: '',
+          timestamp: Date.now(),
+          uploadedImageUrls: imageUrls,
+        };
+        // Insert after the welcome sentinel (index 0) so it appears first
+        // when the welcome message is filtered out during rendering.
+        msgs = [msgs[0], uploadMsg, ...msgs.slice(1)];
+      }
+    }
+
+    // Legacy: inject single imageUrl for old-style user-upload messages
+    if (imageUrl) {
+      msgs = msgs.map((msg) =>
+        msg.id === 'user-upload' && !msg.uploadedImageUrls
+          ? { ...msg, uploadedImageUrl: imageUrl }
+          : msg,
+      );
+    }
+
+    return msgs;
+  }, [messages, uploadedFiles, getPreviewUrl, imageUrl]);
 
   const galleryItems = useMemo(
     () => allResultUrls.map((url) => ({ before: imageUrl || '', after: url })),
