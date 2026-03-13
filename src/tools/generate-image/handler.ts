@@ -78,7 +78,7 @@ const IMAGE_MODELS: Record<string, ImageModelConfig> = {
     supportsImg2Img: true,
   },
   'chroma-detail': {
-    id: 'chroma_v48_detail_svd',
+    id: 'chroma-v48-detail-svd_fp8',
     name: 'Chroma Detail',
     defaultWidth: 1024,
     defaultHeight: 1024,
@@ -114,6 +114,19 @@ const IMAGE_MODELS: Record<string, ImageModelConfig> = {
     defaultGuidance: 4.0,
     sampler: 'euler',
     scheduler: 'simple',
+    supportsImg2Img: true,
+  },
+  'pony-v7': {
+    id: 'coreml-cyberrealisticPony_v7',
+    name: 'CyberRealistic Pony v7',
+    defaultWidth: 1024,
+    defaultHeight: 1024,
+    maxWidth: 2048,
+    maxHeight: 2048,
+    defaultSteps: 20,
+    defaultGuidance: 7.0,
+    sampler: 'DPM Solver Multistep (DPM-Solver++)',
+    scheduler: 'Karras',
     supportsImg2Img: true,
   },
 };

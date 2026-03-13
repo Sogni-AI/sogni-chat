@@ -29,9 +29,9 @@ Tips:
         },
         model: {
           type: 'string',
-          enum: ['z-turbo', 'z-image', 'chroma-v46-flash', 'chroma-detail', 'flux1-krea', 'flux2'],
+          enum: ['z-turbo', 'z-image', 'chroma-v46-flash', 'chroma-detail', 'flux1-krea', 'flux2', 'pony-v7'],
           description:
-            'AI model for generation. Ultra-fast: "z-turbo" (default, 8 steps). Fast: "chroma-v46-flash" (10 steps). Standard: "z-image" (30 steps, supports img2img), "flux1-krea" (25 steps, creative, supports img2img). High quality: "chroma-detail" (30 steps, high detail, supports img2img), "flux2" (20 steps, best for complex scenes). NSFW model selection: for NSFW content prefer "z-turbo" (turbo) or "z-image" (high quality). For explicit/adult content prefer "chroma-v46-flash" (turbo) or "chroma-detail" (highest quality). Default: "z-turbo".',
+            'AI model for generation. Ultra-fast: "z-turbo" (default, 8 steps). Fast: "chroma-v46-flash" (10 steps). Standard: "z-image" (30 steps, supports img2img), "flux1-krea" (25 steps, creative, supports img2img). High quality: "chroma-detail" (30 steps, high detail, supports img2img), "flux2" (20 steps, best for complex scenes). NSFW model selection: for NSFW content prefer "z-turbo" (turbo) or "z-image" (high quality). For explicit/adult content prefer "pony-v7" (best NSFW quality, 20 steps), "chroma-v46-flash" (turbo) or "chroma-detail" (highest quality). Default: "z-turbo".',
         },
         width: {
           type: 'number',
