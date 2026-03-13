@@ -200,6 +200,7 @@ export async function execute(
 
   // Resolve starting image for img2img
   let startingImageData: Uint8Array | undefined;
+  let startingImageMime = 'image/jpeg';
   if (startingImageStrength !== undefined && startingImageStrength > 0 && modelConfig.supportsImg2Img) {
     const useOriginal = rawSourceIndex === -1;
     const effectiveSourceIndex = useOriginal
@@ -211,6 +212,8 @@ export async function execute(
         console.log(`[GENERATE IMAGE] Using result image #${effectiveSourceIndex} as starting image`);
         const fetched = await fetchImageAsUint8Array(context.resultUrls[effectiveSourceIndex]);
         startingImageData = fetched.data;
+        // fetchImageAsUint8Array always outputs JPEG via canvas
+        startingImageMime = 'image/jpeg';
       } catch (err) {
         console.error('[GENERATE IMAGE] Failed to fetch starting image from results, trying original:', err);
       }
@@ -218,6 +221,8 @@ export async function execute(
     if (!startingImageData && context.imageData) {
       console.log('[GENERATE IMAGE] Using original uploaded image as starting image');
       startingImageData = context.imageData;
+      const firstImage = context.uploadedFiles.find(f => f.type === 'image');
+      startingImageMime = firstImage?.mimeType ?? 'image/jpeg';
     }
   }
 
@@ -260,6 +265,7 @@ export async function execute(
           scheduler: modelConfig.scheduler,
           seed,
           startingImage: startingImageData,
+          startingImageMime,
           startingImageStrength: startingImageStrength,
         },
         (progress) => {
@@ -318,6 +324,7 @@ interface ImageGenParams {
   scheduler: string;
   seed?: number;
   startingImage?: Uint8Array;
+  startingImageMime?: string;
   startingImageStrength?: number;
 }
 
@@ -357,7 +364,7 @@ async function runImageGeneration(
     projectParams.guidance = params.guidance;
   }
   if (params.startingImage && params.startingImageStrength !== undefined) {
-    projectParams.startingImage = new Blob([params.startingImage as BlobPart], { type: 'image/jpeg' });
+    projectParams.startingImage = new Blob([params.startingImage as BlobPart], { type: params.startingImageMime || 'image/jpeg' });
     projectParams.startingImageStrength = params.startingImageStrength;
   }
 

@@ -132,16 +132,19 @@ export async function execute(
 
   // Locate reference image (required for WAN animate modes)
   let referenceImageData: Uint8Array | null = null;
+  let referenceImageMime = 'image/jpeg';
   if (config.requiresImage || sourceImageIndex !== undefined) {
     if (sourceImageIndex !== undefined && sourceImageIndex >= 0) {
       const imageFiles = context.uploadedFiles.filter((f: UploadedFile) => f.type === 'image');
       const imgFile = imageFiles[sourceImageIndex];
       if (imgFile) {
         referenceImageData = imgFile.data;
+        referenceImageMime = imgFile.mimeType;
       }
     }
     if (!referenceImageData && context.imageData) {
       referenceImageData = context.imageData;
+      referenceImageMime = context.uploadedFiles.find(f => f.type === 'image')?.mimeType ?? 'image/jpeg';
     }
     if (!referenceImageData && config.requiresImage) {
       return JSON.stringify({ error: 'no_image', message: 'This control mode requires a reference image. Please upload one.' });
@@ -189,7 +192,9 @@ export async function execute(
           prompt,
           controlMode,
           sourceVideo: videoFile.data,
+          sourceVideoMime: videoFile.mimeType,
           referenceImage: referenceImageData,
+          referenceImageMime,
           width,
           height,
           frames,
@@ -252,7 +257,9 @@ interface V2VParams {
   prompt: string;
   controlMode: ControlMode;
   sourceVideo: Uint8Array;
+  sourceVideoMime: string;
   referenceImage: Uint8Array | null;
+  referenceImageMime: string;
   width: number;
   height: number;
   frames: number;
@@ -292,14 +299,14 @@ async function runV2VGeneration(
     steps: params.steps,
     seed: -1,
     controlNet: { name: params.controlMode },
-    referenceVideo: new Blob([params.sourceVideo as BlobPart], { type: 'video/mp4' }),
+    referenceVideo: new Blob([params.sourceVideo as BlobPart], { type: params.sourceVideoMime || 'video/mp4' }),
     sampler: params.sampler,
     scheduler: params.scheduler,
     tokenType: params.tokenType,
   };
 
   if (params.referenceImage) {
-    projectParams.referenceImage = new Blob([params.referenceImage as BlobPart], { type: 'image/jpeg' });
+    projectParams.referenceImage = new Blob([params.referenceImage as BlobPart], { type: params.referenceImageMime || 'image/jpeg' });
   }
   if (params.guidance !== undefined) {
     projectParams.guidance = params.guidance;

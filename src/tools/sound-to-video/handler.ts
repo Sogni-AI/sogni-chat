@@ -179,6 +179,7 @@ export async function execute(
 
   // Locate the reference image (if required or specified)
   let referenceImageData: Uint8Array | null = null;
+  let referenceImageMime = 'image/jpeg';
   let imgWidth = config.defaultWidth;
   let imgHeight = config.defaultHeight;
 
@@ -188,6 +189,7 @@ export async function execute(
       const imgFile = imageFiles[sourceImageIndex];
       if (imgFile) {
         referenceImageData = imgFile.data;
+        referenceImageMime = imgFile.mimeType;
         imgWidth = imgFile.width ?? config.defaultWidth;
         imgHeight = imgFile.height ?? config.defaultHeight;
       }
@@ -195,6 +197,7 @@ export async function execute(
 
     if (!referenceImageData && context.imageData) {
       referenceImageData = context.imageData;
+      referenceImageMime = context.uploadedFiles.find(f => f.type === 'image')?.mimeType ?? 'image/jpeg';
       imgWidth = context.width;
       imgHeight = context.height;
     }
@@ -249,7 +252,9 @@ export async function execute(
           modelId: config.id,
           prompt,
           referenceImage: referenceImageData,
+          referenceImageMime,
           referenceAudio: audioFile.data,
+          referenceAudioMime: audioFile.mimeType,
           width,
           height,
           frames,
@@ -311,7 +316,9 @@ interface S2VParams {
   modelId: string;
   prompt: string;
   referenceImage: Uint8Array | null;
+  referenceImageMime: string;
   referenceAudio: Uint8Array;
+  referenceAudioMime: string;
   width: number;
   height: number;
   frames: number;
@@ -351,14 +358,14 @@ async function runS2VGeneration(
     fps: params.fps,
     steps: params.steps,
     seed: -1,
-    referenceAudio: new Blob([params.referenceAudio as BlobPart], { type: 'audio/mpeg' }),
+    referenceAudio: new Blob([params.referenceAudio as BlobPart], { type: params.referenceAudioMime || 'audio/mpeg' }),
     sampler: params.sampler,
     scheduler: params.scheduler,
     tokenType: params.tokenType,
   };
 
   if (params.referenceImage) {
-    projectParams.referenceImage = new Blob([params.referenceImage as BlobPart], { type: 'image/jpeg' });
+    projectParams.referenceImage = new Blob([params.referenceImage as BlobPart], { type: params.referenceImageMime || 'image/jpeg' });
   }
   if (params.guidance !== undefined) {
     projectParams.guidance = params.guidance;

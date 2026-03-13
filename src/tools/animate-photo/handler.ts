@@ -152,6 +152,8 @@ export async function execute(
   let sourceImageData = context.imageData;
   let sourceWidth = context.width;
   let sourceHeight = context.height;
+  // Track MIME type: fetchImageAsUint8Array outputs JPEG; uploads preserve original
+  let sourceImageMime = context.uploadedFiles.find(f => f.type === 'image')?.mimeType ?? 'image/jpeg';
 
   if (effectiveSourceIndex !== undefined && context.resultUrls[effectiveSourceIndex]) {
     try {
@@ -160,6 +162,7 @@ export async function execute(
       sourceImageData = fetched.data;
       sourceWidth = fetched.width;
       sourceHeight = fetched.height;
+      sourceImageMime = 'image/jpeg'; // fetchImageAsUint8Array always outputs JPEG via canvas
       console.log(`[ANIMATE] Successfully fetched result image: ${sourceWidth}x${sourceHeight}, ${sourceImageData.length} bytes`);
     } catch (err) {
       if (!context.imageData) {
@@ -263,7 +266,7 @@ export async function execute(
   const perJobEta = new Map<number, number>();
   // Track per-job gallery saves so we don't double-save
   const gallerySavedUrls = new Set<string>();
-  const sourceImageBlob = new Blob([sourceImageData as BlobPart], { type: 'image/jpeg' });
+  const sourceImageBlob = new Blob([sourceImageData as BlobPart], { type: sourceImageMime });
 
   // Save a single video to gallery and notify UI immediately (fire-and-forget)
   const saveVideoPerJob = (videoUrl: string) => {

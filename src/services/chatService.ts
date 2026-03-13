@@ -273,6 +273,22 @@ export async function sendChatMessage(
               tool_call_id: toolCall.id,
               name: toolName,
             });
+
+            // Detect error results from the registry (it catches handler exceptions
+            // and returns error JSON strings rather than throwing). Notify the UI so
+            // the spinner is cleared and the user sees the failure immediately.
+            try {
+              const parsed = JSON.parse(toolResult);
+              if (parsed?.error) {
+                callbacks.onToolProgress({
+                  type: 'error',
+                  toolName,
+                  error: typeof parsed.error === 'string' ? parsed.error : parsed.message || 'Tool execution failed',
+                });
+              }
+            } catch {
+              // toolResult is not JSON — not an error, ignore
+            }
           } catch (err: any) {
             const errorMsg = err.message || 'Tool execution failed';
             updatedMessages.push({

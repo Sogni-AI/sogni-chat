@@ -80,35 +80,47 @@ function snapToMultipleOf16(value: number): number {
   return Math.round(value / 16) * 16;
 }
 
+interface ContextImageEntry {
+  data: Uint8Array;
+  mimeType: string;
+}
+
 function gatherContextImages(
   context: ToolExecutionContext,
   sourceImageIndex: number | undefined,
-): Uint8Array[] {
-  const contextBuffers: Uint8Array[] = [];
+): ContextImageEntry[] {
+  const entries: ContextImageEntry[] = [];
+  const seen = new Set<Uint8Array>();
 
   // If a primary image is specified by index, use it first
   if (sourceImageIndex !== undefined && sourceImageIndex >= 0) {
     const imageFiles = context.uploadedFiles.filter((f: UploadedFile) => f.type === 'image');
     if (sourceImageIndex < imageFiles.length) {
-      contextBuffers.push(imageFiles[sourceImageIndex].data);
+      const file = imageFiles[sourceImageIndex];
+      entries.push({ data: file.data, mimeType: file.mimeType });
+      seen.add(file.data);
     }
   }
 
   // Add the main uploaded image as context if available and not already added
-  if (context.imageData && contextBuffers.length === 0) {
-    contextBuffers.push(context.imageData);
+  if (context.imageData && entries.length === 0) {
+    // Infer MIME from the first image upload, fall back to jpeg
+    const firstImage = context.uploadedFiles.find((f: UploadedFile) => f.type === 'image');
+    entries.push({ data: context.imageData, mimeType: firstImage?.mimeType ?? 'image/jpeg' });
+    seen.add(context.imageData);
   }
 
   // Add any additional uploaded images as context
   const imageFiles = context.uploadedFiles.filter((f: UploadedFile) => f.type === 'image');
   for (const file of imageFiles) {
     // Avoid duplicates — simple reference check
-    if (!contextBuffers.includes(file.data)) {
-      contextBuffers.push(file.data);
+    if (!seen.has(file.data)) {
+      entries.push({ data: file.data, mimeType: file.mimeType });
+      seen.add(file.data);
     }
   }
 
-  return contextBuffers;
+  return entries;
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +255,7 @@ export async function execute(
 interface EditGenParams {
   modelId: string;
   prompt: string;
-  contextImages: Uint8Array[];
+  contextImages: ContextImageEntry[];
   width: number;
   height: number;
   steps: number;
@@ -276,7 +288,7 @@ async function runEditGeneration(
     numberOfMedia: params.numberOfMedia,
     steps: params.steps,
     seed: -1,
-    contextImages: params.contextImages.map(d => new Blob([d as BlobPart], { type: 'image/jpeg' })),
+    contextImages: params.contextImages.map(e => new Blob([e.data as BlobPart], { type: e.mimeType })),
     tokenType: params.tokenType,
     sizePreset: 'custom',
     width: params.width,
