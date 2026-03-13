@@ -125,8 +125,8 @@ const IMAGE_MODELS: Record<string, ImageModelConfig> = {
     maxHeight: 2048,
     defaultSteps: 20,
     defaultGuidance: 7.0,
-    sampler: 'DPM Solver Multistep (DPM-Solver++)',
-    scheduler: 'Karras',
+    sampler: 'dpm_pp',
+    scheduler: 'karras',
     supportsImg2Img: true,
   },
 };
