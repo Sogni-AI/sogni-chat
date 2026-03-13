@@ -4,7 +4,7 @@
  * Prefers gallery blob URLs (persistent) over remote URLs (may expire).
  * Shows an "expired" state if the video fails to load.
  */
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { downloadImage } from '@/utils/download';
 import { buildDownloadFilename } from '@/utils/downloadFilename';
 import { useGalleryBlobUrls } from '@/hooks/useGalleryBlobUrls';
@@ -21,9 +21,27 @@ function pauseOtherVideos(current: HTMLVideoElement) {
 /** Individual video player that pauses all other chat videos when it starts playing.
  *  Hides the native player until the first frame is ready to prevent the
  *  ugly black unstyled rectangle that flashes while the video is loading. */
-function ChatVideoPlayer({ src, onError, aspectRatio }: { src: string; onError: () => void; aspectRatio?: string }) {
+function ChatVideoPlayer({ src, onError, aspectRatio, fillWidth }: { src: string; onError: () => void; aspectRatio?: string; fillWidth?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [ready, setReady] = useState(false);
+
+  // Compute placeholder dimensions that fit within maxWidth × maxHeight
+  // while maintaining the aspect ratio (CSS alone can't handle both constraints).
+  // Only used in standalone mode — grid mode uses width:100% + aspect-ratio instead.
+  const placeholderSize = useMemo(() => {
+    if (fillWidth) return null;
+    const maxW = 360; // matches container maxWidth
+    const maxH = 400; // matches video maxHeight
+    const parts = (aspectRatio || '16 / 9').split('/').map(s => parseFloat(s.trim()));
+    const ratio = (parts[0] && parts[1]) ? parts[0] / parts[1] : 16 / 9;
+    let w = maxW;
+    let h = w / ratio;
+    if (h > maxH) {
+      h = maxH;
+      w = h * ratio;
+    }
+    return { width: w, height: h };
+  }, [aspectRatio, fillWidth]);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -31,7 +49,10 @@ function ChatVideoPlayer({ src, onError, aspectRatio }: { src: string; onError: 
 
     activeVideos.add(el);
 
-    const handlePlay = () => pauseOtherVideos(el);
+    const handlePlay = () => {
+      pauseOtherVideos(el);
+      if (el.muted) el.muted = false;
+    };
     el.addEventListener('play', handlePlay);
 
     // Pause video when scrolled out of view
@@ -63,10 +84,11 @@ function ChatVideoPlayer({ src, onError, aspectRatio }: { src: string; onError: 
       {!ready && (
         <div
           style={{
-            aspectRatio: aspectRatio || '16 / 9',
-            width: '100%',
+            ...(placeholderSize
+              ? { width: placeholderSize.width, height: placeholderSize.height }
+              : { width: '100%', aspectRatio: aspectRatio || '16 / 9' }
+            ),
             maxWidth: '100%',
-            maxHeight: '400px',
             borderRadius: 'var(--radius-md)',
             background: 'rgba(var(--rgb-primary), 0.06)',
             display: 'flex',
@@ -98,10 +120,11 @@ function ChatVideoPlayer({ src, onError, aspectRatio }: { src: string; onError: 
         onError={onError}
         style={{
           display: ready ? 'block' : 'none',
-          maxWidth: '100%',
-          maxHeight: '400px',
           borderRadius: 'var(--radius-md)',
-          ...(aspectRatio ? { aspectRatio, width: '100%' } : {}),
+          ...(fillWidth
+            ? { width: '100%', height: 'auto' }
+            : { maxWidth: '100%', maxHeight: '400px' }
+          ),
         }}
       >
         Your browser does not support video playback.
@@ -129,6 +152,7 @@ export const ChatVideoResults = memo(function ChatVideoResults({
   // Resolve gallery IDs to blob URLs — persistent local copies that never expire
   const galleryBlobUrls = useGalleryBlobUrls(galleryVideoIds);
   const [failedVideos, setFailedVideos] = useState<Set<number>>(new Set());
+  const isGrid = urls.length > 1;
 
   const handleDownload = useCallback((url: string, index: number) => {
     const filename = buildDownloadFilename(downloadSlug, index + 1, 'video');
@@ -145,7 +169,12 @@ export const ChatVideoResults = memo(function ChatVideoResults({
     <div
       role="group"
       aria-label={`${urls.length} video result${urls.length !== 1 ? 's' : ''}`}
-      style={{
+      style={isGrid ? {
+        display: 'inline-grid',
+        gridTemplateColumns: `repeat(${urls.length <= 2 ? urls.length : 2}, minmax(0, 1fr))`,
+        gap: '0.5rem',
+        width: '100%',
+      } : {
         display: 'flex',
         flexDirection: 'column',
         gap: '0.5rem',
@@ -161,10 +190,9 @@ export const ChatVideoResults = memo(function ChatVideoResults({
           key={`${url}-${index}`}
           style={{
             position: 'relative',
-            display: 'inline-block',
             borderRadius: 'var(--radius-md)',
             overflow: 'hidden',
-            maxWidth: '360px',
+            ...(isGrid ? {} : { display: 'inline-block', maxWidth: '360px' }),
           }}
         >
           {isFailed ? (
@@ -177,7 +205,7 @@ export const ChatVideoResults = memo(function ChatVideoResults({
                 justifyContent: 'center',
                 gap: '0.375rem',
                 width: '100%',
-                aspectRatio: '16/9',
+                aspectRatio: videoAspectRatio || '16/9',
                 background: 'rgba(var(--rgb-primary), 0.04)',
                 borderRadius: 'var(--radius-md)',
                 border: '1px solid var(--color-border)',
@@ -203,6 +231,7 @@ export const ChatVideoResults = memo(function ChatVideoResults({
               src={displayUrl}
               onError={() => handleError(index)}
               aspectRatio={videoAspectRatio}
+              fillWidth={isGrid}
             />
           )}
 
