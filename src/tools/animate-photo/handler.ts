@@ -183,6 +183,7 @@ export async function execute(
   // Pre-compute video dimensions for aspect ratio (used in all progress callbacks)
   const { width: vidW, height: vidH } = calculateVideoDimensions(sourceWidth, sourceHeight, targetResolution, videoModelId, aspectRatio);
   const videoAspectRatio = `${vidW} / ${vidH}`;
+  const mediaLabel = `${isLTX ? 'LTX 2.3' : 'WAN 2.2'} — ${duration}s @ ${vidW}x${vidH}`;
 
   // Compose the final video prompt based on model
   let composedPrompt: string;
@@ -194,7 +195,7 @@ export async function execute(
       totalCount: numberOfMedia,
       stepLabel: 'Analyzing image',
       videoAspectRatio,
-      modelName: isLTX ? 'LTX 2.3' : 'WAN 2.2',
+      modelName: mediaLabel,
     });
     console.log('[ANIMATE] Describing source image for LTX 2.3 video prompt...');
     const sceneDescription = await withTimeout(
@@ -213,7 +214,7 @@ export async function execute(
         totalCount: numberOfMedia,
         stepLabel: 'Crafting detailed prompt',
         videoAspectRatio,
-        modelName: isLTX ? 'LTX 2.3' : 'WAN 2.2',
+        modelName: mediaLabel,
       });
       refinedPrompt = await withTimeout(
         refineVideoPrompt(context.sogniClient, prompt, duration, context.tokenType, '[ANIMATE]'),
@@ -261,7 +262,7 @@ export async function execute(
     sourceImageUrl,
     stepLabel: 'Starting generation',
     videoAspectRatio,
-    modelName: isLTX ? 'LTX 2.3' : 'WAN 2.2',
+    modelName: mediaLabel,
   });
 
   // Per-job progress/ETA maps to prevent crossover between concurrent jobs
@@ -390,7 +391,7 @@ export async function execute(
         estimatedCost,
         sourceImageUrl,
         stepLabel: 'Retrying generation',
-        modelName: isLTX ? 'LTX 2.3' : 'WAN 2.2',
+        modelName: mediaLabel,
       });
       videoUrls = await tryWithTokenFallback(runVideoGeneration, context, estimatedCost);
     }

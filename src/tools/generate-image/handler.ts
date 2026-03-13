@@ -250,7 +250,7 @@ export async function execute(
     toolName: 'generate_image',
     totalCount: numberOfMedia,
     estimatedCost,
-    modelName: modelConfig.name,
+    modelName: `${modelConfig.name} — ${width}x${height}`,
   });
 
   const billingId = estimatedCost > 0

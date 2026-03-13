@@ -167,6 +167,7 @@ export async function execute(
 
   const videoAspectRatio = `${width} / ${height}`;
   const isLTX = modelKey.startsWith('ltx');
+  const mediaLabel = `${config.name} — ${duration}s @ ${width}x${height}`;
 
   // Creative prompt refinement: expand shallow/intent-level prompts
   // into detailed, production-quality video prompts with actual dialogue,
@@ -179,7 +180,7 @@ export async function execute(
       totalCount: numberOfMedia,
       stepLabel: 'Crafting detailed prompt',
       videoAspectRatio,
-      modelName: config.name,
+      modelName: mediaLabel,
     });
     composedPrompt = await withTimeout(
       refineVideoPrompt(context.sogniClient, prompt, duration, context.tokenType, '[GENERATE VIDEO]'),
@@ -206,7 +207,7 @@ export async function execute(
     totalCount: numberOfMedia,
     estimatedCost,
     videoAspectRatio,
-    modelName: config.name,
+    modelName: mediaLabel,
   });
 
   const billingId = estimatedCost > 0

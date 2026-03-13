@@ -219,6 +219,7 @@ export async function execute(
   const fps = config.defaultFps;
   const steps = config.defaultSteps;
   const videoAspectRatio = `${width} / ${height}`;
+  const mediaLabel = `${config.name} — ${duration}s @ ${width}x${height}`;
 
   // Cost estimation & pre-flight
   const originalToken = context.tokenType;
@@ -238,7 +239,7 @@ export async function execute(
     totalCount: numberOfMedia,
     estimatedCost,
     videoAspectRatio,
-    modelName: config.name,
+    modelName: mediaLabel,
   });
 
   const billingId = estimatedCost > 0
