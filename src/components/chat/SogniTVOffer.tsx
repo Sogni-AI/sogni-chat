@@ -92,7 +92,7 @@ export function SogniTVOffer({ executionId, etaSeconds }: SogniTVOfferProps) {
         color: '#c4b5fd',
         lineHeight: 1.4,
       }}>
-        Want to watch some SogniTV while your media is rendering? We'll automatically turn the TV off when ready!
+        Check out SogniTV while your media is rendering? It'll automatically close when ready!
       </span>
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
