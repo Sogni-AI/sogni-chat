@@ -90,22 +90,9 @@ const IMAGE_MODELS: Record<string, ImageModelConfig> = {
     scheduler: 'simple',
     supportsImg2Img: true,
   },
-  'flux1-schnell': {
-    id: 'flux1_schnell_bf16',
-    name: 'Flux.1 Schnell',
-    defaultWidth: 1024,
-    defaultHeight: 1024,
-    maxWidth: 2048,
-    maxHeight: 2048,
-    defaultSteps: 4,
-    defaultGuidance: 1.0,
-    sampler: 'euler',
-    scheduler: 'simple',
-    supportsImg2Img: false,
-  },
-  'flux1-dev': {
+  'flux1-krea': {
     id: 'flux1_krea_dev_bf16',
-    name: 'Flux.1 Dev',
+    name: 'Flux.1 Krea',
     defaultWidth: 1024,
     defaultHeight: 1024,
     maxWidth: 2048,
@@ -235,7 +222,7 @@ export async function execute(
     console.error(`[GENERATE IMAGE] Cost estimation failed for model "${modelConfig.id}":`, costErr);
     return JSON.stringify({
       error: 'model_unavailable',
-      message: `Model "${modelConfig.name}" (${modelConfig.id}) is not currently available. Try a different model such as "z-turbo", "chroma-v46-flash", or "flux1-schnell".`,
+      message: `Model "${modelConfig.name}" (${modelConfig.id}) is not currently available. Try a different model such as "z-turbo", "chroma-v46-flash", or "flux2".`,
     });
   }
 

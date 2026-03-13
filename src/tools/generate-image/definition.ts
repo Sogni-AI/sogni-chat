@@ -29,9 +29,9 @@ Tips:
         },
         model: {
           type: 'string',
-          enum: ['z-turbo', 'z-image', 'chroma-v46-flash', 'chroma-detail', 'flux1-schnell', 'flux1-dev', 'flux2'],
+          enum: ['z-turbo', 'z-image', 'chroma-v46-flash', 'chroma-detail', 'flux1-krea', 'flux2'],
           description:
-            'AI model for generation. Ultra-fast: "z-turbo" (default, 8 steps), "flux1-schnell" (4 steps, no img2img). Fast: "chroma-v46-flash" (10 steps). Standard: "z-image" (30 steps, supports img2img), "flux1-dev" (25 steps, creative, supports img2img). High quality: "chroma-detail" (30 steps, high detail, supports img2img), "flux2" (20 steps, best for complex scenes). Default: "z-turbo".',
+            'AI model for generation. Ultra-fast: "z-turbo" (default, 8 steps). Fast: "chroma-v46-flash" (10 steps). Standard: "z-image" (30 steps, supports img2img), "flux1-krea" (25 steps, creative, supports img2img). High quality: "chroma-detail" (30 steps, high detail, supports img2img), "flux2" (20 steps, best for complex scenes). NSFW model selection: for NSFW content prefer "z-turbo" (turbo) or "z-image" (high quality). For explicit/adult content prefer "chroma-v46-flash" (turbo) or "chroma-detail" (highest quality). Default: "z-turbo".',
         },
         width: {
           type: 'number',
@@ -58,7 +58,7 @@ Tips:
         starting_image_strength: {
           type: 'number',
           description:
-            'Image-to-image strength (0.0-1.0). Only used when a source image is available and model supports img2img (all except flux1-schnell). Higher values = more deviation from the source image. 0.5 = balanced, 0.8 = creative. Only set when the user wants to generate variations or use an existing image as a starting point.',
+            'Image-to-image strength (0.0-1.0). Only used when a source image is available and model supports img2img. Higher values = more deviation from the source image. 0.5 = balanced, 0.8 = creative. Only set when the user wants to generate variations or use an existing image as a starting point.',
         },
         sourceImageIndex: {
           type: 'number',
