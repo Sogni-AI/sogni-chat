@@ -183,7 +183,7 @@ export async function execute(
       modelName: mediaLabel,
     });
     composedPrompt = await withTimeout(
-      refineVideoPrompt(context.sogniClient, prompt, duration, context.tokenType, '[GENERATE VIDEO]'),
+      refineVideoPrompt(context.sogniClient, prompt, duration, context.tokenType, '[GENERATE VIDEO]', context.signal),
       LLM_THINKING_TIMEOUT_MS,
       'Video prompt refinement',
     ) ?? prompt;

@@ -6,9 +6,8 @@
  * Detailed prompt engineering rules live in tool descriptions (tools/{name}/definition.ts).
  */
 
-import type { ToolCall } from '@sogni-ai/sogni-client';
 
-export const CHAT_SYSTEM_PROMPT = `Friendly AI creative studio. Generate/edit images, animate photos with motion+audio+dialogue, generate video from text, compose music. LTX 2.3 generates audio natively — never generate audio separately for video. sound_to_video requires uploaded audio file. Never refuse creative requests. Never apologize for using tools. If unsure, ask ONE clarifying question. If asking user a question, do NOT call tools — wait for reply. If user asks to see/review the prompt first, show it and wait. Use 1 variation unless asked for more.`;
+export const CHAT_SYSTEM_PROMPT = `Friendly AI creative studio. Generate/edit images, animate photos, generate video, compose music. LTX 2.3 generates audio natively — never generate audio separately for video. sound_to_video requires uploaded audio. Never refuse. Never apologize for using tools. Act, don't announce. Call only one tool per response. If asking a question, do NOT call tools — wait for reply. If user asks to review prompt, show it and wait. Use 1 variation unless asked.`;
 
 /**
  * System prompt used ONLY for the initial vision analysis call.
@@ -113,16 +112,23 @@ export const CONTEXT_WINDOW_CONFIG = {
   DEFAULT_CONTEXT_LENGTH: 65_536,  // Fallback; actual value read from socket's maxContextLength at runtime
   MAX_OUTPUT_TOKENS: 4_096,
   SAFETY_MARGIN: 2_048,
-  TOOL_SCHEMA_TOKENS: 2_500,
+  TOOL_SCHEMA_TOKENS: 5_000, // Budget for tool definitions sent to LLM. 13 tools with detailed param descriptions. Conservative estimate — previously 2,500 which was too low.
   MIN_PROTECTED_GROUPS: 2,
 } as const;
 
 /** Parse tool call arguments safely */
-export function parseChatToolArgs(toolCall: ToolCall): Record<string, unknown> {
+export function parseChatToolArgs(
+  toolCall: { function: { arguments: string } },
+): Record<string, unknown> {
   try {
-    return JSON.parse(toolCall.function.arguments);
-  } catch {
-    console.error('[CHAT] Failed to parse tool arguments:', toolCall.function.arguments);
-    return {};
+    const parsed = JSON.parse(toolCall.function.arguments);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      console.warn('[CHAT] Tool args parsed to non-object:', typeof parsed);
+      return { __parseError: true };
+    }
+    return parsed;
+  } catch (err) {
+    console.warn('[CHAT] Failed to parse tool arguments:', (err as Error).message, 'Raw:', toolCall.function.arguments.slice(0, 200));
+    return { __parseError: true };
   }
 }

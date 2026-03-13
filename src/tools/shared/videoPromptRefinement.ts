@@ -81,7 +81,13 @@ export async function refineVideoPrompt(
   duration: number,
   tokenType: TokenType,
   logPrefix = '[VIDEO]',
+  signal?: AbortSignal,
 ): Promise<string> {
+  if (signal?.aborted) {
+    console.log('[VIDEO REFINEMENT] Skipping refinement — signal already aborted');
+    return prompt;
+  }
+
   try {
     console.log(`${logPrefix} Refining prompt with thinking mode (${duration}s video, ${prompt.length} chars)`);
 

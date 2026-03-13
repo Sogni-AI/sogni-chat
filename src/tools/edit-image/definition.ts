@@ -11,7 +11,7 @@ export const definition: ToolDefinition = {
   function: {
     name: 'edit_image',
     description:
-      'Edit images using 1-6 reference images to guide the generation. Use when the user wants to combine elements from multiple images, transfer style from one image to another, or use reference images to guide editing. This tool uses context/reference images to influence the output — it does NOT directly edit a single image. For direct single-image editing, use restore_photo or refine_result instead.',
+      'Generate new images guided by reference photos. Upload 1-6 context images to influence the output style, subject, or composition. Best for: creating images inspired by reference photos, combining elements from multiple images, style-guided generation. For direct edits to a single image (remove objects, change background, enhance), use restore_photo or refine_result instead.',
     parameters: {
       type: 'object',
       properties: {

@@ -125,6 +125,7 @@ export async function sendChatMessage(
   const { sogniClient } = context;
   const updatedMessages = [...messages];
   let toolRound = 0;
+  let streamNullRetries = 0;
 
   // Verify the chat API is available on this client instance
   if (!sogniClient.chat?.completions) {
@@ -216,6 +217,10 @@ export async function sendChatMessage(
 
       // Stream tokens to UI (strip any leaked <think> blocks)
       for await (const chunk of stream) {
+        if (context.signal?.aborted) {
+          console.log('[CHAT SERVICE] Request aborted during streaming — breaking');
+          break;
+        }
         if (chunk.content) {
           const { cleaned, insideThink: stillInThink } = stripThinkBlocks(chunk.content, insideThink);
           insideThink = stillInThink;
@@ -228,7 +233,15 @@ export async function sendChatMessage(
       const result = stream.finalResult;
 
       if (!result) {
-        callbacks.onError('No response from the AI assistant.');
+        if (streamNullRetries < 1) {
+          streamNullRetries++;
+          console.warn(`[CHAT SERVICE] Null stream result on round ${toolRound}, retrying (attempt ${streamNullRetries})...`);
+          continue;
+        }
+        console.error(`[CHAT SERVICE] Null stream result after retry — round: ${toolRound}, msgs: ${updatedMessages.length}`);
+        callbacks.onComplete(
+          "I wasn't able to complete that response. Could you try rephrasing your request?"
+        );
         break;
       }
 
@@ -237,12 +250,16 @@ export async function sendChatMessage(
         // Safety: if the LLM's text ends with a confirmation question but also emits
         // tool calls, suppress the tool calls and treat as a text-only response.
         // This prevents the "Shall I proceed?" + immediate execution bug.
-        // Only match question patterns near the END of the response (last 200 chars)
+        // Only match question patterns near the END of the response (last 500 chars)
         // to avoid false positives from phrases like "this should improve quality".
         if (result.content) {
-          const tail = result.content.slice(-200).toLowerCase();
-          if (/\bshall i\b|\bshould i\b|\bdo you want\b|\bwould you like\b|\bwant me to\b|\bready to proceed\b/.test(tail) && /\?/.test(tail)) {
-            console.log('[CHAT SERVICE] Suppressed tool calls — response ends with confirmation question');
+          const tail = result.content.slice(-500).toLowerCase();
+          // Don't match inside quoted speech (common in dialogue-heavy prompts)
+          const unquotedTail = tail.replace(/"[^"]*"/g, '').replace(/'[^']*'/g, '');
+          const confirmPattern = /\b(shall i|should i|do you want|would you like|want me to|ready to proceed|like me to)\b/;
+          if (confirmPattern.test(unquotedTail) && /\?\s*$/.test(unquotedTail)) {
+            const match = unquotedTail.match(confirmPattern);
+            console.log(`[CHAT SERVICE] Suppressed tool calls — matched: "${match?.[0]}" in last 500 chars`);
             updatedMessages.push({ role: 'assistant', content: result.content });
             callbacks.onComplete(result.content);
             break;
@@ -277,17 +294,24 @@ export async function sendChatMessage(
             // Detect error results from the registry (it catches handler exceptions
             // and returns error JSON strings rather than throwing). Notify the UI so
             // the spinner is cleared and the user sees the failure immediately.
+            let parsed: Record<string, unknown> | null = null;
             try {
-              const parsed = JSON.parse(toolResult);
-              if (parsed?.error) {
-                callbacks.onToolProgress({
-                  type: 'error',
-                  toolName,
-                  error: typeof parsed.error === 'string' ? parsed.error : parsed.message || 'Tool execution failed',
-                });
-              }
+              parsed = JSON.parse(toolResult);
             } catch {
-              // toolResult is not JSON — not an error, ignore
+              console.warn(`[CHAT SERVICE] Tool "${toolName}" returned non-JSON result — wrapping`);
+              parsed = { success: true, raw: toolResult.slice(0, 500) };
+            }
+
+            if (parsed?.error) {
+              callbacks.onToolProgress({
+                type: 'error',
+                toolName,
+                error: typeof parsed.error === 'string'
+                  ? parsed.error
+                  : (parsed.message as string) || `${toolName} failed`,
+              });
+            } else if (parsed && !('success' in parsed)) {
+              console.warn(`[CHAT SERVICE] Tool "${toolName}" result missing success field`);
             }
           } catch (err: any) {
             const errorMsg = err.message || 'Tool execution failed';

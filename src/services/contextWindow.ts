@@ -82,10 +82,53 @@ function contentHasImage(msg: ChatMessage): boolean {
   return msg.content.some((p) => p.type === 'image_url');
 }
 
-const IMAGE_PLACEHOLDER: ChatMessage = {
-  role: 'user',
-  content: '[Earlier: User uploaded a photo for restoration. Analysis was provided.]',
-};
+/**
+ * Build a concise summary of trimmed message groups so the LLM retains
+ * awareness of earlier uploads and tool usage without the full payloads.
+ */
+function buildTrimmedSummary(trimmedGroups: MessageGroup[]): ChatMessage | null {
+  const events: string[] = [];
+  let hasUpload = false;
+  const toolCalls: string[] = [];
+
+  for (const group of trimmedGroups) {
+    for (const msg of group.messages) {
+      // Skip existing placeholders
+      if (msg.role === 'user' && typeof msg.content === 'string' && msg.content.includes('[Earlier:')) continue;
+
+      // Detect uploads (multimodal messages with image_url parts)
+      if (msg.role === 'user' && Array.isArray(msg.content)) {
+        if (msg.content.some((p: { type: string }) => p.type === 'image_url')) {
+          hasUpload = true;
+        }
+      }
+
+      // Detect tool results (skip errors — only summarize successful calls)
+      if (msg.role === 'tool' && msg.name) {
+        try {
+          const parsed = JSON.parse(typeof msg.content === 'string' ? msg.content : '');
+          if (parsed.error) continue;
+          const count = parsed.resultCount || parsed.urls?.length || 1;
+          toolCalls.push(`${msg.name} (${count} result${count > 1 ? 's' : ''})`);
+        } catch {
+          toolCalls.push(msg.name);
+        }
+      }
+    }
+  }
+
+  if (hasUpload) events.push('User uploaded media for editing');
+  if (toolCalls.length > 0) {
+    events.push(`Tools used: ${[...new Set(toolCalls)].join(', ')}`);
+  }
+
+  if (events.length === 0) return null;
+
+  return {
+    role: 'user' as const,
+    content: `[Earlier conversation summary: ${events.join('. ')}. Details were trimmed to save context.]`,
+  };
+}
 
 /**
  * Trim a conversation to fit within `inputBudget` tokens.
@@ -123,8 +166,8 @@ export function trimConversation(
   for (const g of protectedGroups) currentTokens += g.tokens;
 
   let trimmedCount = 0;
-  let imageWasTrimmed = false;
   const keptTrimmable: MessageGroup[] = [];
+  const trimmedGroups: MessageGroup[] = [];
 
   // Keep from oldest to newest, stopping when adding would exceed budget
   for (const group of trimmable) {
@@ -133,15 +176,18 @@ export function trimConversation(
       currentTokens += group.tokens;
     } else {
       trimmedCount += group.messages.length;
-      if (group.hasImage) imageWasTrimmed = true;
+      trimmedGroups.push(group);
     }
   }
 
   // Rebuild
   const result: ChatMessage[] = [];
+  let insertedSummary = false;
 
-  if (imageWasTrimmed) {
-    result.push(IMAGE_PLACEHOLDER);
+  const summary = buildTrimmedSummary(trimmedGroups);
+  if (summary) {
+    result.unshift(summary);
+    insertedSummary = true;
   }
 
   for (const g of keptTrimmable) result.push(...g.messages);
@@ -150,6 +196,6 @@ export function trimConversation(
   return {
     messages: result,
     trimmedCount,
-    insertedSummary: imageWasTrimmed,
+    insertedSummary,
   };
 }

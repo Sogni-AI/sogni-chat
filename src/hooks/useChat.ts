@@ -106,13 +106,20 @@ export interface UseChatResult {
 
 const MAX_CONCURRENT_REQUESTS = 2;
 
-const WELCOME_MESSAGE: UIChatMessage = {
-  id: 'welcome',
-  role: 'assistant',
-  content:
-    "I can see your photo! I can restore it, apply artistic styles, animate it into a video, change the camera angle, edit details, and more — just describe what you want in your own words.",
-  timestamp: Date.now(),
-};
+const WELCOME_MESSAGE_WITH_IMAGE =
+  "I can see your photo! I can restore it, apply artistic styles, animate it into a video, change the camera angle, edit details, and more — just describe what you want in your own words.";
+
+const WELCOME_MESSAGE_NO_IMAGE =
+  "What would you like to create? I can generate images, create videos, and compose music.";
+
+function makeWelcomeMessage(hasImage: boolean): UIChatMessage {
+  return {
+    id: 'welcome',
+    role: 'assistant',
+    content: hasImage ? WELCOME_MESSAGE_WITH_IMAGE : WELCOME_MESSAGE_NO_IMAGE,
+    timestamp: Date.now(),
+  };
+}
 
 /** Strip transient fields before persisting */
 function cleanForStorage(messages: UIChatMessage[]): UIChatMessage[] {
@@ -158,7 +165,7 @@ export function applyGalleryIdsToMessages(
 }
 
 export function useChat(): UseChatResult {
-  const [uiMessages, setUIMessages] = useState<UIChatMessage[]>([WELCOME_MESSAGE]);
+  const [uiMessages, setUIMessages] = useState<UIChatMessage[]>([makeWelcomeMessage(false)]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -313,8 +320,8 @@ export function useChat(): UseChatResult {
               if (!isActiveSession()) return;
               setIsAnalyzing(false);
               setError(errorMsg);
-              // Restore welcome message on failure
-              setUIMessages([{ ...WELCOME_MESSAGE, timestamp: Date.now() }]);
+              // Restore welcome message on failure (image was present since we were analyzing)
+              setUIMessages([makeWelcomeMessage(true)]);
             },
           },
           context.visionSystemPrompt || context.visionUserText
@@ -330,7 +337,7 @@ export function useChat(): UseChatResult {
           console.error('[CHAT HOOK] Analyze image error:', err);
           setIsAnalyzing(false);
           setError(err.message || 'Failed to analyze image');
-          setUIMessages([{ ...WELCOME_MESSAGE, timestamp: Date.now() }]);
+          setUIMessages([makeWelcomeMessage(true)]);
         }
       } finally {
         if (!thisRequest.aborted && isActiveSession()) {
@@ -810,7 +817,19 @@ export function useChat(): UseChatResult {
       // Check concurrency limit
       if (activeRequestCountRef.current >= MAX_CONCURRENT_REQUESTS) {
         console.log('[CHAT HOOK] Request queued (active:', activeRequestCountRef.current, ')');
-        queuedRequestsRef.current.push(runRequest);
+        const capturedSessionId = sessionIdRef.current;
+        queuedRequestsRef.current.push(() => {
+          // Skip if session changed while this request was queued
+          if (sessionIdRef.current !== capturedSessionId) {
+            console.log('[CHAT HOOK] Skipping queued request — session changed');
+            // Dequeue next if any (don't decrement — runRequest was never called
+            // so the counter was never incremented for this request)
+            const next = queuedRequestsRef.current.shift();
+            if (next) next();
+            return;
+          }
+          runRequest();
+        });
       } else {
         runRequest();
       }
@@ -899,7 +918,7 @@ export function useChat(): UseChatResult {
     }
     queuedRequestsRef.current = [];
     activeRequestCountRef.current = 0;
-    setUIMessages([{ ...WELCOME_MESSAGE, timestamp: Date.now() }]);
+    setUIMessages([makeWelcomeMessage(false)]);
     setIsLoading(false);
     setIsSending(false);
     setIsAnalyzing(false);
