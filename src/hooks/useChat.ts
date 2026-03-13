@@ -561,7 +561,23 @@ export function useChat(): UseChatResult {
                     const galleryVideoIds = progress.type === 'started'
                       ? undefined
                       : msg.galleryVideoIds;
-                    return { ...msg, toolProgress: { ...progress, perJobProgress }, videoResults, galleryVideoIds };
+                    // Merge with previous toolProgress so fields from different event types
+                    // (e.g. progress from jobStep, etaSeconds from jobETA) don't overwrite each other
+                    const prev = msg.toolProgress;
+                    const merged: ToolExecutionProgress = progress.type === 'started'
+                      ? { ...progress, perJobProgress }
+                      : {
+                          ...prev,
+                          ...progress,
+                          // Preserve previous values for fields not present in this event
+                          progress: progress.progress ?? prev?.progress,
+                          etaSeconds: progress.etaSeconds ?? prev?.etaSeconds,
+                          estimatedCost: progress.estimatedCost ?? prev?.estimatedCost,
+                          sourceImageUrl: progress.sourceImageUrl ?? prev?.sourceImageUrl,
+                          videoAspectRatio: progress.videoAspectRatio ?? prev?.videoAspectRatio,
+                          perJobProgress,
+                        };
+                    return { ...msg, toolProgress: merged, videoResults, galleryVideoIds };
                   }),
                 );
               },
