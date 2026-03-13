@@ -238,6 +238,7 @@ export async function execute(
     totalCount: numberOfMedia,
     estimatedCost,
     videoAspectRatio,
+    modelName: config.name,
   });
 
   const billingId = estimatedCost > 0

@@ -26,6 +26,8 @@ export interface UIChatMessage {
   galleryImageIds?: string[];
   galleryVideoIds?: string[];
   videoAspectRatio?: string;
+  /** Display name of the AI model used for this result (e.g. "Z-Image Turbo") */
+  modelName?: string;
 }
 
 /** Full chat session stored in IndexedDB */

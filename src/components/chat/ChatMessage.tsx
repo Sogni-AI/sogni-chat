@@ -228,6 +228,11 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
             onImageClick={onImageClick}
             galleryImageIds={message.galleryImageIds}
           />
+          {message.modelName && (
+            <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', marginTop: '0.25rem', opacity: 0.6 }}>
+              {message.modelName}
+            </div>
+          )}
         </div>
       )}
 
@@ -235,6 +240,11 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
       {message.videoResults && message.videoResults.length > 0 && !message.toolProgress && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
           <ChatVideoResults urls={message.videoResults} galleryVideoIds={message.galleryVideoIds} downloadSlug={downloadSlug} videoAspectRatio={message.videoAspectRatio} />
+          {message.modelName && (
+            <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', marginTop: '0.25rem', opacity: 0.6 }}>
+              {message.modelName}
+            </div>
+          )}
         </div>
       )}
 
@@ -242,6 +252,11 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
       {message.audioResults && message.audioResults.length > 0 && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
           <ChatAudioResults audioUrls={message.audioResults} />
+          {message.modelName && (
+            <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', marginTop: '0.25rem', opacity: 0.6 }}>
+              {message.modelName}
+            </div>
+          )}
         </div>
       )}
     </div>

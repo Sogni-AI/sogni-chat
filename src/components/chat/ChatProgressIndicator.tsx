@@ -364,6 +364,13 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
           })}
         </div>
 
+        {/* Model name label */}
+        {progress.modelName && (
+          <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', opacity: 0.6 }}>
+            {progress.modelName}
+          </div>
+        )}
+
         {/* Batch summary bar — project-level cost + cancel for multi-item jobs */}
         {isBatch && hasAnyPending && (costLabel || onCancel) && (
           <div
@@ -568,6 +575,13 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
               transition: 'width 0.3s ease',
             }}
           />
+        </div>
+      )}
+
+      {/* Model name label */}
+      {progress.modelName && (
+        <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', marginTop: '0.375rem', opacity: 0.6 }}>
+          {progress.modelName}
         </div>
       )}
     </div>

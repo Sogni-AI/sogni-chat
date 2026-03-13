@@ -106,6 +106,8 @@ export interface ToolExecutionProgress {
   stepLabel?: string;
   /** Target video aspect ratio as "w / h" CSS string (e.g. "9 / 16") for preloader sizing */
   videoAspectRatio?: string;
+  /** Display name of the AI model used (e.g. "Z-Image Turbo", "LTX-2") */
+  modelName?: string;
   /** Accumulated per-job progress for multi-job operations (keyed by jobIndex) */
   perJobProgress?: Record<number, {
     progress?: number;

@@ -575,6 +575,7 @@ export function useChat(): UseChatResult {
                           estimatedCost: progress.estimatedCost ?? prev?.estimatedCost,
                           sourceImageUrl: progress.sourceImageUrl ?? prev?.sourceImageUrl,
                           videoAspectRatio: progress.videoAspectRatio ?? prev?.videoAspectRatio,
+                          modelName: progress.modelName ?? prev?.modelName,
                           perJobProgress,
                         };
                     return { ...msg, toolProgress: merged, videoResults, galleryVideoIds };
@@ -638,9 +639,10 @@ export function useChat(): UseChatResult {
                 setUIMessages((prev) =>
                   prev.map((msg) => {
                     if (msg.id !== currentMsgId) return msg;
-                    // Capture sourceImageUrl and videoAspectRatio from toolProgress before clearing it
+                    // Capture sourceImageUrl, videoAspectRatio, modelName from toolProgress before clearing it
                     const srcUrl = msg.toolProgress?.sourceImageUrl;
                     const vidAR = msg.toolProgress?.videoAspectRatio;
+                    const mdlName = msg.toolProgress?.modelName;
                     return {
                       ...msg,
                       imageResults: !isAudioTool && uniqueUrls.length > 0 ? uniqueUrls : undefined,
@@ -649,6 +651,7 @@ export function useChat(): UseChatResult {
                       toolProgress: null,
                       sourceImageUrl: srcUrl || undefined,
                       videoAspectRatio: vidAR || undefined,
+                      modelName: mdlName || undefined,
                     };
                   }),
                 );

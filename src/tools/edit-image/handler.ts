@@ -186,6 +186,7 @@ export async function execute(
     toolName: 'edit_image',
     totalCount: numberOfMedia,
     estimatedCost,
+    modelName: modelConfig.name,
   });
 
   const billingId = estimatedCost > 0

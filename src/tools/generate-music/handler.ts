@@ -52,6 +52,7 @@ export async function execute(
     toolName: 'generate_music',
     totalCount: 1,
     estimatedCost,
+    modelName: audioModel.name,
   });
 
   const billingId = estimatedCost > 0

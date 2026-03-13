@@ -194,6 +194,7 @@ export async function execute(
       totalCount: numberOfMedia,
       stepLabel: 'Analyzing image',
       videoAspectRatio,
+      modelName: isLTX ? 'LTX-2' : 'WAN 2.2',
     });
     console.log('[ANIMATE] Describing source image for LTX-2 video prompt...');
     const sceneDescription = await withTimeout(
@@ -212,6 +213,7 @@ export async function execute(
         totalCount: numberOfMedia,
         stepLabel: 'Crafting detailed prompt',
         videoAspectRatio,
+        modelName: isLTX ? 'LTX-2' : 'WAN 2.2',
       });
       refinedPrompt = await withTimeout(
         refineVideoPrompt(context.sogniClient, prompt, duration, context.tokenType, '[ANIMATE]'),
@@ -259,6 +261,7 @@ export async function execute(
     sourceImageUrl,
     stepLabel: 'Starting generation',
     videoAspectRatio,
+    modelName: isLTX ? 'LTX-2' : 'WAN 2.2',
   });
 
   // Per-job progress/ETA maps to prevent crossover between concurrent jobs
@@ -387,6 +390,7 @@ export async function execute(
         estimatedCost,
         sourceImageUrl,
         stepLabel: 'Retrying generation',
+        modelName: isLTX ? 'LTX-2' : 'WAN 2.2',
       });
       videoUrls = await tryWithTokenFallback(runVideoGeneration, context, estimatedCost);
     }

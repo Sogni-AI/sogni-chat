@@ -233,6 +233,7 @@ export async function execute(
       totalCount: numberOfMedia,
       stepLabel: 'Crafting detailed prompt',
       videoAspectRatio,
+      modelName: config.name,
     });
     composedPrompt = await withTimeout(
       refineVideoPrompt(context.sogniClient, prompt, duration, context.tokenType, '[GENERATE VIDEO]'),
@@ -259,6 +260,7 @@ export async function execute(
     totalCount: numberOfMedia,
     estimatedCost,
     videoAspectRatio,
+    modelName: config.name,
   });
 
   const billingId = estimatedCost > 0
