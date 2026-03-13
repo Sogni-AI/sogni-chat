@@ -61,9 +61,9 @@ const S2V_MODELS: Record<string, S2VModelConfig> = {
     shift: 8.0,
     requiresReferenceImage: true,
   },
-  'ltx2-ia2v': {
-    id: 'ltx2-19b-fp8_ia2v_distilled',
-    name: 'LTX-2 Image+Audio to Video',
+  'ltx23-ia2v': {
+    id: 'ltx23-22b-fp8_ia2v_distilled',
+    name: 'LTX 2.3 Image+Audio to Video',
     defaultWidth: 1920,
     defaultHeight: 1088,
     dimensionStep: 64,
@@ -79,9 +79,9 @@ const S2V_MODELS: Record<string, S2VModelConfig> = {
     scheduler: 'simple',
     requiresReferenceImage: true,
   },
-  'ltx2-a2v': {
-    id: 'ltx2-19b-fp8_a2v_distilled',
-    name: 'LTX-2 Audio to Video',
+  'ltx23-a2v': {
+    id: 'ltx23-22b-fp8_a2v_distilled',
+    name: 'LTX 2.3 Audio to Video',
     defaultWidth: 1920,
     defaultHeight: 1088,
     dimensionStep: 64,

@@ -3,8 +3,8 @@
  * Extracted from the superapp's chatService.ts executeAnimatePhoto.
  *
  * This is the most complex tool handler — it includes:
- * - Vision LLM sub-calls for scene description (LTX-2)
- * - Creative prompt refinement via thinking mode (LTX-2)
+ * - Vision LLM sub-calls for scene description (LTX 2.3)
+ * - Creative prompt refinement via thinking mode (LTX 2.3)
  * - Video generation with per-job progress tracking
  * - Per-job gallery saves (fire-and-forget)
  * - Transient error retry (workerDisconnected)
@@ -41,7 +41,7 @@ import { CHAT_MODEL } from '@/config/chat';
 // Private helpers
 // ---------------------------------------------------------------------------
 
-/** System prompt for the /describe vision call used to anchor LTX-2 video prompts */
+/** System prompt for the /describe vision call used to anchor LTX 2.3 video prompts */
 const VIDEO_DESCRIBE_SYSTEM_PROMPT =
   'Describe this image in 2-3 dense present-tense sentences for a video generation model. ' +
   'Include: subject identity, appearance, clothing, pose, expression, environment, lighting, surface textures, and colors. ' +
@@ -49,7 +49,7 @@ const VIDEO_DESCRIBE_SYSTEM_PROMPT =
   'Do NOT mention what to animate or any motion. Just describe the static scene exactly as it appears.';
 
 /**
- * Use the vision LLM to describe a source image in detail for LTX-2 video prompting.
+ * Use the vision LLM to describe a source image in detail for LTX 2.3 video prompting.
  * Returns a rich scene description that anchors the video to the first frame.
  * Falls back to empty string on failure (video will still generate, just with weaker anchoring).
  */
@@ -113,11 +113,11 @@ export async function execute(
   const prompt = args.prompt as string;
   const rawSourceIndex = args.sourceImageIndex as number | undefined;
   const duration = Math.max(2, Math.min(20, (args.duration as number) || 5));
-  const rawVideoModel = (args.videoModel as string) || 'ltx2';
-  const validVideoModels: VideoModelId[] = ['ltx2', 'wan22', 'ltx2-hq', 'wan22-hq', 'ltx23'];
+  const rawVideoModel = (args.videoModel as string) || 'ltx23';
+  const validVideoModels: VideoModelId[] = ['ltx23', 'wan22'];
   const videoModelId: VideoModelId = validVideoModels.includes(rawVideoModel as VideoModelId)
     ? (rawVideoModel as VideoModelId)
-    : 'ltx2';
+    : 'ltx23';
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
   const aspectRatio = args.aspectRatio as string | undefined;
   const isLTX = videoModelId.startsWith('ltx');
@@ -194,9 +194,9 @@ export async function execute(
       totalCount: numberOfMedia,
       stepLabel: 'Analyzing image',
       videoAspectRatio,
-      modelName: isLTX ? 'LTX-2' : 'WAN 2.2',
+      modelName: isLTX ? 'LTX 2.3' : 'WAN 2.2',
     });
-    console.log('[ANIMATE] Describing source image for LTX-2 video prompt...');
+    console.log('[ANIMATE] Describing source image for LTX 2.3 video prompt...');
     const sceneDescription = await withTimeout(
       describeImageForVideo(context.sogniClient, sourceImageData, context.tokenType),
       LLM_SUBCALL_TIMEOUT_MS,
@@ -213,7 +213,7 @@ export async function execute(
         totalCount: numberOfMedia,
         stepLabel: 'Crafting detailed prompt',
         videoAspectRatio,
-        modelName: isLTX ? 'LTX-2' : 'WAN 2.2',
+        modelName: isLTX ? 'LTX 2.3' : 'WAN 2.2',
       });
       refinedPrompt = await withTimeout(
         refineVideoPrompt(context.sogniClient, prompt, duration, context.tokenType, '[ANIMATE]'),
@@ -261,7 +261,7 @@ export async function execute(
     sourceImageUrl,
     stepLabel: 'Starting generation',
     videoAspectRatio,
-    modelName: isLTX ? 'LTX-2' : 'WAN 2.2',
+    modelName: isLTX ? 'LTX 2.3' : 'WAN 2.2',
   });
 
   // Per-job progress/ETA maps to prevent crossover between concurrent jobs
@@ -390,7 +390,7 @@ export async function execute(
         estimatedCost,
         sourceImageUrl,
         stepLabel: 'Retrying generation',
-        modelName: isLTX ? 'LTX-2' : 'WAN 2.2',
+        modelName: isLTX ? 'LTX 2.3' : 'WAN 2.2',
       });
       videoUrls = await tryWithTokenFallback(runVideoGeneration, context, estimatedCost);
     }
@@ -410,7 +410,7 @@ export async function execute(
       resultCount: videoUrls.length,
       mediaType: 'video',
       creditsCost: formatCredits(estimatedCost),
-      message: `Successfully generated ${videoUrls.length} ${duration}-second video${videoUrls.length !== 1 ? 's' : ''} using ${isLTX ? 'LTX-2' : 'WAN 2.2'}${isLTX ? ' (with audio)' : ''}. Cost: ~${formatCredits(estimatedCost)} credits. The user can now see and play the video${videoUrls.length !== 1 ? 's' : ''}.`,
+      message: `Successfully generated ${videoUrls.length} ${duration}-second video${videoUrls.length !== 1 ? 's' : ''} using ${isLTX ? 'LTX 2.3' : 'WAN 2.2'}${isLTX ? ' (with audio)' : ''}. Cost: ~${formatCredits(estimatedCost)} credits. The user can now see and play the video${videoUrls.length !== 1 ? 's' : ''}.`,
     });
   } catch (err: unknown) {
     if (billingId) discardPending(billingId);

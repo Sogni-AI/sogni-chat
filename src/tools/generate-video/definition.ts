@@ -11,7 +11,7 @@ export const definition: ToolDefinition = {
   function: {
     name: 'generate_video',
     description:
-      'Generate a video from a text description — no source image needed. LTX-2 generates audio natively (dialogue, ambient sounds, music, foley) — no separate audio generation step is needed. Describe audio in the prompt. Use this when the user wants to create a video from scratch without uploading a photo. For animating an existing photo, use animate_photo instead. CRITICAL: If the user\'s request is vague or lacks specific creative direction (e.g. just "create a video", "make a video"), do NOT call this tool yet. Instead, ask about their vision: subject matter, mood, camera style, and any specific actions or dialogue. If an image is available, analyze what is actually in it and suggest 2-3 creative directions tailored to the image content — never give generic ideas. Only call this tool once you have clear creative intent.',
+      'Generate a video from a text description — no source image needed. LTX 2.3 generates audio natively (dialogue, ambient sounds, music, foley) — no separate audio generation step is needed. Describe audio in the prompt. Use this when the user wants to create a video from scratch without uploading a photo. For animating an existing photo, use animate_photo instead. CRITICAL: If the user\'s request is vague or lacks specific creative direction (e.g. just "create a video", "make a video"), do NOT call this tool yet. Instead, ask about their vision: subject matter, mood, camera style, and any specific actions or dialogue. If an image is available, analyze what is actually in it and suggest 2-3 creative directions tailored to the image content — never give generic ideas. Only call this tool once you have clear creative intent.',
     parameters: {
       type: 'object',
       properties: {
@@ -41,19 +41,19 @@ CONSTRAINTS:
         },
         videoModel: {
           type: 'string',
-          enum: ['ltx2', 'wan22', 'ltx2-hq', 'wan22-hq', 'ltx23'],
+          enum: ['ltx23', 'wan22'],
           description:
-            'Video model. "ltx2" (default): Fast 8-step distilled, generates audio, good balance of speed and quality. "ltx2-hq": High quality 20-step, generates audio, best for cinematic detail. "ltx23": Latest LTX 2.3 distilled, 8-step, fast + high quality with audio. "wan22": Fast 4-step, simple motion, no audio. "wan22-hq": High quality 20-step, better motion fidelity, no audio. Default: "ltx2".',
+            'Video model. "ltx23" (default): LTX 2.3 distilled, 8-step, fast + high quality with audio. "wan22": Fast 4-step, simple motion, no audio. Default: "ltx23".',
         },
         width: {
           type: 'number',
           description:
-            'Video width in pixels. LTX-2: 640-3840 (step 64), default 1920. WAN: 480-1536 (step 16), default 640.',
+            'Video width in pixels. LTX 2.3: 640-3840 (step 64), default 1920. WAN: 480-1536 (step 16), default 640.',
         },
         height: {
           type: 'number',
           description:
-            'Video height in pixels. LTX-2: 640-3840 (step 64), default 1088. WAN: 480-1536 (step 16), default 640.',
+            'Video height in pixels. LTX 2.3: 640-3840 (step 64), default 1088. WAN: 480-1536 (step 16), default 640.',
         },
         numberOfVariations: {
           type: 'number',

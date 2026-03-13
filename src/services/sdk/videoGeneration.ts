@@ -1,6 +1,6 @@
 /**
  * Video generation service for image-to-video (I2V).
- * Supports multiple video models (WAN 2.2, LTX-2) via centralized config.
+ * Supports multiple video models (WAN 2.2, LTX 2.3) via centralized config.
  * Supports multi-video batching via the photobooth pattern (numberOfMedia > 1).
  */
 import { SogniClient } from '@sogni-ai/sogni-client';

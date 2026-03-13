@@ -11,7 +11,7 @@ export const definition: ToolDefinition = {
   function: {
     name: 'sound_to_video',
     description:
-      'Generate video synchronized to a PRE-RECORDED audio file that the user has already uploaded. REQUIRES an uploaded audio file (mp3, wav, m4a) — do NOT use this tool if no audio file has been uploaded. If the user wants dialogue, speaking, or audio in their video WITHOUT a pre-recorded audio file, use animate_photo instead (LTX-2 generates audio natively). Only use this tool when the user has explicitly uploaded an audio file and wants video synced to it — such as lip-sync, music visualization, or audio-reactive motion.',
+      'Generate video synchronized to a PRE-RECORDED audio file that the user has already uploaded. REQUIRES an uploaded audio file (mp3, wav, m4a) — do NOT use this tool if no audio file has been uploaded. If the user wants dialogue, speaking, or audio in their video WITHOUT a pre-recorded audio file, use animate_photo instead (LTX 2.3 generates audio natively). Only use this tool when the user has explicitly uploaded an audio file and wants video synced to it — such as lip-sync, music visualization, or audio-reactive motion.',
     parameters: {
       type: 'object',
       properties: {
@@ -42,7 +42,7 @@ CONSTRAINTS:
         sourceImageIndex: {
           type: 'number',
           description:
-            'Optional index of an uploaded image to use as the starting frame (0-based). Required for lip-sync models (WAN S2V). For audio-only-to-video models (LTX-2 A2V), this is optional — omit it to generate video purely from text + audio.',
+            'Optional index of an uploaded image to use as the starting frame (0-based). Required for lip-sync models (WAN S2V). For audio-only-to-video models (LTX 2.3 A2V), this is optional — omit it to generate video purely from text + audio.',
         },
         duration: {
           type: 'number',
@@ -53,9 +53,9 @@ CONSTRAINTS:
         },
         videoModel: {
           type: 'string',
-          enum: ['wan-s2v', 'ltx2-ia2v', 'ltx2-a2v'],
+          enum: ['wan-s2v', 'ltx23-ia2v', 'ltx23-a2v'],
           description:
-            'Video model. "wan-s2v" (default): WAN 2.2 sound-to-video, best for lip-sync with a face image, fast 4-step. "ltx2-ia2v": LTX-2 image+audio to video, audio-reactive with a reference image, 8-step. "ltx2-a2v": LTX-2 audio-only to video, no image needed, creates video purely from text prompt + audio. Default: "wan-s2v".',
+            'Video model. "wan-s2v" (default): WAN 2.2 sound-to-video, best for lip-sync with a face image, fast 4-step. "ltx23-ia2v": LTX 2.3 image+audio to video, audio-reactive with a reference image, 8-step. "ltx23-a2v": LTX 2.3 audio-only to video, no image needed, creates video purely from text prompt + audio. Default: "wan-s2v".',
         },
         numberOfVariations: {
           type: 'number',

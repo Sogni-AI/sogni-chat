@@ -88,7 +88,7 @@ export async function refineVideoPrompt(
     const messages: ChatMessage[] = [
       {
         role: 'system',
-        content: `You are a video prompt engineer. Expand the user's video concept into a detailed, production-quality prompt for an AI video generation model (LTX-2).
+        content: `You are a video prompt engineer. Expand the user's video concept into a detailed, production-quality prompt for an AI video generation model (LTX 2.3).
 
 CRITICAL RULES:
 1. DIALOGUE: If the concept implies conversation, argument, or speech, write out the ACTUAL DIALOGUE in double quotes. Never summarize dialogue — write the exact words each person says. Space dialogue naturally across ${duration} seconds with pauses, gestures, and reactions between lines.
