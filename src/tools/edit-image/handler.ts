@@ -208,6 +208,7 @@ export async function execute(
           tokenType,
           sampler: modelConfig.sampler,
           scheduler: modelConfig.scheduler,
+          disableNSFWFilter: context.safeContentFilter === false,
         },
         (progress) => {
           callbacks.onToolProgress({
@@ -264,6 +265,7 @@ interface EditGenParams {
   tokenType: TokenType;
   sampler: string;
   scheduler: string;
+  disableNSFWFilter?: boolean;
 }
 
 interface EditProgress {
@@ -295,6 +297,7 @@ async function runEditGeneration(
     height: params.height,
     sampler: params.sampler,
     scheduler: params.scheduler,
+    disableNSFWFilter: !!params.disableNSFWFilter,
   };
 
   if (params.guidance !== undefined) {

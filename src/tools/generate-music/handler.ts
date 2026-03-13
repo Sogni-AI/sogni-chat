@@ -74,6 +74,7 @@ export async function execute(
           shift: audioModel.shift.default,
           guidance: audioModel.guidance?.default,
           tokenType,
+          disableNSFWFilter: context.safeContentFilter === false,
         },
         (progress) => {
           callbacks.onToolProgress({
@@ -136,6 +137,7 @@ interface MusicParams {
   shift: number;
   guidance?: number;
   tokenType: TokenType;
+  disableNSFWFilter?: boolean;
 }
 
 interface MusicProgress {
@@ -164,6 +166,7 @@ async function runMusicGeneration(
     steps: params.steps,
     shift: params.shift,
     seed: -1,
+    disableNSFWFilter: !!params.disableNSFWFilter,
   };
 
   if (params.lyrics) {

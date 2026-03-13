@@ -40,6 +40,8 @@ export interface UseChatResult {
       tokenType: TokenType;
       balances: Balances | null;
       qualityTier?: 'fast' | 'hq';
+      safeContentFilter?: boolean;
+      onContentFilterChange?: (enabled: boolean) => void;
       uploadedFiles?: UploadedFile[];
       onTokenSwitch?: (newType: TokenType) => void;
       onInsufficientCredits?: () => void;
@@ -350,6 +352,8 @@ export function useChat(): UseChatResult {
         tokenType: TokenType;
         balances: Balances | null;
         qualityTier?: 'fast' | 'hq';
+        safeContentFilter?: boolean;
+        onContentFilterChange?: (enabled: boolean) => void;
         uploadedFiles?: UploadedFile[];
         onTokenSwitch?: (newType: TokenType) => void;
         onInsufficientCredits?: () => void;
@@ -437,6 +441,8 @@ export function useChat(): UseChatResult {
           get resultUrls() { return allResultUrlsRef.current; },
           balances: context.balances,
           qualityTier: context.qualityTier,
+          safeContentFilter: context.safeContentFilter,
+          onContentFilterChange: context.onContentFilterChange,
           onTokenSwitch: context.onTokenSwitch,
           onInsufficientCredits: context.onInsufficientCredits,
           signal: toolAbortController.signal,

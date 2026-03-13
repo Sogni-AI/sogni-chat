@@ -11,6 +11,7 @@ import { trackPageView } from '@/services/analyticsService';
 import { SogniTV } from '@/components/shared/SogniTV';
 import { captureReferralFromURL } from '@/utils/referralTracking';
 import { DEFAULT_VARIANT_ID } from '@/config/modelVariants';
+import { getSavedContentFilter, saveContentFilter } from '@/config/contentFilterPreset';
 import { useState, useEffect, createContext, useContext, useCallback } from 'react';
 
 // Shared layout context for child pages to trigger modals and access layout state
@@ -27,6 +28,10 @@ interface LayoutContextValue {
   sidebarCollapsed: boolean;
   /** Toggle sidebar collapsed state */
   toggleSidebar: () => void;
+  /** Whether the safe content filter is enabled */
+  safeContentFilter: boolean;
+  /** Toggle the safe content filter */
+  setSafeContentFilter: (enabled: boolean) => void;
 }
 
 const LayoutContext = createContext<LayoutContextValue>({
@@ -38,6 +43,8 @@ const LayoutContext = createContext<LayoutContextValue>({
   setSelectedModelVariant: () => {},
   sidebarCollapsed: false,
   toggleSidebar: () => {},
+  safeContentFilter: true,
+  setSafeContentFilter: () => {},
 });
 
 export function useLayout() {
@@ -85,6 +92,13 @@ export function AppLayout() {
     });
   }, []);
 
+  // Safe Content Filter state (persisted to localStorage)
+  const [safeContentFilter, setSafeContentFilterState] = useState<boolean>(getSavedContentFilter);
+  const setSafeContentFilter = useCallback((enabled: boolean) => {
+    setSafeContentFilterState(enabled);
+    saveContentFilter(enabled);
+  }, []);
+
   const showSignupModal = useCallback((mode: LoginModalMode = 'signup') => {
     setSignupMode(mode);
     setShowSignup(true);
@@ -103,6 +117,8 @@ export function AppLayout() {
     setSelectedModelVariant,
     sidebarCollapsed,
     toggleSidebar,
+    safeContentFilter,
+    setSafeContentFilter,
   };
 
   if (authLoading) {

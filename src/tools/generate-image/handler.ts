@@ -228,7 +228,16 @@ export async function execute(
 
   // Cost estimation & pre-flight
   const originalToken = context.tokenType;
-  let estimatedCost = await fetchImageCostEstimate(context.sogniClient, context.tokenType, modelConfig.id, numberOfMedia, steps, guidance, modelConfig.sampler);
+  let estimatedCost: number;
+  try {
+    estimatedCost = await fetchImageCostEstimate(context.sogniClient, context.tokenType, modelConfig.id, numberOfMedia, steps, guidance, modelConfig.sampler);
+  } catch (costErr) {
+    console.error(`[GENERATE IMAGE] Cost estimation failed for model "${modelConfig.id}":`, costErr);
+    return JSON.stringify({
+      error: 'model_unavailable',
+      message: `Model "${modelConfig.name}" (${modelConfig.id}) is not currently available. Try a different model such as "z-turbo", "chroma-v46-flash", or "flux1-schnell".`,
+    });
+  }
 
   const preflight = preflightCreditCheck(context, estimatedCost);
   if (!preflight.ok) return preflight.errorJson;
@@ -267,6 +276,7 @@ export async function execute(
           startingImage: startingImageData,
           startingImageMime,
           startingImageStrength: startingImageStrength,
+          disableNSFWFilter: context.safeContentFilter === false,
         },
         (progress) => {
           callbacks.onToolProgress({
@@ -302,6 +312,12 @@ export async function execute(
     if (isInsufficientCreditsError(err)) {
       return JSON.stringify({ error: 'insufficient_credits', message: 'The user does not have enough credits for image generation.' });
     }
+    if (err instanceof Error && (err as Error & { isNSFW?: boolean }).isNSFW) {
+      return JSON.stringify({
+        error: 'nsfw_filtered',
+        message: 'The generated image was blocked by the Safe Content Filter. Ask the user if they would like to disable it. If they agree, call set_content_filter with enabled=false, then retry the image generation.',
+      });
+    }
     throw err;
   }
 }
@@ -326,6 +342,7 @@ interface ImageGenParams {
   startingImage?: Uint8Array;
   startingImageMime?: string;
   startingImageStrength?: number;
+  disableNSFWFilter?: boolean;
 }
 
 interface ImageProgress {
@@ -351,10 +368,12 @@ async function runImageGeneration(
     steps: params.steps,
     seed: params.seed ?? -1,
     tokenType: params.tokenType,
+    sizePreset: 'custom',
     width: params.width,
     height: params.height,
     sampler: params.sampler,
     scheduler: params.scheduler,
+    disableNSFWFilter: !!params.disableNSFWFilter,
   };
 
   if (params.negativePrompt) {
@@ -374,6 +393,8 @@ async function runImageGeneration(
     const resultUrls: string[] = [];
     let completedCount = 0;
     let failedCount = 0;
+    let nsfwCount = 0;
+    let lastFailReason = '';
     const totalJobs = params.numberOfMedia;
     // Check if already aborted before setting up listeners
     if (signal?.aborted) {
@@ -403,7 +424,15 @@ async function runImageGeneration(
       if (completedCount + failedCount >= totalJobs) {
         cleanup();
         if (failedCount === totalJobs) {
-          reject(new Error(`All ${totalJobs} image generation jobs failed`));
+          if (nsfwCount > 0) {
+            reject(Object.assign(
+              new Error(`Image was blocked by the Safe Content Filter. Ask the user if they would like to disable it, then call set_content_filter with enabled=false and retry.`),
+              { isNSFW: true },
+            ));
+          } else {
+            const detail = lastFailReason ? ` (${lastFailReason})` : '';
+            reject(new Error(`All ${totalJobs} image generation job(s) failed for model "${params.modelId}"${detail}. The model may be temporarily unavailable — try a different model.`));
+          }
         } else {
           resolve(resultUrls.filter(Boolean));
         }
@@ -450,7 +479,8 @@ async function runImageGeneration(
         case 'completed': {
           if (!event.jobId) return;
           const resultUrl = event.resultUrl as string | undefined;
-          if (resultUrl && !event.error) {
+          const isNSFW = !!(event.isNSFW);
+          if (resultUrl && !event.error && !isNSFW) {
             resultUrls.push(resultUrl);
             completedCount++;
             onProgress({
@@ -460,9 +490,16 @@ async function runImageGeneration(
               resultUrl,
               progress: 1,
             });
+          } else if (isNSFW) {
+            failedCount++;
+            nsfwCount++;
+            console.warn('[GENERATE IMAGE] Job blocked by Safe Content Filter');
+            lastFailReason = 'nsfw_filtered';
           } else {
             failedCount++;
-            console.error('[GENERATE IMAGE] Job completed with error:', event.error);
+            const reason = event.error ?? (resultUrl ? 'unknown error' : 'no result URL returned');
+            console.error('[GENERATE IMAGE] Job completed with error:', reason, '| event:', JSON.stringify(event));
+            lastFailReason = String(reason);
           }
           checkDone();
           break;
@@ -470,7 +507,19 @@ async function runImageGeneration(
         case 'error':
         case 'failed': {
           failedCount++;
-          console.error('[GENERATE IMAGE] Job failed:', event.error);
+          const errObj = event.error as { originalCode?: string; message?: string } | string | undefined;
+          const isSensitive = typeof errObj === 'object' && errObj?.originalCode === 'sensitiveContent'
+            || (typeof errObj === 'object' && typeof errObj?.message === 'string' && errObj.message.toLowerCase().includes('sensitive content'))
+            || (typeof errObj === 'string' && errObj.toLowerCase().includes('sensitive content'));
+          if (isSensitive) {
+            nsfwCount++;
+            console.warn('[GENERATE IMAGE] Job blocked by Safe Content Filter (error event)');
+            lastFailReason = 'nsfw_filtered';
+          } else {
+            const reason = errObj ?? 'unknown error';
+            console.error('[GENERATE IMAGE] Job failed:', reason, '| event:', JSON.stringify(event));
+            lastFailReason = String(typeof reason === 'object' ? (reason as { message?: string }).message || JSON.stringify(reason) : reason);
+          }
           checkDone();
           break;
         }

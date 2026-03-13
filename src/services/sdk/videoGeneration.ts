@@ -29,6 +29,8 @@ export interface VideoGenerationParams {
   aspectRatio?: string;
   /** Target shorter-side resolution (e.g. 768 for 720p, 1088 for 1080p) */
   targetResolution?: number;
+  /** Whether to disable the NSFW safety filter */
+  disableNSFWFilter?: boolean;
 }
 
 export interface VideoGenerationProgress {
@@ -101,6 +103,7 @@ export async function generateVideo(
     seed: -1,
     referenceImage: referenceImageBlob,
     tokenType,
+    disableNSFWFilter: !!params.disableNSFWFilter,
   };
 
   // Model-specific params

@@ -299,6 +299,7 @@ export async function execute(
       numberOfMedia,
       aspectRatio,
       targetResolution,
+      disableNSFWFilter: context.safeContentFilter === false,
     },
     (progress) => {
       if (progress.type === 'progress' || progress.type === 'completed') {

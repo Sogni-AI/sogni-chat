@@ -55,6 +55,10 @@ export interface ToolExecutionContext {
   model?: string;
   /** Override the think parameter (true = extended thinking, false = disabled, undefined = default) */
   think?: boolean;
+  /** Whether the safe content filter is enabled (true = filter on, false = filter off). Default: true. */
+  safeContentFilter?: boolean;
+  /** Called when the content filter setting is changed (e.g. by the set_content_filter tool) */
+  onContentFilterChange?: (enabled: boolean) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -74,7 +78,8 @@ export type ToolName =
   | 'sound_to_video'
   | 'video_to_video'
   | 'generate_music'
-  | 'analyze_image';
+  | 'analyze_image'
+  | 'set_content_filter';
 
 // ---------------------------------------------------------------------------
 // Progress & callbacks

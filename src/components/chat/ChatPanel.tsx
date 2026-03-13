@@ -34,6 +34,8 @@ interface ChatPanelProps {
   chat: UseChatResult;
   qualityTier: 'fast' | 'hq';
   onQualityTierChange: (tier: 'fast' | 'hq') => void;
+  safeContentFilter?: boolean;
+  onContentFilterChange?: (enabled: boolean) => void;
   estimatedCost?: number | null;
   costLoading?: boolean;
   onResultsChange?: (urls: string[]) => void;
@@ -184,6 +186,8 @@ export function ChatPanel({
   chat,
   qualityTier,
   onQualityTierChange,
+  safeContentFilter,
+  onContentFilterChange,
   estimatedCost,
   costLoading,
   onResultsChange,
@@ -301,13 +305,15 @@ export function ChatPanel({
         tokenType,
         balances,
         qualityTier,
+        safeContentFilter,
+        onContentFilterChange,
         uploadedFiles,
         onTokenSwitch,
         onInsufficientCredits,
         modelVariantId: selectedModelVariant,
       });
     },
-    [sogniClient, imageData, width, height, tokenType, balances, qualityTier, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, selectedModelVariant],
+    [sogniClient, imageData, width, height, tokenType, balances, qualityTier, safeContentFilter, onContentFilterChange, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, selectedModelVariant],
   );
 
   const handleImageClick = useCallback((url: string, _index: number) => {

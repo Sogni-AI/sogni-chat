@@ -205,6 +205,7 @@ export async function execute(
           tokenType,
           sampler: config.sampler,
           scheduler: config.scheduler,
+          disableNSFWFilter: context.safeContentFilter === false,
         },
         (progress) => {
           callbacks.onToolProgress({
@@ -270,6 +271,7 @@ interface V2VParams {
   tokenType: TokenType;
   sampler: string;
   scheduler: string;
+  disableNSFWFilter?: boolean;
 }
 
 interface V2VProgress {
@@ -303,6 +305,7 @@ async function runV2VGeneration(
     sampler: params.sampler,
     scheduler: params.scheduler,
     tokenType: params.tokenType,
+    disableNSFWFilter: !!params.disableNSFWFilter,
   };
 
   if (params.referenceImage) {

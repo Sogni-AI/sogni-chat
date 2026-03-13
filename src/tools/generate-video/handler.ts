@@ -283,6 +283,7 @@ export async function execute(
           tokenType,
           sampler: config.sampler,
           scheduler: config.scheduler,
+          disableNSFWFilter: context.safeContentFilter === false,
         },
         (progress) => {
           callbacks.onToolProgress({
@@ -343,6 +344,7 @@ interface T2VParams {
   tokenType: TokenType;
   sampler: string;
   scheduler: string;
+  disableNSFWFilter?: boolean;
 }
 
 interface VideoProgress {
@@ -374,6 +376,7 @@ async function runT2VGeneration(
     sampler: params.sampler,
     scheduler: params.scheduler,
     tokenType: params.tokenType,
+    disableNSFWFilter: !!params.disableNSFWFilter,
   };
 
   if (params.guidance !== undefined) {

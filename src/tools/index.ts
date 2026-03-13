@@ -24,6 +24,9 @@ import './generate-music';
 // Phase 5: Vision analysis tool
 import './analyze-image';
 
+// Settings tools
+import './set-content-filter';
+
 export { toolRegistry } from './registry';
 export type {
   ToolHandler,

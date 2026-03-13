@@ -134,7 +134,7 @@ export default function ChatPage() {
     clearPendingRestore,
   } = useChatSessions();
   const isDesktop = useMediaQuery('(min-width: 900px)');
-  const { showOutOfCreditsPopup, showSignupModal, sidebarCollapsed, toggleSidebar, setSelectedModelVariant } = useLayout();
+  const { showOutOfCreditsPopup, showSignupModal, sidebarCollapsed, toggleSidebar, setSelectedModelVariant, safeContentFilter, setSafeContentFilter } = useLayout();
   const { showToast } = useToastContext();
 
   const [resultUrls, setResultUrls] = useState<string[]>([]);
@@ -798,6 +798,9 @@ export default function ChatPage() {
               chat={chat}
               qualityTier={qualityTier}
               onQualityTierChange={setQualityTier}
+              safeContentFilter={safeContentFilter}
+              onContentFilterChange={setSafeContentFilter}
+
               estimatedCost={estimatedCost}
               costLoading={costLoading}
               onResultsChange={handleResultsChange}
