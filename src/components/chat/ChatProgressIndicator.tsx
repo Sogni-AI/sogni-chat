@@ -3,17 +3,40 @@
  * Shows a blurred version of the original photo as background with
  * progress info overlaid. Individual results replace the blur as they arrive.
  */
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import type { ToolExecutionProgress } from '@/tools/types';
 import { formatCredits } from '@/services/creditsService';
 import { useTokenPrice } from '@/hooks/useTokenPrice';
+import { activeVideos, pauseOtherVideos } from './videoCoordination';
 
-/** Inline video player for progress grid — hidden until first frame is ready */
+/** Inline video player for progress grid — hidden until first frame is ready.
+ *  Participates in the global video coordination so that playing one video
+ *  pauses all others and unmutes the active video (same as ChatVideoPlayer). */
 function ProgressVideo({ src, aspectRatio }: { src: string; aspectRatio?: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [ready, setReady] = useState(false);
 
   // Reset loading state when src changes (e.g. retry with different URL)
   useEffect(() => { setReady(false); }, [src]);
+
+  // Register in the global activeVideos set and wire up play coordination
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+
+    activeVideos.add(el);
+
+    const handlePlay = () => {
+      pauseOtherVideos(el);
+      if (el.muted) el.muted = false;
+    };
+    el.addEventListener('play', handlePlay);
+
+    return () => {
+      el.removeEventListener('play', handlePlay);
+      activeVideos.delete(el);
+    };
+  }, []);
 
   return (
     <>
@@ -41,6 +64,7 @@ function ProgressVideo({ src, aspectRatio }: { src: string; aspectRatio?: string
         </div>
       )}
       <video
+        ref={videoRef}
         src={src}
         autoPlay
         loop

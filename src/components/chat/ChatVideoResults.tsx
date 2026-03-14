@@ -8,15 +8,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { downloadImage } from '@/utils/download';
 import { buildDownloadFilename } from '@/utils/downloadFilename';
 import { useGalleryBlobUrls } from '@/hooks/useGalleryBlobUrls';
-
-/** Global registry: when any chat video plays, pause all others */
-const activeVideos = new Set<HTMLVideoElement>();
-
-function pauseOtherVideos(current: HTMLVideoElement) {
-  activeVideos.forEach((v) => {
-    if (v !== current && !v.paused) v.pause();
-  });
-}
+import { activeVideos, pauseOtherVideos } from './videoCoordination';
 
 /** Individual video player that pauses all other chat videos when it starts playing.
  *  Hides the native player until the first frame is ready to prevent the
