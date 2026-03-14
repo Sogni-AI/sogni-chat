@@ -108,6 +108,16 @@ export function AppLayout() {
     setShowSignup(false);
   }, []);
 
+  // Auto-open signup modal when arriving with a referral code and not logged in
+  useEffect(() => {
+    if (authLoading || isAuthenticated) return;
+    const url = new URL(window.location.href);
+    const hasReferralCode = url.searchParams.get('code') || url.searchParams.get('referral');
+    if (hasReferralCode) {
+      showSignupModal('signup');
+    }
+  }, [authLoading, isAuthenticated, showSignupModal]);
+
   const layoutContext: LayoutContextValue = {
     showSignupModal,
     hideSignupModal,
