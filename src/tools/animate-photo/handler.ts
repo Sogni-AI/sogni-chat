@@ -120,6 +120,7 @@ export async function execute(
     : 'ltx23';
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
   const aspectRatio = args.aspectRatio as string | undefined;
+  const frameMode = (args.frameMode as 'first' | 'last' | undefined) ?? 'first';
   const isLTX = videoModelId.startsWith('ltx');
 
   if (!context.imageData && context.resultUrls.length === 0) {
@@ -188,7 +189,8 @@ export async function execute(
   // Compose the final video prompt based on model
   let composedPrompt: string;
   if (isLTX) {
-    // Step 1: Use vision LLM to describe the source image for rich first-frame anchoring
+    // Step 1: Use vision LLM to describe the source image for rich frame anchoring
+    // (applies to both first-frame and last-frame modes)
     callbacks.onToolProgress({
       type: 'started',
       toolName: 'animate_photo',
@@ -197,7 +199,7 @@ export async function execute(
       videoAspectRatio,
       modelName: mediaLabel,
     });
-    console.log('[ANIMATE] Describing source image for LTX 2.3 video prompt...');
+    console.log(`[ANIMATE] Describing source image for LTX 2.3 video prompt (frameMode=${frameMode})...`);
     const sceneDescription = await withTimeout(
       describeImageForVideo(context.sogniClient, sourceImageData, context.tokenType),
       LLM_SUBCALL_TIMEOUT_MS,
@@ -223,14 +225,21 @@ export async function execute(
       ) ?? prompt;
     }
 
-    composedPrompt = sceneDescription
-      ? `A cinematic scene of ${sceneDescription} ${refinedPrompt}`
-      : `A cinematic scene of ${refinedPrompt}`;
+    if (frameMode === 'last') {
+      // Last-frame mode: describe the motion that leads TO the target image
+      composedPrompt = sceneDescription
+        ? `${refinedPrompt} The scene resolves to ${sceneDescription}`
+        : refinedPrompt;
+    } else {
+      composedPrompt = sceneDescription
+        ? `A cinematic scene of ${sceneDescription} ${refinedPrompt}`
+        : `A cinematic scene of ${refinedPrompt}`;
+    }
   } else {
     // WAN 2.2: Use the prompt directly — no scene description or cinematic prefix
     composedPrompt = prompt;
   }
-  console.log(`[ANIMATE] Video prompt (${videoModelId}, ${composedPrompt.length} chars):`, composedPrompt);
+  console.log(`[ANIMATE] Video prompt (${videoModelId}, frameMode=${frameMode}, ${composedPrompt.length} chars):`, composedPrompt);
   console.log(`[ANIMATE] Video quality: ${qualityTier} -> ${targetResolution ? `${targetResolution}p shorter side` : 'default resolution'}`);
 
   // Estimate video cost using the selected model config
@@ -304,6 +313,7 @@ export async function execute(
       aspectRatio,
       targetResolution,
       disableNSFWFilter: context.safeContentFilter === false,
+      frameMode: isLTX ? frameMode : undefined,
     },
     (progress) => {
       if (progress.type === 'progress' || progress.type === 'completed') {

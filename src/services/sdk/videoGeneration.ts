@@ -13,6 +13,9 @@ import {
   type VideoModelId,
 } from '@/constants/videoSettings';
 
+/** Which frame slot the source image should occupy */
+export type FrameMode = 'first' | 'last';
+
 export interface VideoGenerationParams {
   imageData: Uint8Array;
   width: number;
@@ -31,6 +34,8 @@ export interface VideoGenerationParams {
   targetResolution?: number;
   /** Whether to disable the NSFW safety filter */
   disableNSFWFilter?: boolean;
+  /** Which frame slot the source image occupies: 'first' (default) or 'last' (LTX-2 only) */
+  frameMode?: FrameMode;
 }
 
 export interface VideoGenerationProgress {
@@ -66,6 +71,8 @@ export async function generateVideo(
   const duration = params.duration ?? 5;
   const numberOfMedia = params.numberOfMedia ?? 1;
   const config = getVideoModelConfig(modelId);
+  const frameMode = params.frameMode ?? 'first';
+  const isLastFrameMode = frameMode === 'last';
 
   const { width, height } = calculateVideoDimensions(srcWidth, srcHeight, params.targetResolution, modelId, params.aspectRatio);
   const frames = calculateVideoFrames(duration, modelId);
@@ -78,6 +85,7 @@ export async function generateVideo(
     model: config.model,
     modelId,
     numberOfMedia,
+    frameMode,
   });
 
   // Convert Uint8Array to Blob for SDK referenceImage param
@@ -101,7 +109,9 @@ export async function generateVideo(
     sampler: config.sampler,
     scheduler: config.scheduler,
     seed: -1,
-    referenceImage: referenceImageBlob,
+    ...(isLastFrameMode
+      ? { referenceImageEnd: referenceImageBlob }
+      : { referenceImage: referenceImageBlob }),
     tokenType,
     disableNSFWFilter: !!params.disableNSFWFilter,
   };

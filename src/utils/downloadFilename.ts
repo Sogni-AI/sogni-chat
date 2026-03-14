@@ -23,16 +23,18 @@ export function slugify(name: string): string {
 export function buildDownloadFilename(
   originalFileName: string | undefined,
   index?: number,
-  type: 'restored' | 'original' | 'video' | 'styled' = 'restored',
+  type: 'restored' | 'original' | 'video' | 'styled' | 'audio' = 'restored',
 ): string {
-  const slug = originalFileName ? slugify(originalFileName) : 'photo';
-  const ext = type === 'video' ? 'mp4' : 'jpg';
+  const slug = originalFileName ? slugify(originalFileName) : (type === 'audio' ? 'music' : 'photo');
+  const ext = type === 'video' ? 'mp4' : type === 'audio' ? 'mp3' : 'jpg';
 
   const parts = ['sogni'];
   if (type === 'original') {
     parts.push('original');
   } else if (type === 'video') {
     parts.push('video');
+  } else if (type === 'audio') {
+    parts.push('audio');
   } else if (type === 'styled') {
     parts.push('styled');
   } else {

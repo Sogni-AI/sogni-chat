@@ -227,6 +227,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
             sourceImageUrl={message.sourceImageUrl || imageUrl || undefined}
             onImageClick={onImageClick}
             galleryImageIds={message.galleryImageIds}
+            downloadSlug={downloadSlug}
           />
           {message.modelName && (
             <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', marginTop: '0.25rem', opacity: 0.6 }}>
@@ -251,7 +252,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
       {/* Audio results */}
       {message.audioResults && message.audioResults.length > 0 && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
-          <ChatAudioResults audioUrls={message.audioResults} />
+          <ChatAudioResults audioUrls={message.audioResults} downloadSlug={downloadSlug} />
           {message.modelName && (
             <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', marginTop: '0.25rem', opacity: 0.6 }}>
               {message.modelName}

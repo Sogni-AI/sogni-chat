@@ -75,6 +75,12 @@ CONSTRAINTS (both models):
           type: 'string',
           description: ASPECT_RATIO_DESCRIPTION,
         },
+        frameMode: {
+          type: 'string',
+          enum: ['first', 'last'],
+          description:
+            'Which frame the source image anchors. "first" (default): image is the first frame — video animates forward from it. "last": image is the LAST frame — video generates motion that ends at the image (LTX 2.3 only). Use "last" when the user says "end at this image", "use as last frame", "arrive at this pose", or similar.',
+        },
       },
       required: ['prompt'],
     },

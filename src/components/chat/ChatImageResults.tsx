@@ -10,6 +10,8 @@
 import { memo, useState, useCallback, useEffect } from 'react';
 import { useGalleryBlobUrls } from '@/hooks/useGalleryBlobUrls';
 import { toggleFavorite as dbToggleFavorite, getImage } from '@/utils/galleryDB';
+import { downloadImage } from '@/utils/download';
+import { buildDownloadFilename } from '@/utils/downloadFilename';
 
 interface ChatImageResultsProps {
   urls: string[];
@@ -18,6 +20,8 @@ interface ChatImageResultsProps {
   onImageClick?: (url: string, index: number) => void;
   /** Gallery image IDs for persistent blob-based rendering (parallel to urls) */
   galleryImageIds?: string[];
+  /** Descriptive slug for download filenames (e.g. from session title) */
+  downloadSlug?: string;
 }
 
 export const ChatImageResults = memo(function ChatImageResults({
@@ -25,6 +29,7 @@ export const ChatImageResults = memo(function ChatImageResults({
   sourceImageUrl,
   onImageClick,
   galleryImageIds,
+  downloadSlug,
 }: ChatImageResultsProps) {
   // Resolve gallery IDs to blob URLs — persistent local copies that never expire
   const galleryBlobUrls = useGalleryBlobUrls(galleryImageIds);
@@ -80,6 +85,14 @@ export const ChatImageResults = memo(function ChatImageResults({
       });
     }
   }, []);
+
+  const handleDownload = useCallback((e: React.MouseEvent, url: string, index: number) => {
+    e.stopPropagation();
+    const filename = buildDownloadFilename(downloadSlug, index + 1, 'restored');
+    downloadImage(url, filename).catch((err) =>
+      console.error('[CHAT IMAGE] Download failed:', err),
+    );
+  }, [downloadSlug]);
 
   const handleLoad = (index: number) => {
     setLoadedImages((prev) => new Set([...prev, index]));
@@ -257,56 +270,110 @@ export const ChatImageResults = memo(function ChatImageResults({
               </div>
             )}
 
-            {/* Favorite heart button — visible when gallery ID is available */}
-            {galleryImageIds?.[index] && isLoaded && !isFailed && (
-              <button
-                onClick={(e) => handleToggleFavorite(e, galleryImageIds[index])}
-                aria-label={favoriteIds.has(galleryImageIds[index]) ? 'Remove from favorites' : 'Add to favorites'}
+            {/* Action buttons — top-right, visible when image loaded */}
+            {isLoaded && !isFailed && (
+              <div
                 style={{
                   position: 'absolute',
                   top: '0.375rem',
                   right: '0.375rem',
-                  background: 'rgba(0, 0, 0, 0.5)',
-                  backdropFilter: 'blur(4px)',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '28px',
-                  height: '28px',
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
+                  flexDirection: 'column',
+                  gap: '0.25rem',
                   zIndex: 3,
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(0, 0, 0, 0.7)';
-                  e.currentTarget.style.transform = 'scale(1.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(0, 0, 0, 0.5)';
-                  e.currentTarget.style.transform = 'scale(1)';
-                }}
               >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
+                {/* Favorite heart button — visible when gallery ID is available */}
+                {galleryImageIds?.[index] && (
+                  <button
+                    onClick={(e) => handleToggleFavorite(e, galleryImageIds[index])}
+                    aria-label={favoriteIds.has(galleryImageIds[index]) ? 'Remove from favorites' : 'Add to favorites'}
+                    style={{
+                      background: 'rgba(0, 0, 0, 0.5)',
+                      backdropFilter: 'blur(4px)',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '28px',
+                      height: '28px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(0, 0, 0, 0.7)';
+                      e.currentTarget.style.transform = 'scale(1.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(0, 0, 0, 0.5)';
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{
+                        color: favoriteIds.has(galleryImageIds[index]) ? 'var(--color-accent)' : 'rgba(255, 255, 255, 0.85)',
+                      }}
+                    >
+                      <path
+                        d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+                        fill={favoriteIds.has(galleryImageIds[index]) ? 'currentColor' : 'none'}
+                      />
+                    </svg>
+                  </button>
+                )}
+
+                {/* Download button */}
+                <button
+                  onClick={(e) => handleDownload(e, displayUrl, index)}
+                  aria-label="Save image"
                   style={{
-                    color: favoriteIds.has(galleryImageIds[index]) ? 'var(--color-accent)' : 'rgba(255, 255, 255, 0.85)',
+                    background: 'rgba(0, 0, 0, 0.5)',
+                    backdropFilter: 'blur(4px)',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '28px',
+                    height: '28px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(0, 0, 0, 0.7)';
+                    e.currentTarget.style.transform = 'scale(1.1)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(0, 0, 0, 0.5)';
+                    e.currentTarget.style.transform = 'scale(1)';
                   }}
                 >
-                  <path
-                    d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
-                    fill={favoriteIds.has(galleryImageIds[index]) ? 'currentColor' : 'none'}
-                  />
-                </svg>
-              </button>
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ color: 'rgba(255, 255, 255, 0.85)' }}
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                </button>
+              </div>
             )}
           </button>
         );
