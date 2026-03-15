@@ -134,7 +134,7 @@ export default function ChatPage() {
     clearPendingRestore,
   } = useChatSessions();
   const isDesktop = useMediaQuery('(min-width: 900px)');
-  const { showOutOfCreditsPopup, showSignupModal, sidebarCollapsed, toggleSidebar, setSelectedModelVariant, safeContentFilter, setSafeContentFilter } = useLayout();
+  const { showOutOfCreditsPopup, showSignupModal, sidebarCollapsed, toggleSidebar, setSelectedModelVariant, safeContentFilter, setSafeContentFilter, isLoginModalOpen } = useLayout();
   const { showToast } = useToastContext();
 
   const [resultUrls, setResultUrls] = useState<string[]>([]);
@@ -740,7 +740,7 @@ export default function ChatPage() {
             </button>
           </div>
         </main>
-        <SogniTVPreview />
+        {!isLoginModalOpen && <SogniTVPreview />}
       </>
     );
   }

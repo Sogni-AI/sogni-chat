@@ -3,6 +3,7 @@ import Turnstile from 'react-turnstile';
 import { Step1Fields, Step2Fields } from '../types';
 import { FormContent, FormFooter, FormPanel, ErrorMessage } from '../common';
 import { useSogniAuth } from '../../../../services/sogniAuth';
+import { clearReferralSource } from '@/utils/referralTracking';
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_KEY || '0x4AAAAAAAx5VThz0lTCgKRb';
 
@@ -50,6 +51,7 @@ function Step3({ step1, step2, onReturn, onContinue }: Props) {
       }
 
       setAuthenticatedState(username, email);
+      clearReferralSource();
       onContinue();
     } catch (err) {
       console.error('[AUTH] Signup failed:', err);

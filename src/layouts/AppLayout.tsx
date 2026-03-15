@@ -12,7 +12,7 @@ import { SogniTV } from '@/components/shared/SogniTV';
 import { captureReferralFromURL } from '@/utils/referralTracking';
 import { DEFAULT_VARIANT_ID } from '@/config/modelVariants';
 import { getSavedContentFilter, saveContentFilter } from '@/config/contentFilterPreset';
-import { useState, useEffect, createContext, useContext, useCallback } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, useCallback } from 'react';
 
 // Shared layout context for child pages to trigger modals and access layout state
 interface LayoutContextValue {
@@ -32,6 +32,8 @@ interface LayoutContextValue {
   safeContentFilter: boolean;
   /** Toggle the safe content filter */
   setSafeContentFilter: (enabled: boolean) => void;
+  /** Whether the login/signup modal is currently open */
+  isLoginModalOpen: boolean;
 }
 
 const LayoutContext = createContext<LayoutContextValue>({
@@ -45,6 +47,7 @@ const LayoutContext = createContext<LayoutContextValue>({
   toggleSidebar: () => {},
   safeContentFilter: true,
   setSafeContentFilter: () => {},
+  isLoginModalOpen: false,
 });
 
 export function useLayout() {
@@ -109,11 +112,14 @@ export function AppLayout() {
   }, []);
 
   // Auto-open signup modal when arriving with a referral code and not logged in
+  const referralAutoOpenDone = useRef(false);
   useEffect(() => {
     if (authLoading || isAuthenticated) return;
+    if (referralAutoOpenDone.current) return;
     const url = new URL(window.location.href);
     const hasReferralCode = url.searchParams.get('code') || url.searchParams.get('referral');
     if (hasReferralCode) {
+      referralAutoOpenDone.current = true;
       showSignupModal('signup');
     }
   }, [authLoading, isAuthenticated, showSignupModal]);
@@ -129,6 +135,7 @@ export function AppLayout() {
     toggleSidebar,
     safeContentFilter,
     setSafeContentFilter,
+    isLoginModalOpen: showSignup,
   };
 
   if (authLoading) {
