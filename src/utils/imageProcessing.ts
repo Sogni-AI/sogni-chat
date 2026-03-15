@@ -7,10 +7,27 @@
  * Scales proportionally so the longest side is at most `maxDimension` pixels,
  * converts to JPEG, and returns a base64 data URI.
  */
+/**
+ * Resize a Uint8Array image for vision analysis.
+ * Converts to a blob URL, resizes via canvas, and returns a base64 data URI.
+ */
+export async function resizeUint8ArrayForVision(
+  data: Uint8Array,
+  mimeType = 'image/jpeg',
+): Promise<string> {
+  const blob = new Blob([data.buffer as ArrayBuffer], { type: mimeType });
+  const blobUrl = URL.createObjectURL(blob);
+  try {
+    return await resizeImageForVision(blobUrl);
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
+}
+
 export async function resizeImageForVision(
   imageUrl: string,
   maxDimension: number = 1024,
-  quality: number = 0.85,
+  quality: number = 0.92,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();

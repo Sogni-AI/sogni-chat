@@ -14,6 +14,7 @@ import type { SogniClient } from '@sogni-ai/sogni-client';
 import type { ChatMessage } from '@sogni-ai/sogni-client';
 import type { ToolExecutionContext, ToolCallbacks } from '../types';
 import type { TokenType } from '@/types/wallet';
+import { resizeUint8ArrayForVision } from '@/utils/imageProcessing';
 import {
   fetchImageAsUint8Array,
   preflightCreditCheck,
@@ -27,7 +28,6 @@ import {
   stripThinkBlocks,
   LLM_SUBCALL_TIMEOUT_MS,
   LLM_THINKING_TIMEOUT_MS,
-  uint8ArrayToDataUri,
   needsCreativeRefinement,
   refineVideoPrompt,
 } from '../shared';
@@ -59,7 +59,7 @@ async function describeImageForVideo(
   tokenType: TokenType,
 ): Promise<string> {
   try {
-    const dataUri = uint8ArrayToDataUri(imageData);
+    const dataUri = await resizeUint8ArrayForVision(imageData);
 
     const messages: ChatMessage[] = [
       { role: 'system', content: VIDEO_DESCRIBE_SYSTEM_PROMPT },

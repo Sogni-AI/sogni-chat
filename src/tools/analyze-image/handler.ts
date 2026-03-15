@@ -8,8 +8,8 @@ import type { ToolExecutionContext, ToolCallbacks } from '../types';
 import {
   fetchImageAsUint8Array,
   stripThinkBlocks,
-  uint8ArrayToDataUri,
 } from '../shared';
+import { resizeUint8ArrayForVision } from '@/utils/imageProcessing';
 import { CHAT_MODEL } from '@/config/chat';
 
 // System prompts per analysis type
@@ -128,7 +128,7 @@ export async function execute(
     stepLabel: analysisType === 'compare' ? 'Comparing images...' : 'Analyzing image...',
   });
 
-  const dataUri = uint8ArrayToDataUri(imageData);
+  const dataUri = await resizeUint8ArrayForVision(imageData);
   const systemPrompt = SYSTEM_PROMPTS[analysisType] || SYSTEM_PROMPTS.general;
   const detailedSuffix = detailed ? ' Provide an extremely thorough and detailed analysis.' : '';
 
@@ -138,7 +138,7 @@ export async function execute(
   ];
 
   if (compareImageData) {
-    const compareDataUri = uint8ArrayToDataUri(compareImageData);
+    const compareDataUri = await resizeUint8ArrayForVision(compareImageData);
     userContent.push({ type: 'image_url', image_url: { url: compareDataUri } });
   }
 
