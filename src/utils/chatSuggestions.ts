@@ -18,7 +18,8 @@ type ChatToolName =
   | 'sound_to_video'
   | 'video_to_video'
   | 'generate_music'
-  | 'analyze_image';
+  | 'analyze_image'
+  | 'extract_metadata';
 
 /** A suggestion chip with display label and prompt text sent on click */
 export interface Suggestion {
@@ -113,6 +114,11 @@ const SUGGESTIONS_BY_TOOL: Record<ChatToolName, Suggestion[]> = {
     { label: 'Read the text', prompt: 'Extract all visible text from this image' },
     { label: 'Edit based on analysis', prompt: 'Edit this image to improve it' },
     { label: 'Generate something similar', prompt: 'Generate a new image inspired by this one' },
+  ],
+  extract_metadata: [
+    { label: 'Generate a new version', prompt: 'Generate a new version of this image using the extracted settings' },
+    { label: 'Different prompt, same settings', prompt: 'Use these generation settings but with a different prompt' },
+    { label: 'What model was used?', prompt: 'What model was used to generate this?' },
   ],
 };
 

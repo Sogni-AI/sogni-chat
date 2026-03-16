@@ -19,6 +19,7 @@ class ToolRegistry {
     video_to_video: 660_000,
     generate_video: 300_000,
     animate_photo: 300_000,
+    extract_metadata: 60_000,
   };
 
   /** Register a tool handler */

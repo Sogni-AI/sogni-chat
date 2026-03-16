@@ -27,6 +27,9 @@ import './analyze-image';
 // Settings tools
 import './set-content-filter';
 
+// Metadata extraction
+import './extract-metadata';
+
 export { toolRegistry } from './registry';
 export type {
   ToolHandler,

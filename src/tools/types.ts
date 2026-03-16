@@ -65,7 +65,7 @@ export interface ToolExecutionContext {
 // Tool names
 // ---------------------------------------------------------------------------
 
-/** Tool name union — expanded from original 5 to 12 tools */
+/** Tool name union — expanded from original 5 to 14 tools */
 export type ToolName =
   | 'restore_photo'
   | 'apply_style'
@@ -79,7 +79,8 @@ export type ToolName =
   | 'video_to_video'
   | 'generate_music'
   | 'analyze_image'
-  | 'set_content_filter';
+  | 'set_content_filter'
+  | 'extract_metadata';
 
 // ---------------------------------------------------------------------------
 // Progress & callbacks
