@@ -251,6 +251,24 @@ export const ChatInput = memo(function ChatInput({
     [onAddMediaFile],
   );
 
+  const handlePaste = useCallback(
+    async (e: React.ClipboardEvent) => {
+      if (!onAddMediaFile || disabled || isMediaUploading) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) await onAddMediaFile(file);
+          return; // one image per paste
+        }
+      }
+    },
+    [onAddMediaFile, disabled, isMediaUploading],
+  );
+
   const hasFiles = uploadedFiles && uploadedFiles.length > 0;
   const canSendNow = !disabled && value.trim().length > 0;
 
@@ -366,6 +384,7 @@ export const ChatInput = memo(function ChatInput({
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder={placeholder}
             disabled={disabled}
             rows={1}
