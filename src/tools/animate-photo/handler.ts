@@ -269,7 +269,7 @@ export async function execute(
     totalCount: numberOfMedia,
     estimatedCost,
     sourceImageUrl,
-    stepLabel: 'Starting generation',
+    stepLabel: 'Generating video',
     videoAspectRatio,
     modelName: mediaLabel,
   });
