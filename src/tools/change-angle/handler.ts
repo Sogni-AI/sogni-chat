@@ -91,6 +91,7 @@ export async function execute(
     totalCount: 1,
     estimatedCost,
     sourceImageUrl,
+    modelName: `Qwen Image Edit 2511${qualityTier === 'fast' ? ' Lightning' : ''} — ${sourceWidth}x${sourceHeight}`,
   });
 
   const billingId = estimatedCost > 0

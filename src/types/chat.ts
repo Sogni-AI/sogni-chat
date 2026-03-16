@@ -17,6 +17,10 @@ export interface UIChatMessage {
   audioResults?: string[];
   toolProgress?: ToolExecutionProgress | null;
   isStreaming?: boolean;
+  /** Streaming status text (e.g. "Thinking...") — transient, cleared after streaming */
+  streamingStatus?: string;
+  /** Chat model variant label (e.g. "Sogni Agent · Auto") — transient */
+  chatModelLabel?: string;
   lastCompletedTool?: string;
   uploadedImageUrl?: string;
   /** Multiple uploaded image preview URLs (for multi-image sessions) */

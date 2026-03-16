@@ -127,6 +127,8 @@ function cleanForStorage(messages: UIChatMessage[]): UIChatMessage[] {
     ...msg,
     toolProgress: undefined,
     isStreaming: undefined,
+    streamingStatus: undefined,
+    chatModelLabel: undefined,
     uploadedImageUrl: undefined,
     uploadedImageUrls: undefined,
   }));
@@ -410,6 +412,13 @@ export function useChat(): UseChatResult {
         setIsSending(true);
         setIsLoading(true);
 
+        // Determine model from variant (user dropdown) or session override (abliterated fallback)
+        const variant = context.modelVariantId ? getVariantById(context.modelVariantId) : undefined;
+        const effectiveModel = sessionModelRef.current
+          || (variant ? variant.modelId : undefined);
+        const effectiveThink = variant?.think;
+        const chatModelLabel = `Sogni Agent · ${variant?.menuLabel || 'Auto'}`;
+
         // Each request tracks its own streaming message ID
         const localStreamingId: { current: string | null } = {
           current: `assistant-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -422,6 +431,8 @@ export function useChat(): UseChatResult {
             content: '',
             timestamp: Date.now(),
             isStreaming: true,
+            streamingStatus: 'Thinking...',
+            chatModelLabel,
           },
         ]);
 
@@ -431,12 +442,6 @@ export function useChat(): UseChatResult {
         const toolAbortController = new AbortController();
         const controllersSet = toolAbortControllersRef.current;
         controllersSet.add(toolAbortController);
-
-        // Determine model from variant (user dropdown) or session override (abliterated fallback)
-        const variant = context.modelVariantId ? getVariantById(context.modelVariantId) : undefined;
-        const effectiveModel = sessionModelRef.current
-          || (variant ? variant.modelId : undefined);
-        const effectiveThink = variant?.think;
 
         const executionContext: ToolExecutionContext = {
           sogniClient: context.sogniClient,
@@ -475,7 +480,7 @@ export function useChat(): UseChatResult {
                 setUIMessages((prev) =>
                   prev.map((msg) =>
                     msg.id === targetId
-                      ? { ...msg, content: currentContent }
+                      ? { ...msg, content: currentContent, streamingStatus: undefined }
                       : msg,
                   ),
                 );
@@ -691,6 +696,8 @@ export function useChat(): UseChatResult {
                     timestamp: Date.now(),
                     isStreaming: true,
                     lastCompletedTool: toolName,
+                    streamingStatus: 'Thinking...',
+                    chatModelLabel,
                   },
                 ]);
               },

@@ -54,15 +54,15 @@ export async function execute(
     sourceWidth, sourceHeight, { scale, aspectRatio },
   );
 
-  // Refine always uses 'fast' preset
+  const qualityTier = context.qualityTier || 'fast';
   const originalToken = context.tokenType;
-  let estimatedCost = await fetchRestorationCostEstimate(context.sogniClient, context.tokenType, numberOfMedia, 'fast');
+  let estimatedCost = await fetchRestorationCostEstimate(context.sogniClient, context.tokenType, numberOfMedia, qualityTier);
 
   // Pre-flight credit check before creating placeholders
   const preflight = preflightCreditCheck(context, estimatedCost);
   if (!preflight.ok) return preflight.errorJson;
   if (context.tokenType !== originalToken) {
-    estimatedCost = await fetchRestorationCostEstimate(context.sogniClient, context.tokenType, numberOfMedia, 'fast');
+    estimatedCost = await fetchRestorationCostEstimate(context.sogniClient, context.tokenType, numberOfMedia, qualityTier);
   }
 
   const sourceImageUrl = context.resultUrls[sourceIndex];
@@ -73,6 +73,7 @@ export async function execute(
     totalCount: numberOfMedia,
     estimatedCost,
     sourceImageUrl,
+    modelName: `Qwen Image Edit 2511${qualityTier === 'fast' ? ' Lightning' : ''} — ${outputWidth}x${outputHeight}`,
   });
 
   const billingId = estimatedCost > 0
@@ -90,6 +91,7 @@ export async function execute(
           tokenType,
           customPrompt: prompt,
           numberOfMedia,
+          qualityTier,
         },
         (progress) => {
           if (progress.type === 'progress' || progress.type === 'completed') {

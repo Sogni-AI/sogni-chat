@@ -27,6 +27,7 @@ export async function execute(
   const sourceIndex = args.sourceImageIndex as number | undefined;
   const scale = (args.scale as number) || 1;
   const aspectRatio = args.aspectRatio as string | undefined;
+  const qualityTier = context.qualityTier || 'fast';
 
   if (!context.imageData && context.resultUrls.length === 0) {
     return JSON.stringify({ error: 'no_image', message: 'Please upload or generate an image first.' });
@@ -65,13 +66,13 @@ export async function execute(
   );
 
   const originalToken = context.tokenType;
-  let estimatedCost = await fetchRestorationCostEstimate(context.sogniClient, context.tokenType, 1, 'fast');
+  let estimatedCost = await fetchRestorationCostEstimate(context.sogniClient, context.tokenType, 1, qualityTier);
 
   // Pre-flight credit check before creating placeholders
   const preflight = preflightCreditCheck(context, estimatedCost);
   if (!preflight.ok) return preflight.errorJson;
   if (context.tokenType !== originalToken) {
-    estimatedCost = await fetchRestorationCostEstimate(context.sogniClient, context.tokenType, 1, 'fast');
+    estimatedCost = await fetchRestorationCostEstimate(context.sogniClient, context.tokenType, 1, qualityTier);
   }
 
   const sourceImageUrl = (sourceIndex !== undefined && context.resultUrls[sourceIndex]) || undefined;
@@ -82,6 +83,7 @@ export async function execute(
     totalCount: 1,
     estimatedCost,
     sourceImageUrl,
+    modelName: `Qwen Image Edit 2511${qualityTier === 'fast' ? ' Lightning' : ''} — ${outputWidth}x${outputHeight}`,
   });
 
   const billingId = estimatedCost > 0
@@ -98,6 +100,7 @@ export async function execute(
           height: outputHeight,
           tokenType,
           stylePrompt: prompt,
+          qualityTier,
         },
         (progress) => {
           callbacks.onToolProgress({

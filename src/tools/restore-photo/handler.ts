@@ -51,6 +51,7 @@ export async function execute(
     toolName: 'restore_photo',
     totalCount: numberOfMedia,
     estimatedCost,
+    modelName: `Qwen Image Edit 2511${qualityTier === 'fast' ? ' Lightning' : ''} — ${outputWidth}x${outputHeight}`,
   });
 
   const billingId = estimatedCost > 0

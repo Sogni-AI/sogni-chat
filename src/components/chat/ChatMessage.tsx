@@ -143,7 +143,26 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
                 </ReactMarkdown>
               )}
               {message.isStreaming && !message.toolProgress && (
-                <span className="chat-streaming-cursor" />
+                hasVisibleContent ? (
+                  <span className="chat-streaming-cursor" />
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div
+                      className="animate-spin"
+                      style={{
+                        width: '0.75rem',
+                        height: '0.75rem',
+                        border: '2px solid rgba(142, 142, 142, 0.3)',
+                        borderTopColor: '#8e8e8e',
+                        borderRadius: '50%',
+                        flexShrink: 0,
+                      }}
+                    />
+                    <span style={{ fontSize: '0.8125rem', color: '#8e8e8e' }}>
+                      {message.streamingStatus || 'Thinking...'}
+                    </span>
+                  </div>
+                )
               )}
             </>
           ) : (
@@ -154,6 +173,13 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* Chat model label during streaming */}
+      {isAssistant && message.isStreaming && message.chatModelLabel && (
+        <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', opacity: 0.6 }}>
+          {message.chatModelLabel}
         </div>
       )}
 

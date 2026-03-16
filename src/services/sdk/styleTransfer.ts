@@ -4,6 +4,7 @@
  */
 import { SogniClient } from '@sogni-ai/sogni-client';
 import { TokenType } from '@/types/wallet';
+import { QUALITY_PRESETS, type QualityTier } from '@/config/qualityPresets';
 
 interface StyleTransferParams {
   imageData: Uint8Array;
@@ -12,6 +13,7 @@ interface StyleTransferParams {
   tokenType: TokenType;
   stylePrompt: string;
   outputFormat?: 'jpg' | 'png';
+  qualityTier?: QualityTier;
 }
 
 interface StyleTransferProgress {
@@ -37,19 +39,23 @@ export async function applyStyle(
     height,
     tokenType,
     stylePrompt,
-    outputFormat = 'jpg'
+    outputFormat = 'jpg',
+    qualityTier = 'fast',
   } = params;
 
   if (signal?.aborted) {
     throw new Error('CANCELLED');
   }
 
+  const preset = QUALITY_PRESETS[qualityTier];
+
   console.log('[STYLE SERVICE] Starting style transfer...', {
     imageDataSize: imageData.length,
     width,
     height,
     tokenType,
-    stylePrompt
+    stylePrompt,
+    qualityTier,
   });
 
   // Create project with Qwen Image Edit model (same as restoration)
@@ -57,15 +63,15 @@ export async function applyStyle(
     type: 'image',
     testnet: false,
     tokenType: tokenType,
-    modelId: 'qwen_image_edit_2511_fp8_lightning',
+    modelId: preset.model,
     positivePrompt: stylePrompt,
     negativePrompt: '',
     stylePrompt: '',
     sizePreset: 'custom',
     width,
     height,
-    steps: 5,
-    guidance: 1,
+    steps: preset.steps,
+    guidance: preset.guidance,
     numberOfMedia: 1, // Single variation for style transfer
     outputFormat,
     disableNSFWFilter: true,
