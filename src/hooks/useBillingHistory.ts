@@ -11,7 +11,8 @@ import {
   subscribeToChanges,
   aggregateRecords,
   getAllBillingRecords,
-  clearBillingHistory
+  clearBillingHistory,
+  tokenToUSD
 } from '../services/billingHistoryService';
 
 interface UseBillingHistoryResult {
@@ -40,7 +41,7 @@ export function useBillingHistory(): UseBillingHistoryResult {
       for (const r of records) {
         if (r.tokenType === 'spark') totalSpark += r.costToken;
         else totalSogni += r.costToken;
-        totalUSD += r.costUSD;
+        totalUSD += tokenToUSD(r.costToken, r.tokenType);
       }
       setSummary({ totalSpark, totalSogni, totalUSD, recordCount: records.length });
 

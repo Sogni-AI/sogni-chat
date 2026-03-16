@@ -14,6 +14,16 @@ import { v4 as uuidv4 } from 'uuid';
 import type { BillingRecord, BillingLineItem, BillingJobType } from '@/types/billing';
 import { addBillingRecord, getAllBillingRecords, clearBillingHistory as clearDB } from './billingHistoryDB';
 
+/** Fixed USD rate per Spark token */
+export const SPARK_USD_RATE = 0.005;
+
+/** Convert a token amount to USD based on token type */
+export function tokenToUSD(amount: number, tokenType: 'spark' | 'sogni'): number {
+  if (tokenType === 'spark') return amount * SPARK_USD_RATE;
+  // SOGNI tokens — no fixed rate available yet
+  return 0;
+}
+
 /** Metadata attached to a pending cost entry */
 interface PendingCostMetadata {
   type: BillingJobType;
@@ -83,7 +93,7 @@ export function registerPendingCost(
   if (typeof toolNameOrCostToken === 'string') {
     pendingCosts.set(correlationId, {
       costToken: estimatedCostOrCostUSD,
-      costUSD: 0,
+      costUSD: tokenToUSD(estimatedCostOrCostUSD, tokenType),
       tokenType,
       metadata: metadata ?? { type: toolToBillingType[toolNameOrCostToken] ?? 'restoration' },
       createdAt: Date.now(),
@@ -162,12 +172,14 @@ export function aggregateRecords(records: BillingRecord[]): BillingLineItem[] {
     const first = currentGroup[0];
     const last = currentGroup[currentGroup.length - 1];
 
+    const totalCostToken = currentGroup.reduce((sum, r) => sum + r.costToken, 0);
+
     lineItems.push({
       id: first.id,
       type: first.type,
       tokenType: first.tokenType,
-      totalCostToken: currentGroup.reduce((sum, r) => sum + r.costToken, 0),
-      totalCostUSD: currentGroup.reduce((sum, r) => sum + r.costUSD, 0),
+      totalCostToken,
+      totalCostUSD: tokenToUSD(totalCostToken, first.tokenType),
       itemCount: currentGroup.length,
       timestamp: last.timestamp,
       quality: first.quality
