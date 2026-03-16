@@ -203,12 +203,16 @@ export const ChatInput = memo(function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-resize textarea
+  // Auto-resize textarea and manage overflow
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
     textarea.style.height = 'auto';
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 160)}px`;
+    const scrollH = textarea.scrollHeight;
+    const capped = Math.min(scrollH, 160);
+    textarea.style.height = `${capped}px`;
+    // Only allow scrolling when content exceeds max height
+    textarea.style.overflowY = scrollH > 160 ? 'auto' : 'hidden';
   }, [value]);
 
   const handleSend = useCallback(() => {
@@ -308,7 +312,7 @@ export const ChatInput = memo(function ChatInput({
             background: '#2f2f2f',
             borderRadius: 'var(--radius-pill)',
             border: '1px solid rgba(255, 255, 255, 0.08)',
-            padding: '0.5rem 0.75rem',
+            padding: '0.375rem 0.75rem',
             transition: 'border-color 0.2s',
           }}
         >
@@ -371,7 +375,7 @@ export const ChatInput = memo(function ChatInput({
               resize: 'none',
               border: 'none',
               borderRadius: 0,
-              padding: '0.375rem 0.5rem',
+              padding: '0.3rem 0.5rem',
               fontSize: '0.9375rem',
               lineHeight: '1.5',
               fontFamily: 'var(--font-primary)',
@@ -379,7 +383,7 @@ export const ChatInput = memo(function ChatInput({
               background: 'transparent',
               outline: 'none',
               maxHeight: '160px',
-              overflow: 'auto',
+              overflowY: 'hidden',
               opacity: disabled ? 0.5 : 1,
             }}
           />
