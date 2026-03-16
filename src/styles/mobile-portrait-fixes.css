@@ -32,11 +32,11 @@
     padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 
-  /* Prevent text size adjustment on iOS */
+  /* Prevent iOS auto-zoom on focus (requires >= 16px) */
   input,
   textarea,
   select {
-    font-size: 16px;
+    font-size: 16px !important;
   }
 }
 

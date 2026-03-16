@@ -257,12 +257,20 @@ export const ChatInput = memo(function ChatInput({
       const items = e.clipboardData?.items;
       if (!items) return;
 
+      // Collect all image files from the clipboard before processing,
+      // since clipboard items can become invalid after async operations.
+      const imageFiles: File[] = [];
       for (const item of items) {
         if (item.type.startsWith('image/')) {
-          e.preventDefault();
           const file = item.getAsFile();
-          if (file) await onAddMediaFile(file);
-          return; // one image per paste
+          if (file) imageFiles.push(file);
+        }
+      }
+
+      if (imageFiles.length > 0) {
+        e.preventDefault();
+        for (const file of imageFiles) {
+          await onAddMediaFile(file);
         }
       }
     },
@@ -381,6 +389,7 @@ export const ChatInput = memo(function ChatInput({
 
           <textarea
             ref={textareaRef}
+            className="chat-input-textarea"
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -395,6 +404,7 @@ export const ChatInput = memo(function ChatInput({
               border: 'none',
               borderRadius: 0,
               padding: '0.3rem 0.5rem',
+              margin: 0,
               fontSize: '0.9375rem',
               lineHeight: '1.5',
               fontFamily: 'var(--font-primary)',
@@ -404,6 +414,7 @@ export const ChatInput = memo(function ChatInput({
               maxHeight: '160px',
               overflowY: 'hidden',
               opacity: disabled ? 0.5 : 1,
+              WebkitAppearance: 'none',
             }}
           />
 
