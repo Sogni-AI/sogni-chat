@@ -2,7 +2,20 @@
 .chat-input-textarea {
   -webkit-appearance: none;
   appearance: none;
+  box-sizing: border-box;
+}
+
+/* Normalize placeholder line-height on iOS WebKit */
+.chat-input-textarea::placeholder {
+  line-height: inherit;
   vertical-align: top;
+  overflow: hidden;
+}
+
+.chat-input-textarea::-webkit-input-placeholder {
+  line-height: inherit;
+  vertical-align: top;
+  overflow: hidden;
 }
 
 /* Markdown paragraph spacing — collapse margin on last paragraph */

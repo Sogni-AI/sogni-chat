@@ -333,7 +333,7 @@ export const ChatInput = memo(function ChatInput({
         <div
           style={{
             display: 'flex',
-            alignItems: 'flex-end',
+            alignItems: 'center',
             gap: '0',
             background: '#2f2f2f',
             borderRadius: 'var(--radius-pill)',
@@ -360,6 +360,7 @@ export const ChatInput = memo(function ChatInput({
               title="Attach audio, video, or image file"
               style={{
                 flexShrink: 0,
+                alignSelf: 'flex-end',
                 width: '2rem',
                 height: '2rem',
                 borderRadius: '50%',
@@ -424,6 +425,7 @@ export const ChatInput = memo(function ChatInput({
             disabled={!canSendNow}
             style={{
               flexShrink: 0,
+              alignSelf: 'flex-end',
               width: '2rem',
               height: '2rem',
               borderRadius: '50%',
