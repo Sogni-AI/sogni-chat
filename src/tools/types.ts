@@ -125,7 +125,7 @@ export interface ToolCallbacks {
   onToolProgress: (progress: ToolExecutionProgress) => void;
   onToolComplete: (toolName: ToolName, resultUrls: string[], videoResultUrls?: string[]) => void;
   onInsufficientCredits?: () => void;
-  onGallerySaved?: (galleryImageIds: string[], galleryVideoIds: string[]) => void;
+  onGallerySaved?: (galleryImageIds: string[], galleryVideoIds: string[], galleryAudioIds?: string[]) => void;
 }
 
 // ---------------------------------------------------------------------------
