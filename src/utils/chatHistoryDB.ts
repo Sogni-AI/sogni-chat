@@ -89,10 +89,13 @@ export async function updateSessionMessages(
   const updatedMessages = updater(session.uiMessages);
   const allImageUrls = updatedMessages.flatMap(m => m.imageResults || []);
   const allResultUrls = [...new Set([...session.allResultUrls, ...allImageUrls])];
+  const allAudioUrls = updatedMessages.flatMap(m => m.audioResults || []);
+  const audioResultUrls = [...new Set([...(session.audioResultUrls || []), ...allAudioUrls])];
   const updated: ChatSession = {
     ...session,
     uiMessages: updatedMessages,
     allResultUrls,
+    audioResultUrls,
     updatedAt: Date.now(),
   };
   await saveSession(updated);

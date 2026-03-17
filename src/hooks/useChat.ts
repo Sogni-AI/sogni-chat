@@ -1260,6 +1260,9 @@ export function useChat(): UseChatResult {
               );
               projectSessionMap.remove(project.id);
             });
+            sdkProject.on('failed', () => {
+              projectSessionMap.remove(project.id);
+            });
           }
         }
       }
