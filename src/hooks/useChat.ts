@@ -710,6 +710,7 @@ export function useChat(): UseChatResult {
                       videoAspectRatio: vidAR || undefined,
                       modelName: mdlName || undefined,
                       toolModelKey,
+                      lastCompletedTool: toolName,
                     };
                   }),
                 );
