@@ -16,6 +16,7 @@ import {
 import type { TokenType } from '@/types/wallet';
 import { AUDIO_MODELS } from '@/constants/audioSettings';
 import { fetchAudioCostEstimate } from '@/services/creditsService';
+import { saveAudioToGallery } from '@/services/galleryService';
 
 // ---------------------------------------------------------------------------
 // Main handler
@@ -99,6 +100,20 @@ export async function execute(
 
     // Music results are passed as regular resultUrls (audio type)
     callbacks.onToolComplete('generate_music', audioUrls);
+
+    // Save each audio track to gallery (fire-and-forget)
+    for (const audioUrl of audioUrls) {
+      saveAudioToGallery({
+        audioUrl,
+        prompt,
+        duration,
+        modelKey,
+      }).then(({ galleryImageId }) => {
+        callbacks.onGallerySaved?.([], [], [galleryImageId]);
+      }).catch(err => {
+        console.error('[MUSIC] Failed to save audio to gallery:', err);
+      });
+    }
 
     return JSON.stringify({
       success: true,

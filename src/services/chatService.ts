@@ -41,7 +41,7 @@ export interface ChatStreamCallbacks {
   /** Called when the model's response is detected as a refusal (finishReason 'stop' + refusal patterns) */
   onModelRefusal?: (refusedContent: string) => void;
   /** Called after a gallery save completes, providing gallery IDs for persistent rendering */
-  onGallerySaved?: (galleryImageIds: string[], galleryVideoIds: string[]) => void;
+  onGallerySaved?: (galleryImageIds: string[], galleryVideoIds: string[], galleryAudioIds?: string[]) => void;
 }
 
 // ---------------------------------------------------------------------------
