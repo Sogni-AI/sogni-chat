@@ -129,10 +129,12 @@ Return ONLY the refined prompt. No explanation, no commentary, no preamble.`,
 
     let refined = '';
     let insideThink = false;
+    let insideToolCall = false;
     for await (const chunk of stream) {
       if (chunk.content) {
-        const { cleaned, insideThink: still } = stripThinkBlocks(chunk.content, insideThink);
-        insideThink = still;
+        const { cleaned, insideThink: stillThink, insideToolCall: stillToolCall } = stripThinkBlocks(chunk.content, insideThink, insideToolCall);
+        insideThink = stillThink;
+        insideToolCall = stillToolCall;
         if (cleaned) refined += cleaned;
       }
     }

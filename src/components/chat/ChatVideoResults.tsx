@@ -9,6 +9,7 @@ import { downloadImage } from '@/utils/download';
 import { buildDownloadFilename } from '@/utils/downloadFilename';
 import { useGalleryBlobUrls } from '@/hooks/useGalleryBlobUrls';
 import { activeVideos, pauseOtherVideos } from './videoCoordination';
+import { isMobile } from '@/utils/mobileDownload';
 
 /** Individual video player that pauses all other chat videos when it starts playing.
  *  Hides the native player until the first frame is ready to prevent the
@@ -106,7 +107,7 @@ function ChatVideoPlayer({ src, onError, aspectRatio, fillWidth, autoPlay = true
         autoPlay={autoPlay}
         controls
         loop
-        playsInline
+        playsInline={!isMobile()}
         preload={autoPlay ? 'auto' : 'metadata'}
         onLoadedMetadata={() => { if (!autoPlay) setReady(true); }}
         onLoadedData={() => setReady(true)}
