@@ -1,6 +1,6 @@
 /**
  * 3-dot actions menu for generated media results.
- * Shows "Branch in new chat" and "Retry" options with model switching.
+ * Shows Save, Favorite, "Branch in new chat" and "Retry" options with model switching.
  *
  * Mobile-first: on narrow viewports the retry submenu expands inline
  * instead of flying out to the right (which would overflow the screen).
@@ -10,20 +10,36 @@ import { memo, useState, useCallback, useEffect, useRef } from 'react';
 import type { UIChatMessage } from '@/types/chat';
 import { getModelOptions } from '@/tools/shared/modelRegistry';
 import type { ModelOption } from '@/tools/shared/modelRegistry';
+import { downloadImage } from '@/utils/download';
+import { buildDownloadFilename } from '@/utils/downloadFilename';
+import { useGalleryBlobUrls } from '@/hooks/useGalleryBlobUrls';
+import { toggleFavorite as dbToggleFavorite, getImage } from '@/utils/galleryDB';
 
 /** Breakpoint below which we use inline submenu instead of flyout */
 const MOBILE_BREAKPOINT = 744;
 
 interface MediaActionsMenuProps {
   message: UIChatMessage;
-  onBranchChat: (message: UIChatMessage) => void;
-  onRetry: (message: UIChatMessage, modelKey?: string) => void;
+  onBranchChat?: (message: UIChatMessage) => void;
+  onRetry?: (message: UIChatMessage, modelKey?: string) => void;
+  /** Type of media being displayed */
+  mediaType?: 'image' | 'video' | 'audio';
+  /** URLs of the media results */
+  mediaUrls?: string[];
+  /** Gallery image IDs for favorite toggle and persistent blob downloads */
+  galleryImageIds?: string[];
+  /** Descriptive slug for download filenames */
+  downloadSlug?: string;
 }
 
 export const MediaActionsMenu = memo(function MediaActionsMenu({
   message,
   onBranchChat,
   onRetry,
+  mediaType,
+  mediaUrls,
+  galleryImageIds,
+  downloadSlug,
 }: MediaActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const [showRetrySubmenu, setShowRetrySubmenu] = useState(false);
@@ -37,6 +53,96 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
   const allModels = toolName ? getModelOptions(toolName) : [];
   const hasModelOptions = allModels.length > 1;
   const hasToolArgs = !!message.toolArgs && !!toolName;
+
+  // --- Download / Favorite support ---
+  // Resolve gallery blob URLs for persistent image downloads
+  const galleryBlobUrls = useGalleryBlobUrls(
+    mediaType === 'image' ? galleryImageIds : undefined,
+  );
+  const hasGalleryIds = !!galleryImageIds && galleryImageIds.length > 0;
+
+  // Track favorite state for gallery images
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
+  const allFavorited = hasGalleryIds && galleryImageIds!.every(id => favoriteIds.has(id));
+
+  // Load favorite state when gallery IDs are available
+  useEffect(() => {
+    if (!hasGalleryIds) return;
+    let cancelled = false;
+    const loadFavorites = async () => {
+      const favs = new Set<string>();
+      for (const id of galleryImageIds!) {
+        try {
+          const img = await getImage(id);
+          if (img?.isFavorite) favs.add(id);
+        } catch { /* ignore */ }
+      }
+      if (!cancelled) setFavoriteIds(favs);
+    };
+    loadFavorites();
+    return () => { cancelled = true; };
+  }, [galleryImageIds, hasGalleryIds]);
+
+  // Save label based on media type and count
+  const saveLabel = (() => {
+    if (!mediaUrls?.length) return 'Save';
+    if (mediaUrls.length === 1) {
+      return mediaType === 'video' ? 'Save video' : mediaType === 'audio' ? 'Save audio' : 'Save image';
+    }
+    return mediaType === 'video' ? 'Save all videos' : mediaType === 'audio' ? 'Save all tracks' : 'Save all images';
+  })();
+
+  const handleDownload = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!mediaUrls?.length) return;
+    setOpen(false);
+    mediaUrls.forEach((url, index) => {
+      const displayUrl = (mediaType === 'image' ? galleryBlobUrls.get(index) : undefined) || url;
+      const filenameType = mediaType === 'video' ? 'video' : mediaType === 'audio' ? 'audio' : 'restored';
+      const filename = buildDownloadFilename(
+        downloadSlug,
+        mediaUrls.length > 1 ? index + 1 : undefined,
+        filenameType,
+      );
+      // Stagger downloads to avoid overwhelming the browser
+      setTimeout(() => {
+        downloadImage(displayUrl, filename).catch(err =>
+          console.error('[MEDIA MENU] Download failed:', err),
+        );
+      }, index * 300);
+    });
+  }, [mediaUrls, mediaType, galleryBlobUrls, downloadSlug]);
+
+  const handleToggleFavorite = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!galleryImageIds?.length) return;
+    setOpen(false);
+
+    const shouldFavorite = !allFavorited;
+    // Optimistic update
+    setFavoriteIds(prev => {
+      const next = new Set(prev);
+      for (const id of galleryImageIds) {
+        shouldFavorite ? next.add(id) : next.delete(id);
+      }
+      return next;
+    });
+
+    // Persist — only toggle images that need to change
+    for (const id of galleryImageIds) {
+      const currentlyFavorited = favoriteIds.has(id);
+      if (currentlyFavorited !== shouldFavorite) {
+        try {
+          const newVal = await dbToggleFavorite(id);
+          setFavoriteIds(prev => {
+            const next = new Set(prev);
+            newVal ? next.add(id) : next.delete(id);
+            return next;
+          });
+        } catch { /* ignore */ }
+      }
+    }
+  }, [galleryImageIds, allFavorited, favoriteIds]);
 
   // Track viewport width for mobile vs desktop layout
   useEffect(() => {
@@ -80,21 +186,21 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
   const handleBranch = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     setOpen(false);
-    onBranchChat(message);
+    onBranchChat?.(message);
   }, [message, onBranchChat]);
 
   const handleTryAgain = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     setOpen(false);
     setShowRetrySubmenu(false);
-    onRetry(message);
+    onRetry?.(message);
   }, [message, onRetry]);
 
   const handleSwitchModel = useCallback((e: React.MouseEvent, modelKey: string) => {
     e.stopPropagation();
     setOpen(false);
     setShowRetrySubmenu(false);
-    onRetry(message, modelKey);
+    onRetry?.(message, modelKey);
   }, [message, onRetry]);
 
   const toggleRetrySubmenu = useCallback((e: React.MouseEvent) => {
@@ -160,18 +266,52 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
             padding: '4px 0',
           }}
         >
+          {/* Save / Download */}
+          {mediaUrls && mediaUrls.length > 0 && (
+            <MenuItem
+              icon={<DownloadIcon />}
+              label={saveLabel}
+              onClick={handleDownload}
+              isMobile={isMobile}
+            />
+          )}
+
+          {/* Favorite toggle — images with gallery IDs only */}
+          {hasGalleryIds && (
+            <MenuItem
+              icon={<HeartIcon filled={!!allFavorited} />}
+              label={
+                allFavorited
+                  ? (galleryImageIds!.length > 1 ? 'Unfavorite all' : 'Unfavorite')
+                  : (galleryImageIds!.length > 1 ? 'Favorite all' : 'Favorite')
+              }
+              onClick={handleToggleFavorite}
+              isMobile={isMobile}
+            />
+          )}
+
+          {/* Divider before Branch/Retry */}
+          {(mediaUrls?.length || hasGalleryIds) && (onBranchChat || hasToolArgs) && (
+            <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
+          )}
+
           {/* Branch in new chat */}
-          <MenuItem
-            icon={<BranchIcon />}
-            label="Branch in new chat"
-            onClick={handleBranch}
-            isMobile={isMobile}
-          />
+          {onBranchChat && (
+            <MenuItem
+              icon={<BranchIcon />}
+              label="Branch in new chat"
+              onClick={handleBranch}
+              isMobile={isMobile}
+            />
+          )}
 
           {/* Retry section — only if we have tool args */}
-          {hasToolArgs && (
+          {hasToolArgs && onRetry && (
             <>
-              <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
+              {/* Divider before retry (only if branch or save items above) */}
+              {(onBranchChat || mediaUrls?.length || hasGalleryIds) && (
+                <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
+              )}
 
               {hasModelOptions ? (
                 isMobile ? (
@@ -237,7 +377,7 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
                         style={{
                           position: 'absolute',
                           left: 'calc(100% + 4px)',
-                          top: 0,
+                          bottom: 0,
                           background: '#2a2a2a',
                           border: '1px solid rgba(255,255,255,0.12)',
                           borderRadius: '0.5rem',
@@ -411,6 +551,27 @@ function RetryIcon() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="23 4 23 10 17 10" />
       <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+    </svg>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+
+function HeartIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path
+        d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+        fill={filled ? 'currentColor' : 'none'}
+      />
     </svg>
   );
 }

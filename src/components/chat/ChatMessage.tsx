@@ -270,21 +270,24 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
               sourceImageUrl={message.sourceImageUrl || imageUrl || undefined}
               onImageClick={onImageClick}
               galleryImageIds={message.galleryImageIds}
-              downloadSlug={downloadSlug}
             />
           </LazyMedia>
-          {(onBranchChat || message.modelName) && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.25rem' }}>
-              {onBranchChat && onRetry && (
-                <MediaActionsMenu message={message} onBranchChat={onBranchChat} onRetry={onRetry} />
-              )}
-              {message.modelName && (
-                <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', opacity: 0.6 }}>
-                  {message.modelName}
-                </div>
-              )}
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.25rem' }}>
+            <MediaActionsMenu
+              message={message}
+              onBranchChat={onBranchChat}
+              onRetry={onRetry}
+              mediaType="image"
+              mediaUrls={message.imageResults}
+              galleryImageIds={message.galleryImageIds}
+              downloadSlug={downloadSlug}
+            />
+            {message.modelName && (
+              <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', opacity: 0.6 }}>
+                {message.modelName}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -292,19 +295,22 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
            the player has its own loading spinner and gallery blobs are local */}
       {message.videoResults && message.videoResults.length > 0 && !message.toolProgress && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
-          <ChatVideoResults urls={message.videoResults} galleryVideoIds={message.galleryVideoIds} downloadSlug={downloadSlug} videoAspectRatio={message.videoAspectRatio} autoPlay={!message.isFromHistory} />
-          {(onBranchChat || message.modelName) && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.25rem' }}>
-              {onBranchChat && onRetry && (
-                <MediaActionsMenu message={message} onBranchChat={onBranchChat} onRetry={onRetry} />
-              )}
-              {message.modelName && (
-                <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', opacity: 0.6 }}>
-                  {message.modelName}
-                </div>
-              )}
-            </div>
-          )}
+          <ChatVideoResults urls={message.videoResults} galleryVideoIds={message.galleryVideoIds} videoAspectRatio={message.videoAspectRatio} autoPlay={!message.isFromHistory} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.25rem' }}>
+            <MediaActionsMenu
+              message={message}
+              onBranchChat={onBranchChat}
+              onRetry={onRetry}
+              mediaType="video"
+              mediaUrls={message.videoResults}
+              downloadSlug={downloadSlug}
+            />
+            {message.modelName && (
+              <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', opacity: 0.6 }}>
+                {message.modelName}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -312,20 +318,23 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
       {message.audioResults && message.audioResults.length > 0 && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
           <LazyMedia enabled={!!message.isFromHistory} placeholderHeight={80}>
-            <ChatAudioResults audioUrls={message.audioResults} downloadSlug={downloadSlug} />
+            <ChatAudioResults audioUrls={message.audioResults} />
           </LazyMedia>
-          {(onBranchChat || message.modelName) && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.25rem' }}>
-              {onBranchChat && onRetry && (
-                <MediaActionsMenu message={message} onBranchChat={onBranchChat} onRetry={onRetry} />
-              )}
-              {message.modelName && (
-                <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', opacity: 0.6 }}>
-                  {message.modelName}
-                </div>
-              )}
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.25rem' }}>
+            <MediaActionsMenu
+              message={message}
+              onBranchChat={onBranchChat}
+              onRetry={onRetry}
+              mediaType="audio"
+              mediaUrls={message.audioResults}
+              downloadSlug={downloadSlug}
+            />
+            {message.modelName && (
+              <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', opacity: 0.6 }}>
+                {message.modelName}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

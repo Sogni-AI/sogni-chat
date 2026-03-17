@@ -5,8 +5,6 @@
  * Shows an "expired" state if the video fails to load.
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { downloadImage } from '@/utils/download';
-import { buildDownloadFilename } from '@/utils/downloadFilename';
 import { useGalleryBlobUrls } from '@/hooks/useGalleryBlobUrls';
 import { activeVideos, pauseOtherVideos } from './videoCoordination';
 import { isMobile } from '@/utils/mobileDownload';
@@ -131,8 +129,6 @@ interface ChatVideoResultsProps {
   urls: string[];
   /** Gallery video IDs for persistent blob-based rendering (parallel to urls) */
   galleryVideoIds?: string[];
-  /** Descriptive slug for download filenames (e.g. from session title) */
-  downloadSlug?: string;
   /** Video aspect ratio as CSS string (e.g. "9 / 16") — prevents reflow when video loads */
   videoAspectRatio?: string;
   /** Whether videos should auto-play (default: true). Set false for restored history. */
@@ -142,7 +138,6 @@ interface ChatVideoResultsProps {
 export const ChatVideoResults = memo(function ChatVideoResults({
   urls,
   galleryVideoIds,
-  downloadSlug,
   videoAspectRatio,
   autoPlay = true,
 }: ChatVideoResultsProps) {
@@ -150,13 +145,6 @@ export const ChatVideoResults = memo(function ChatVideoResults({
   const galleryBlobUrls = useGalleryBlobUrls(galleryVideoIds);
   const [failedVideos, setFailedVideos] = useState<Set<number>>(new Set());
   const isGrid = urls.length > 1;
-
-  const handleDownload = useCallback((url: string, index: number) => {
-    const filename = buildDownloadFilename(downloadSlug, index + 1, 'video');
-    downloadImage(url, filename).catch((err) =>
-      console.error('[CHAT VIDEO] Download failed:', err),
-    );
-  }, [downloadSlug]);
 
   const handleError = useCallback((index: number) => {
     setFailedVideos((prev) => new Set([...prev, index]));
@@ -255,45 +243,6 @@ export const ChatVideoResults = memo(function ChatVideoResults({
             </div>
           )}
 
-          {/* Save / Download button — only shown when video loaded */}
-          {!isFailed && (
-            <button
-              onClick={() => handleDownload(displayUrl, index)}
-              aria-label="Save video"
-              style={{
-                position: 'absolute',
-                top: '0.375rem',
-                right: '0.375rem',
-                background: 'rgba(0,0,0,0.6)',
-                backdropFilter: 'blur(4px)',
-                border: 'none',
-                borderRadius: '50%',
-                width: '36px',
-                height: '36px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                color: 'white',
-                transition: 'background 0.2s',
-              }}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-            </button>
-          )}
         </div>
         );
       })}

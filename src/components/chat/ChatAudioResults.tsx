@@ -6,19 +6,15 @@
  */
 
 import React, { useRef, useState, useCallback } from 'react';
-import { downloadImage } from '@/utils/download';
-import { buildDownloadFilename } from '@/utils/downloadFilename';
 
 interface ChatAudioResultsProps {
   /** URLs of generated audio files */
   audioUrls: string[];
   /** Optional label shown above the player */
   label?: string;
-  /** Descriptive slug for download filenames (e.g. from session title) */
-  downloadSlug?: string;
 }
 
-const ChatAudioResults: React.FC<ChatAudioResultsProps> = ({ audioUrls, label, downloadSlug }) => {
+const ChatAudioResults: React.FC<ChatAudioResultsProps> = ({ audioUrls, label }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -29,14 +25,6 @@ const ChatAudioResults: React.FC<ChatAudioResultsProps> = ({ audioUrls, label, d
       audioRef.current.load();
     }
   }, []);
-
-  const handleDownload = useCallback(() => {
-    const url = audioUrls[activeIndex];
-    const filename = buildDownloadFilename(downloadSlug, audioUrls.length > 1 ? activeIndex + 1 : undefined, 'audio');
-    downloadImage(url, filename).catch((err) =>
-      console.error('[CHAT AUDIO] Download failed:', err),
-    );
-  }, [audioUrls, activeIndex, downloadSlug]);
 
   if (!audioUrls || audioUrls.length === 0) {
     return null;
@@ -62,27 +50,6 @@ const ChatAudioResults: React.FC<ChatAudioResultsProps> = ({ audioUrls, label, d
           <source src={activeUrl} type="audio/wav" />
           Your browser does not support the audio element.
         </audio>
-        <button
-          onClick={handleDownload}
-          aria-label="Save audio"
-          className="chat-audio-results__download-btn"
-          type="button"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-        </button>
       </div>
 
       {audioUrls.length > 1 && (
@@ -128,27 +95,6 @@ const ChatAudioResults: React.FC<ChatAudioResultsProps> = ({ audioUrls, label, d
           flex: 1;
           min-width: 0;
           border-radius: 8px;
-        }
-
-        .chat-audio-results__download-btn {
-          flex-shrink: 0;
-          width: 32px;
-          height: 32px;
-          border-radius: 50%;
-          border: 1px solid rgba(var(--rgb-primary, 79, 70, 229), 0.2);
-          background: rgba(var(--rgb-primary, 79, 70, 229), 0.08);
-          color: rgba(var(--rgb-primary, 79, 70, 229), 0.7);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          transition: all 0.15s ease;
-        }
-
-        .chat-audio-results__download-btn:hover {
-          background: rgba(var(--rgb-primary, 79, 70, 229), 0.18);
-          border-color: rgba(var(--rgb-primary, 79, 70, 229), 0.4);
-          color: rgb(var(--rgb-primary, 79, 70, 229));
         }
 
         .chat-audio-results__tracks {
