@@ -29,6 +29,7 @@ export interface UIChatMessage {
   modelRefusal?: boolean;
   galleryImageIds?: string[];
   galleryVideoIds?: string[];
+  galleryAudioIds?: string[];
   videoAspectRatio?: string;
   /** Display name of the AI model used for this result (e.g. "Z-Image Turbo") */
   modelName?: string;

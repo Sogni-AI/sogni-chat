@@ -46,8 +46,8 @@ export interface GalleryImage {
   createdAt: number;
   /** Sogni SDK job ID that produced this image */
   sdkJobId?: string;
-  /** Media type: 'image' (default) or 'video' */
-  mediaType?: 'image' | 'video';
+  /** Media type: 'image' (default), 'video', or 'audio' */
+  mediaType?: 'image' | 'video' | 'audio';
   /** Video duration in seconds (only for video type) */
   duration?: number;
 }

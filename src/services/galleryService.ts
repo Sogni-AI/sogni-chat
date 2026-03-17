@@ -16,6 +16,7 @@ import {
 } from '@/utils/galleryDB';
 import type { GalleryProject, GalleryImage, GallerySourceImage } from '@/types/gallery';
 import { getVideoModelConfig } from '@/constants/videoSettings';
+import { AUDIO_MODELS } from '@/constants/audioSettings';
 
 // ============================================================================
 // Types
@@ -373,6 +374,107 @@ export async function saveVideoToGallery(
 
   await saveImage(galleryImage);
   console.log(`[GALLERY SERVICE] Video saved to gallery, project ${projectId}`);
+
+  return { projectId, galleryImageId };
+}
+
+// ============================================================================
+// Audio Save
+// ============================================================================
+
+export interface SaveAudioParams {
+  /** Audio URL to download */
+  audioUrl: string;
+  /** Prompt used for music generation */
+  prompt?: string;
+  /** Audio duration in seconds */
+  duration?: number;
+  /** Model key used (e.g. 'turbo', 'sft') */
+  modelKey?: string;
+}
+
+/**
+ * Save a generated audio track to the gallery.
+ *
+ * Downloads the audio blob from the URL and saves it as a GalleryImage
+ * with mediaType 'audio'. Creates a new project for each track.
+ *
+ * @returns The projectId and gallery image ID
+ */
+export async function saveAudioToGallery(
+  params: SaveAudioParams
+): Promise<{ projectId: string; galleryImageId: string }> {
+  const { audioUrl, prompt, duration, modelKey } = params;
+  const now = Date.now();
+
+  // Download audio blob
+  let audioBlob: Blob;
+  try {
+    const response = await fetch(audioUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download audio: ${response.status}`);
+    }
+    audioBlob = await response.blob();
+    console.log(`[GALLERY SERVICE] Audio downloaded: ${(audioBlob.size / 1024 / 1024).toFixed(1)}MB`);
+  } catch (error) {
+    console.error('[GALLERY SERVICE] Failed to download audio:', error);
+    throw error;
+  }
+
+  const projectId = crypto.randomUUID();
+  const sourceImageId = crypto.randomUUID();
+
+  // Create a minimal placeholder source image for the project
+  // (projects require a sourceImageId; audio has no visual source)
+  await saveSourceImage({
+    id: sourceImageId,
+    blob: new Blob([], { type: 'audio/mpeg' }),
+    filename: `audio-source-${Date.now()}.mp3`,
+    width: 0,
+    height: 0,
+    mimeType: 'audio/mpeg',
+  });
+
+  const dateStr = new Date(now).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+
+  const modelName = modelKey && AUDIO_MODELS[modelKey as keyof typeof AUDIO_MODELS]
+    ? AUDIO_MODELS[modelKey as keyof typeof AUDIO_MODELS].name
+    : 'Music';
+
+  await saveProject({
+    id: projectId,
+    name: `${modelName} - ${dateStr}`,
+    sourceImageId,
+    model: modelName,
+    prompt: prompt || 'Music generation',
+    numberOfResults: 1,
+    createdAt: now,
+    updatedAt: now,
+  });
+  console.log('[GALLERY SERVICE] New audio project created:', projectId);
+
+  // Save audio as GalleryImage with mediaType 'audio'
+  const galleryImageId = crypto.randomUUID();
+  const galleryImage: GalleryImage = {
+    id: galleryImageId,
+    projectId,
+    blob: audioBlob,
+    width: 0,
+    height: 0,
+    mimeType: audioBlob.type || 'audio/mpeg',
+    index: 0,
+    isFavorite: false,
+    createdAt: now,
+    mediaType: 'audio',
+    duration: duration || 30,
+  };
+
+  await saveImage(galleryImage);
+  console.log(`[GALLERY SERVICE] Audio saved to gallery, project ${projectId}`);
 
   return { projectId, galleryImageId };
 }

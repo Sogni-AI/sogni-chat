@@ -1,6 +1,6 @@
 /**
  * Inline video results displayed within chat messages.
- * Shows video players with a save/download button overlay.
+ * Shows video players with click-to-play and auto-pause coordination.
  * Prefers gallery blob URLs (persistent) over remote URLs (may expire).
  * Shows an "expired" state if the video fails to load.
  */
