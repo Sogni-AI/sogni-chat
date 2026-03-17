@@ -61,6 +61,8 @@ export interface ToolExecutionContext {
   safeContentFilter?: boolean;
   /** Called when the content filter setting is changed (e.g. by the set_content_filter tool) */
   onContentFilterChange?: (enabled: boolean) => void;
+  /** Current chat session ID — used by projectSessionMap for offline recovery */
+  sessionId: string;
 }
 
 // ---------------------------------------------------------------------------

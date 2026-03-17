@@ -420,7 +420,7 @@ export function useChat(): UseChatResult {
         role: 'user',
         content: content.trim(),
         timestamp: Date.now(),
-        uploadedImageUrls: context.uploadedImageUrls,
+        ...(context.uploadedImageUrls?.length ? { uploadedImageUrls: context.uploadedImageUrls } : {}),
       };
       setUIMessages((prev) => [...prev, userMsg]);
 
@@ -503,6 +503,7 @@ export function useChat(): UseChatResult {
           signal: toolAbortController.signal,
           model: effectiveModel,
           think: effectiveThink,
+          sessionId: capturedSessionId || '',
         };
 
         let accumulatedContent = '';
@@ -1217,6 +1218,7 @@ export function useChat(): UseChatResult {
         signal: toolAbortController.signal,
         model: effectiveModel,
         think: effectiveThink,
+        sessionId: capturedSessionId || '',
       };
 
       let retryResultUrls: string[] = [];
