@@ -52,6 +52,7 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const submenuRef = useRef<HTMLDivElement>(null);
+  const submenuCloseTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < MOBILE_BREAKPOINT);
 
   const toolName = message.lastCompletedTool;
@@ -194,6 +195,7 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
       document.removeEventListener('mousedown', handleClick);
       document.removeEventListener('touchstart', handleClick);
       document.removeEventListener('keydown', handleEscape);
+      clearTimeout(submenuCloseTimer.current);
     };
   }, [open]);
 
@@ -202,15 +204,11 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
     const el = submenuRef.current;
     if (!el || !showRetrySubmenu || isMobile) return;
     el.style.maxHeight = '';
-    el.style.bottom = '0';
     const rect = el.getBoundingClientRect();
     const pad = 8;
     const available = rect.bottom - pad;
     if (rect.height > available) {
       el.style.maxHeight = `${available}px`;
-      // Shift down so top doesn't go above viewport
-      const overflow = rect.height - available;
-      el.style.bottom = `${-overflow}px`;
     }
   }, [showRetrySubmenu, isMobile]);
 
@@ -430,8 +428,13 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
                   /* Desktop: flyout submenu on hover */
                   <div
                     style={{ position: 'relative' }}
-                    onMouseEnter={() => setShowRetrySubmenu(true)}
-                    onMouseLeave={() => setShowRetrySubmenu(false)}
+                    onMouseEnter={() => {
+                      clearTimeout(submenuCloseTimer.current);
+                      setShowRetrySubmenu(true);
+                    }}
+                    onMouseLeave={() => {
+                      submenuCloseTimer.current = setTimeout(() => setShowRetrySubmenu(false), 150);
+                    }}
                   >
                     <MenuItem
                       icon={<RetryIcon />}
@@ -445,6 +448,10 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
                       <div
                         ref={submenuRef}
                         role="menu"
+                        onMouseEnter={() => clearTimeout(submenuCloseTimer.current)}
+                        onMouseLeave={() => {
+                          submenuCloseTimer.current = setTimeout(() => setShowRetrySubmenu(false), 150);
+                        }}
                         style={{
                           position: 'absolute',
                           left: 'calc(100% + 4px)',

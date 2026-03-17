@@ -89,7 +89,7 @@ export function ReferralSharePopup({ isOpen, onClose }: ReferralSharePopupProps)
             textAlign: 'center',
           }}
         >
-          <div style={{ fontSize: '2rem', marginBottom: '8px' }}>💰</div>
+          <div style={{ fontSize: '2rem', marginBottom: '8px' }}>✨</div>
           <h2
             id="referral-popup-title"
             style={{
@@ -178,9 +178,9 @@ export function ReferralSharePopup({ isOpen, onClose }: ReferralSharePopupProps)
               style={{
                 padding: '10px 16px',
                 borderRadius: '10px',
-                border: 'none',
-                background: copied ? '#10b981' : 'var(--sogni-gradient)',
-                color: 'white',
+                background: copied ? '#10b981' : 'var(--color-bg-hover)',
+                color: copied ? 'white' : 'var(--color-text-primary)',
+                border: '1px solid var(--color-border)',
                 fontSize: '0.8125rem',
                 fontWeight: 600,
                 cursor: 'pointer',

@@ -1,10 +1,12 @@
 /**
  * Header bar — sits at the top of the main content area (right of sidebar).
- * Contains: model selector dropdown + nav + auth status.
+ * Contains: model selector dropdown + nav + share button + auth status.
  */
+import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSogniAuth } from '@/services/sogniAuth';
 import { AuthStatus } from '@/components/auth/AuthStatus';
+import { ReferralSharePopup } from '@/components/shared/ReferralSharePopup';
 import { ModelSelector } from './ModelSelector';
 
 interface HeaderProps {
@@ -17,6 +19,7 @@ export function Header({ selectedModelVariant, onSelectModelVariant }: HeaderPro
   const navigate = useNavigate();
   const location = useLocation();
   const onHistoryPage = location.pathname === '/history';
+  const [showReferral, setShowReferral] = useState(false);
 
   return (
     <header className="flex-shrink-0" role="banner" style={{
@@ -54,10 +57,37 @@ export function Header({ selectedModelVariant, onSelectModelVariant }: HeaderPro
               </nav>
             )}
 
+            {/* Share / Referral button */}
+            {isAuthenticated && (
+              <button
+                onClick={() => setShowReferral(true)}
+                className="header-share-btn"
+                style={{
+                  background: 'transparent',
+                  color: 'var(--color-text-tertiary)',
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: 'none',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                  transition: 'color 0.15s ease',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
+              >
+                Share
+              </button>
+            )}
+
             <AuthStatus />
           </div>
         </div>
       </div>
+
+      <ReferralSharePopup isOpen={showReferral} onClose={() => setShowReferral(false)} />
     </header>
   );
 }
