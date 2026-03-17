@@ -6,7 +6,7 @@
  * instead of flying out to the right (which would overflow the screen).
  * Touch targets are sized to at least 44px for comfortable tapping.
  */
-import { memo, useState, useCallback, useEffect, useRef } from 'react';
+import { memo, useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import type { UIChatMessage } from '@/types/chat';
 import { getModelOptions } from '@/tools/shared/modelRegistry';
 import type { ModelOption } from '@/tools/shared/modelRegistry';
@@ -50,6 +50,8 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
   const [open, setOpen] = useState(false);
   const [showRetrySubmenu, setShowRetrySubmenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const submenuRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < MOBILE_BREAKPOINT);
 
   const toolName = message.lastCompletedTool;
@@ -195,6 +197,36 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
     };
   }, [open]);
 
+  // Clamp desktop flyout submenu within viewport
+  useLayoutEffect(() => {
+    const el = submenuRef.current;
+    if (!el || !showRetrySubmenu || isMobile) return;
+    el.style.maxHeight = '';
+    el.style.bottom = '0';
+    const rect = el.getBoundingClientRect();
+    const pad = 8;
+    const available = rect.bottom - pad;
+    if (rect.height > available) {
+      el.style.maxHeight = `${available}px`;
+      // Shift down so top doesn't go above viewport
+      const overflow = rect.height - available;
+      el.style.bottom = `${-overflow}px`;
+    }
+  }, [showRetrySubmenu, isMobile]);
+
+  // Clamp mobile dropdown when inline model list expands
+  useLayoutEffect(() => {
+    const el = dropdownRef.current;
+    if (!el || !open || !isMobile) return;
+    el.style.maxHeight = '';
+    const rect = el.getBoundingClientRect();
+    const pad = 8;
+    const available = rect.bottom - pad;
+    if (rect.height > available) {
+      el.style.maxHeight = `${available}px`;
+    }
+  }, [open, isMobile, showRetrySubmenu]);
+
   const handleToggle = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     setOpen(prev => !prev);
@@ -269,6 +301,7 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
       {/* Dropdown menu */}
       {open && (
         <div
+          ref={dropdownRef}
           role="menu"
           style={{
             position: 'absolute',
@@ -280,7 +313,7 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
             boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
             zIndex: 50,
             minWidth: isMobile ? '220px' : '200px',
-            overflow: 'visible',
+            overflow: isMobile ? 'hidden auto' : 'visible',
             padding: '4px 0',
           }}
         >
@@ -410,6 +443,7 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
 
                     {showRetrySubmenu && (
                       <div
+                        ref={submenuRef}
                         role="menu"
                         style={{
                           position: 'absolute',
@@ -421,6 +455,7 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
                           boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
                           zIndex: 51,
                           minWidth: '200px',
+                          overflowY: 'auto',
                           padding: '4px 0',
                         }}
                       >
