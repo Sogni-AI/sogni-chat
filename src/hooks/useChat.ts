@@ -1101,9 +1101,9 @@ export function useChat(): UseChatResult {
       },
       modelKeyOverride?: string,
     ) => {
-      const toolName = targetMessage.lastCompletedTool as ToolName;
+      let effectiveToolName = targetMessage.lastCompletedTool as ToolName;
       const toolArgs = targetMessage.toolArgs;
-      if (!toolName || !toolArgs) return;
+      if (!effectiveToolName || !toolArgs) return;
 
       // Concurrency guard: block retry if already loading (matches sendMessage pattern)
       if (activeRequestCountRef.current >= MAX_CONCURRENT_REQUESTS) {
@@ -1116,9 +1116,23 @@ export function useChat(): UseChatResult {
       // For quality-tier tools (restore_photo, apply_style, etc.), the override
       // key is "quality" (fast/hq). We also need to override context.qualityTier
       // since some tools read from context rather than args.
-      const isQualityOverride = modelKeyOverride && isQualityTierTool(toolName);
-      if (modelKeyOverride) {
-        modifiedArgs[getModelArgKey(toolName)] = modelKeyOverride;
+      // Special case: if a non-quality key (e.g. "flux2") is selected on a quality-tier
+      // tool, switch to edit_image tool which supports that model directly.
+      let isQualityOverride = false;
+      if (modelKeyOverride && isQualityTierTool(effectiveToolName)) {
+        if (modelKeyOverride === 'fast' || modelKeyOverride === 'hq') {
+          isQualityOverride = true;
+          modifiedArgs[getModelArgKey(effectiveToolName)] = modelKeyOverride;
+        } else {
+          // Non-quality model (e.g. flux2) — switch to edit_image tool
+          effectiveToolName = 'edit_image' as ToolName;
+          modifiedArgs.model = modelKeyOverride;
+          // Remove quality-tier-specific args that edit_image doesn't use
+          delete modifiedArgs.quality;
+          delete modifiedArgs.scale;
+        }
+      } else if (modelKeyOverride) {
+        modifiedArgs[getModelArgKey(effectiveToolName)] = modelKeyOverride;
       }
 
       // Session safety: capture session ID for background detection (mirrors sendMessage)
@@ -1152,7 +1166,7 @@ export function useChat(): UseChatResult {
         timestamp: Date.now(),
         isStreaming: true,
         toolArgs: modifiedArgs,
-        toolProgress: { type: 'started', toolName, totalCount: 0 },
+        toolProgress: { type: 'started', toolName: effectiveToolName, totalCount: 0 },
       };
 
       setUIMessages(prev => [...prev, userMsg, assistantMsg]);
@@ -1324,7 +1338,7 @@ export function useChat(): UseChatResult {
       };
 
       try {
-        const result = await toolRegistry.execute(toolName, modifiedArgs, executionContext, callbacks);
+        const result = await toolRegistry.execute(effectiveToolName, modifiedArgs, executionContext, callbacks);
         if (toolAbortController.signal.aborted || !isActiveSession()) return;
         // If the tool returned an error JSON and onToolComplete wasn't called, show error.
         // Guard on isStreaming: if onToolComplete already fired, the message is finalized.

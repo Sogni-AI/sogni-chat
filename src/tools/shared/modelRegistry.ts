@@ -11,11 +11,13 @@ export interface ModelOption {
   displayName: string;
 }
 
-/** Quality-tier model options shared by restore_photo, apply_style, refine_result, change_angle.
- *  These tools select models via a "quality" arg (fast/hq) rather than a "model" arg. */
+/** Model options for quality-tier tools (restore_photo, apply_style, refine_result, change_angle).
+ *  These tools natively support fast/hq via a "quality" arg. Flux.2 Dev is also offered —
+ *  selecting it switches the retry to use the edit_image tool instead. */
 const QUALITY_TIER_MODELS: ModelOption[] = [
   { key: 'fast', displayName: 'Qwen Image Edit Lightning' },
   { key: 'hq', displayName: 'Qwen Image Edit 2511' },
+  { key: 'flux2', displayName: 'Flux.2 Dev' },
 ];
 
 /**
