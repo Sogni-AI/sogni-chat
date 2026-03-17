@@ -242,6 +242,7 @@ export default function ChatPage() {
       uiMessages: state.uiMessages,
       conversation: state.conversation,
       allResultUrls: state.allResultUrls,
+      audioResultUrls: state.audioResultUrls,
       analysisSuggestions: state.analysisSuggestions,
       sessionModel: state.sessionModel,
       uploadedFiles: uploadedFilesRef.current,

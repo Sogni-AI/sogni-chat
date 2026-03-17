@@ -104,6 +104,7 @@ export async function execute(
       success: true,
       resultCount: audioUrls.length,
       mediaType: 'audio',
+      audioUrls,
       model: audioModel.name,
       duration,
       bpm,
@@ -111,7 +112,7 @@ export async function execute(
       timesig,
       hasLyrics: !!lyrics,
       creditsCost: formatCredits(estimatedCost),
-      message: `Successfully generated ${duration}-second ${lyrics ? 'song' : 'instrumental'} using ${audioModel.name} at ${bpm} BPM in ${keyscale}. Cost: ~${formatCredits(estimatedCost)} credits. The user can now listen to the result.`,
+      message: `Successfully generated ${duration}-second ${lyrics ? 'song' : 'instrumental'} using ${audioModel.name} at ${bpm} BPM in ${keyscale}. Cost: ~${formatCredits(estimatedCost)} credits. The user can now listen to the result. The audio URL(s) can be used with sound_to_video to create a music video.`,
     });
   } catch (err: unknown) {
     if (billingId) discardPending(billingId);

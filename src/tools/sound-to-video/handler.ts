@@ -12,6 +12,7 @@ import {
   recordCompletion,
   discardPending,
   formatCredits,
+  fetchAudioAsUint8Array,
 } from '../shared';
 import type { TokenType } from '@/types/wallet';
 import { parseAspectRatio } from '@/utils/imageDimensions';
@@ -157,24 +158,55 @@ export async function execute(
   callbacks: ToolCallbacks,
 ): Promise<string> {
   const prompt = args.prompt as string;
-  const modelKey = (args.videoModel as string) || 'wan-s2v';
+  const explicitModel = args.videoModel as string | undefined;
   const duration = Math.max(2, Math.min(10, (args.duration as number) || 5));
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
   const aspectRatio = args.aspectRatio as string | undefined;
   const audioSourceIndex = args.audioSourceIndex as number | undefined;
   const sourceImageIndex = args.sourceImageIndex as number | undefined;
 
+  // Determine if any image is available (uploaded or in context)
+  const hasUploadedImage = context.uploadedFiles.some((f: UploadedFile) => f.type === 'image') || !!context.imageData;
+
+  // Auto-select model: if no model was explicitly chosen and no image is available,
+  // use ltx23-a2v (audio-only to video) instead of the default wan-s2v which requires an image.
+  let modelKey = explicitModel || 'wan-s2v';
+  if (!explicitModel && !hasUploadedImage) {
+    modelKey = 'ltx23-a2v';
+    console.log('[SOUND TO VIDEO] No image available, auto-selecting ltx23-a2v (audio-only to video)');
+  }
+
   const config = S2V_MODELS[modelKey] ?? S2V_MODELS['wan-s2v'];
 
-  // Locate the audio file from uploaded files
+  // Locate the audio: first check uploaded files, then fall back to generated audio in resultUrls
+  let audioData: Uint8Array;
+  let audioMimeType: string;
+
   const audioFiles = context.uploadedFiles.filter((f: UploadedFile) => f.type === 'audio');
   const audioIndex = audioSourceIndex ?? 0;
   const audioFile = audioFiles[audioIndex];
-  if (!audioFile) {
-    return JSON.stringify({ error: 'no_audio', message: 'No audio file uploaded. This tool requires a pre-recorded audio file (mp3, wav, or m4a). Tell the user to upload an audio file to use this tool. Do not call any other tools.' });
-  }
-  if (!audioFile.data || audioFile.data.byteLength === 0) {
-    return JSON.stringify({ error: 'invalid_audio', message: 'The audio file is empty or corrupted. Please upload a valid audio file.' });
+
+  if (audioFile && audioFile.data && audioFile.data.byteLength > 0) {
+    // Use uploaded audio file
+    audioData = audioFile.data;
+    audioMimeType = audioFile.mimeType;
+  } else {
+    // Fallback: look for generated audio tracked by the session (e.g. from generate_music)
+    const audioResultUrls = context.audioResultUrls;
+    if (audioResultUrls.length === 0) {
+      return JSON.stringify({ error: 'no_audio', message: 'No audio available. Either upload an audio file (mp3, wav, m4a) or use generate_music first to create audio. Do not call any other tools.' });
+    }
+    // Use the most recent generated audio
+    const targetAudioUrl = audioResultUrls[audioResultUrls.length - 1];
+    console.log('[SOUND TO VIDEO] No uploaded audio found, fetching generated audio from:', targetAudioUrl);
+    try {
+      const fetched = await fetchAudioAsUint8Array(targetAudioUrl);
+      audioData = fetched.data;
+      audioMimeType = fetched.mimeType;
+    } catch (err) {
+      console.error('[SOUND TO VIDEO] Failed to fetch generated audio:', err);
+      return JSON.stringify({ error: 'audio_fetch_failed', message: 'Could not load the generated audio. Try uploading the audio file directly.' });
+    }
   }
 
   // Locate the reference image (if required or specified)
@@ -255,8 +287,8 @@ export async function execute(
           prompt,
           referenceImage: referenceImageData,
           referenceImageMime,
-          referenceAudio: audioFile.data,
-          referenceAudioMime: audioFile.mimeType,
+          referenceAudio: audioData,
+          referenceAudioMime: audioMimeType,
           width,
           height,
           frames,

@@ -66,6 +66,7 @@ export interface UseChatResult {
     uiMessages: UIChatMessage[];
     conversation: ChatMessage[];
     allResultUrls: string[];
+    audioResultUrls: string[];
     analysisSuggestions: Suggestion[];
     sessionModel?: string;
   };
@@ -179,6 +180,8 @@ export function useChat(): UseChatResult {
   const conversationRef = useRef<ChatMessage[]>([]);
   // Track all result URLs via ref so tool executions always see the latest state (Fix #4)
   const allResultUrlsRef = useRef<string[]>([]);
+  // Track audio result URLs separately (from generate_music) so sound_to_video can find them
+  const audioResultUrlsRef = useRef<string[]>([]);
   // Abort handle for cancellation (Fix #8)
   const abortRef = useRef<{ aborted: boolean }>({ aborted: false });
   // AbortControllers for active tool executions (so cancel button actually aborts SDK operations)
@@ -451,6 +454,7 @@ export function useChat(): UseChatResult {
           tokenType: context.tokenType,
           uploadedFiles: context.uploadedFiles || [],
           get resultUrls() { return allResultUrlsRef.current; },
+          get audioResultUrls() { return audioResultUrlsRef.current; },
           balances: context.balances,
           qualityTier: context.qualityTier,
           safeContentFilter: context.safeContentFilter,
@@ -673,6 +677,13 @@ export function useChat(): UseChatResult {
                   const combined = [...new Set([...allResultUrlsRef.current, ...uniqueUrls])];
                   allResultUrlsRef.current = combined;
                   setAllResultUrls(combined);
+                }
+
+                // Track audio result URLs separately so sound_to_video can find generated audio
+                if (isAudioTool && uniqueUrls.length > 0) {
+                  audioResultUrlsRef.current = [
+                    ...new Set([...audioResultUrlsRef.current, ...uniqueUrls]),
+                  ];
                 }
 
                 // After tool completes, the LLM will generate a new response.
@@ -933,6 +944,7 @@ export function useChat(): UseChatResult {
     setAllResultUrls([]);
     setAnalysisSuggestions([]);
     allResultUrlsRef.current = [];
+    audioResultUrlsRef.current = [];
     analysisSuggestionsRef.current = [];
     conversationRef.current = [];
     sessionModelRef.current = undefined;
@@ -953,6 +965,7 @@ export function useChat(): UseChatResult {
       uiMessages: cleaned,
       conversation: conversationRef.current,
       allResultUrls: allResultUrlsRef.current,
+      audioResultUrls: audioResultUrlsRef.current,
       analysisSuggestions: analysisSuggestionsRef.current,
       sessionModel: sessionModelRef.current,
     };
@@ -992,6 +1005,7 @@ export function useChat(): UseChatResult {
     setError(null);
     conversationRef.current = session.conversation;
     allResultUrlsRef.current = session.allResultUrls;
+    audioResultUrlsRef.current = session.audioResultUrls || [];
     analysisSuggestionsRef.current = session.analysisSuggestions;
     sessionModelRef.current = session.sessionModel;
   }, []);

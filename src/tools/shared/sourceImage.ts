@@ -1,6 +1,33 @@
 /**
- * Utilities for fetching source images for tool execution.
+ * Utilities for fetching source media (images, audio) for tool execution.
  */
+
+/**
+ * Fetch an audio URL and return the raw bytes + detected MIME type.
+ * Unlike the image variant this does a straightforward binary fetch
+ * (no canvas needed).
+ */
+export async function fetchAudioAsUint8Array(
+  url: string,
+): Promise<{ data: Uint8Array; mimeType: string }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30_000);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`Audio fetch failed: ${response.status} ${response.statusText}`);
+    }
+    const contentType = response.headers.get('content-type') || 'audio/mpeg';
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength === 0) {
+      throw new Error('Audio fetch returned empty data');
+    }
+    return { data: new Uint8Array(buffer), mimeType: contentType };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 /**
  * Fetch an image URL and convert to Uint8Array with dimensions.
