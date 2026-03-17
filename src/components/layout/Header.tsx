@@ -78,7 +78,7 @@ export function Header({ selectedModelVariant, onSelectModelVariant }: HeaderPro
                 onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--color-text-primary)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--color-text-tertiary)'; }}
               >
-                Share
+                ✨ Share
               </button>
             )}
 

@@ -107,17 +107,6 @@ export function ReferralSharePopup({ isOpen, onClose }: ReferralSharePopupProps)
 
         {/* Body */}
         <div style={{ padding: '20px 24px' }}>
-          <p
-            style={{
-              fontSize: '0.875rem',
-              lineHeight: 1.6,
-              color: 'var(--color-text-secondary)',
-              margin: '0 0 8px',
-            }}
-          >
-            Share <strong style={{ color: 'var(--color-primary)' }}>chat.sogni.ai</strong> and earn render credits!
-          </p>
-
           <ul
             style={{
               fontSize: '0.8125rem',
@@ -125,13 +114,17 @@ export function ReferralSharePopup({ isOpen, onClose }: ReferralSharePopupProps)
               color: 'var(--color-text-secondary)',
               margin: '0 0 20px',
               paddingLeft: '20px',
+              listStyleType: 'disc',
             }}
           >
             <li>
-              Friends who sign up with your link get <strong style={{ color: 'var(--color-accent)' }}>25 bonus credits</strong>
+              Friends who sign up with your link get <strong style={{ color: 'var(--color-accent)' }}>25 bonus credits</strong>.
             </li>
             <li>
-              You earn a bonus on every credit purchase they make — or that their own referrals make.
+              You earn <strong style={{ color: 'var(--color-accent)' }}>25 credits</strong> after their first purchase.
+            </li>
+            <li>
+              You also earn a share of rewards on every credit purchase they make — or that their own referrals make.
             </li>
           </ul>
 
