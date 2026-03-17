@@ -32,6 +32,7 @@ import { QUALITY_PRESETS, getSavedQualityTier, saveQualityTier } from '@/config/
 import type { TokenType } from '@/types/wallet';
 import { SogniTVPreview } from '@/components/shared/SogniTVPreview';
 import { warmUpAudio } from '@/utils/sonicLogos';
+import { projectSessionMap } from '@/services/projectSessionMap';
 import '@/components/chat/chat.css';
 
 // Pre-compiled regexes for title detection — avoids re-compiling on every call
@@ -186,7 +187,29 @@ export default function ChatPage() {
   }, []);
 
   // Keep useChat's sessionIdRef in sync with the active session
-  const { loadFromSession, setSessionId, setOnBackgroundComplete, setOnBackgroundGallerySaved } = chat;
+  const { loadFromSession, setSessionId, setOnBackgroundComplete, setOnBackgroundGallerySaved, attachRecoveryListeners, setOnRecoveryToast } = chat;
+
+  // Clean up stale project→session mappings on startup (older than 24h)
+  useEffect(() => {
+    projectSessionMap.cleanup();
+  }, []);
+
+  // Attach SDK recovery listeners once the client is available
+  useEffect(() => {
+    const client = getSogniClient();
+    if (!client) return;
+    const cleanup = attachRecoveryListeners(client);
+    return cleanup;
+  }, [getSogniClient, attachRecoveryListeners]);
+
+  // Wire recovery toast notifications to the app's toast system
+  useEffect(() => {
+    setOnRecoveryToast((message) => {
+      showToast({ message, type: 'info' });
+    });
+    return () => setOnRecoveryToast(null);
+  }, [setOnRecoveryToast, showToast]);
+
   useEffect(() => {
     setSessionId(activeSessionId);
   }, [activeSessionId, setSessionId]);
