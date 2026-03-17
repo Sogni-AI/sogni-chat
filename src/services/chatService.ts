@@ -184,6 +184,27 @@ export async function sendChatMessage(
           : uploadedImageUris;
       }
 
+      // Annotate the latest user message with non-image file info so the LLM
+      // knows audio/video files are attached (they can't be sent as multimodal content).
+      // Only enhances the API copy; stored history stays unchanged.
+      const nonImageFiles = context.uploadedFiles.filter(f => f.type !== 'image');
+      if (nonImageFiles.length > 0) {
+        let lastUserIdx = -1;
+        for (let i = allMessages.length - 1; i >= 0; i--) {
+          if (allMessages[i].role === 'user') {
+            lastUserIdx = i;
+            break;
+          }
+        }
+        if (lastUserIdx >= 0 && typeof allMessages[lastUserIdx].content === 'string') {
+          const fileList = nonImageFiles.map(f => `${f.filename} (${f.type})`).join(', ');
+          allMessages[lastUserIdx] = {
+            ...allMessages[lastUserIdx],
+            content: `[Attached files: ${fileList}]\n${allMessages[lastUserIdx].content}`,
+          };
+        }
+      }
+
       // Attach cached vision context to the latest user message.
       // Only enhances the copy sent to the API; stored history stays text-only.
       if (visionDataUris.length > 0) {
