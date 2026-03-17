@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Sogni Creative Agent is a standalone AI creative studio powered by the Sogni Client SDK. It provides a conversational interface where users interact with 11 AI tools spanning image generation/editing, video creation, and music composition. The app uses a tool registry architecture where each AI capability is a self-contained module that self-registers at import time.
+Sogni Creative Agent is a standalone AI creative studio powered by the Sogni Client SDK. It provides a conversational interface where users interact with 14 AI tools spanning image generation/editing, video creation, music composition, vision analysis, and settings control. The app uses a tool registry architecture where each AI capability is a self-contained module that self-registers at import time.
 
 ## Build & Development Commands
 
@@ -57,7 +57,7 @@ src/tools/
     index.ts           #   Self-registers with toolRegistry.register()
 ```
 
-**11 registered tools**:
+**14 registered tools**:
 - `restore_photo` — AI photo restoration (Qwen Image Edit)
 - `apply_style` — Artistic style transfer
 - `refine_result` — Iterative refinement of previous results
@@ -69,6 +69,9 @@ src/tools/
 - `sound_to_video` — Audio-synced video generation
 - `video_to_video` — Video style transfer with ControlNet
 - `generate_music` — Music generation with lyrics/BPM/key control (Sonic Logos)
+- `analyze_image` — Vision analysis of uploaded images
+- `set_content_filter` — Toggle safe content filter on/off
+- `extract_metadata` — Extract metadata from generated results
 
 ### How to Add a New Tool
 
@@ -174,7 +177,7 @@ No global state library. Uses React Context + Custom Hooks:
 - `src/utils/chatSuggestions.ts` — Context-aware suggestion chips per tool
 
 ### Tools
-- `src/tools/` — All 11 tool modules (see Tool Registry Pattern above)
+- `src/tools/` — All 14 tool modules (see Tool Registry Pattern above)
 - `src/tools/shared/` — Shared utilities: creditCheck, progress, aspectRatio, sourceImage, llmHelpers, billing
 
 ### Authentication
