@@ -8,7 +8,7 @@ import type { SogniClient } from '@sogni-ai/sogni-client';
 import { sendChatMessage, sendVisionAnalysis } from '@/services/chatService';
 import type { ToolExecutionContext, ToolExecutionProgress, ToolCallbacks, ToolName, UploadedFile } from '@/tools/types';
 import { toolRegistry } from '@/tools/registry';
-import { getModelArgKey } from '@/tools/shared/modelRegistry';
+import { getModelArgKey, isQualityTierTool } from '@/tools/shared/modelRegistry';
 import type { TokenType, Balances } from '@/types/wallet';
 import type { Suggestion } from '@/utils/chatSuggestions';
 import { parseAnalysisSuggestions, stripSuggestTagsForDisplay } from '@/utils/chatSuggestions';
@@ -694,9 +694,11 @@ export function useChat(): UseChatResult {
                     const srcUrl = msg.toolProgress?.sourceImageUrl;
                     const vidAR = msg.toolProgress?.videoAspectRatio;
                     const mdlName = msg.toolProgress?.modelName;
-                    // Extract model key from stored tool args for retry/switch model
+                    // Extract model key from stored tool args for retry/switch model.
+                    // Tools use different arg names: "model", "videoModel", or "quality".
                     const toolModelKey = (msg.toolArgs?.model as string)
                       || (msg.toolArgs?.videoModel as string)
+                      || (msg.toolArgs?.quality as string)
                       || undefined;
                     return {
                       ...msg,
@@ -1110,6 +1112,10 @@ export function useChat(): UseChatResult {
 
       // Build modified args with model override
       const modifiedArgs = { ...toolArgs };
+      // For quality-tier tools (restore_photo, apply_style, etc.), the override
+      // key is "quality" (fast/hq). We also need to override context.qualityTier
+      // since some tools read from context rather than args.
+      const isQualityOverride = modelKeyOverride && isQualityTierTool(toolName);
       if (modelKeyOverride) {
         modifiedArgs[getModelArgKey(toolName)] = modelKeyOverride;
       }
@@ -1168,7 +1174,7 @@ export function useChat(): UseChatResult {
         get resultUrls() { return allResultUrlsRef.current; },
         get audioResultUrls() { return audioResultUrlsRef.current; },
         balances: context.balances,
-        qualityTier: context.qualityTier,
+        qualityTier: isQualityOverride ? (modelKeyOverride as 'fast' | 'hq') : context.qualityTier,
         safeContentFilter: context.safeContentFilter,
         onContentFilterChange: context.onContentFilterChange,
         onTokenSwitch: context.onTokenSwitch,
@@ -1274,6 +1280,7 @@ export function useChat(): UseChatResult {
             const mdlName = msg.toolProgress?.modelName;
             const retryModelKey = (modifiedArgs.model as string)
               || (modifiedArgs.videoModel as string)
+              || (modifiedArgs.quality as string)
               || undefined;
             return {
               ...msg,

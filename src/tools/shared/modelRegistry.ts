@@ -11,6 +11,13 @@ export interface ModelOption {
   displayName: string;
 }
 
+/** Quality-tier model options shared by restore_photo, apply_style, refine_result, change_angle.
+ *  These tools select models via a "quality" arg (fast/hq) rather than a "model" arg. */
+const QUALITY_TIER_MODELS: ModelOption[] = [
+  { key: 'fast', displayName: 'Qwen Image Edit Lightning' },
+  { key: 'hq', displayName: 'Qwen Image Edit 2511' },
+];
+
 /**
  * Map of tool names to their available generation models.
  * Tools not listed here (or with only 1 model) won't show "Switch Model" in the menu.
@@ -30,6 +37,11 @@ const TOOL_MODELS: Record<string, ModelOption[]> = {
     { key: 'qwen', displayName: 'Qwen Image Edit 2511' },
     { key: 'flux2', displayName: 'Flux.2 Dev' },
   ],
+  // Quality-tier tools: model is selected via "quality" arg (fast/hq)
+  restore_photo: QUALITY_TIER_MODELS,
+  apply_style: QUALITY_TIER_MODELS,
+  refine_result: QUALITY_TIER_MODELS,
+  change_angle: QUALITY_TIER_MODELS,
   generate_video: [
     { key: 'ltx23', displayName: 'LTX 2.3 22B' },
     { key: 'wan22', displayName: 'WAN 2.2 14B' },
@@ -49,10 +61,24 @@ const TOOL_MODELS: Record<string, ModelOption[]> = {
   ],
 };
 
-/** Get the model arg key name used by a given tool ("model" or "videoModel") */
+/** Tools that select models via a "quality" arg instead of "model"/"videoModel" */
+const QUALITY_ARG_TOOLS = ['restore_photo', 'apply_style', 'refine_result', 'change_angle'];
+
+/**
+ * Get the model arg key name used by a given tool.
+ * - Video tools use "videoModel"
+ * - Quality-tier tools use "quality"
+ * - All others use "model"
+ */
 export function getModelArgKey(toolName: string): string {
+  if (QUALITY_ARG_TOOLS.includes(toolName)) return 'quality';
   const videoModelTools = ['generate_video', 'animate_photo', 'sound_to_video'];
   return videoModelTools.includes(toolName) ? 'videoModel' : 'model';
+}
+
+/** Check if a tool uses quality-tier model selection */
+export function isQualityTierTool(toolName: string): boolean {
+  return QUALITY_ARG_TOOLS.includes(toolName);
 }
 
 /** Get all available models for a tool. Returns empty array if tool has no model options. */
