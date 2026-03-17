@@ -759,45 +759,102 @@ export default function ChatPage() {
     const messageIndex = currentMessages.findIndex(m => m.id === message.id);
     if (messageIndex < 0) return;
 
+    // Track background jobs if current session has running tools
+    if (chatRef.current.isLoading || chatRef.current.isSending) {
+      const currentId = activeSessionIdRef.current;
+      if (currentId) {
+        setActiveJobSessionIds((prev) => new Set(prev).add(currentId));
+      }
+    }
+
     // Save current session first
     if (activeSessionIdRef.current) await saveActiveSession();
 
     isRestoringRef.current = true;
 
-    // Copy messages up to and including the target
-    const branchedMessages = currentMessages.slice(0, messageIndex + 1);
+    // Copy messages up to and including the target, stripping transient fields
+    const branchedMessages = currentMessages.slice(0, messageIndex + 1).map(msg => ({
+      ...msg,
+      toolProgress: undefined,
+      isStreaming: undefined,
+      streamingStatus: undefined,
+      chatModelLabel: undefined,
+      isFromHistory: undefined,
+    }));
 
     // Get conversation state
     const sessionState = chat.getSessionState();
 
+    // Truncate conversation to match branched messages: count user+assistant turns
+    // in the branched messages and slice the conversation array to match
+    let userTurns = 0;
+    let assistantTurns = 0;
+    for (const msg of branchedMessages) {
+      if (msg.role === 'user' && msg.id !== 'user-upload' && msg.content?.trim()) userTurns++;
+      if (msg.role === 'assistant') assistantTurns++;
+    }
+    const totalTurns = userTurns + assistantTurns;
+    // Slice conversation to match (conversation entries are user/assistant pairs)
+    let convCount = 0;
+    let convSliceEnd = 0;
+    for (let i = 0; i < sessionState.conversation.length; i++) {
+      convCount++;
+      if (convCount >= totalTurns) {
+        convSliceEnd = i + 1;
+        break;
+      }
+    }
+    const branchedConversation = convSliceEnd > 0
+      ? sessionState.conversation.slice(0, convSliceEnd)
+      : sessionState.conversation;
+
     // Collect result URLs from branched messages
     const branchedResultUrls: string[] = [];
+    const branchedAudioUrls: string[] = [];
     for (const msg of branchedMessages) {
       if (msg.imageResults) branchedResultUrls.push(...msg.imageResults);
       if (msg.videoResults) branchedResultUrls.push(...msg.videoResults);
-      if (msg.audioResults) branchedResultUrls.push(...msg.audioResults);
+      if (msg.audioResults) {
+        branchedResultUrls.push(...msg.audioResults);
+        branchedAudioUrls.push(...msg.audioResults);
+      }
     }
 
     // Create and save the new session
     const newId = createNewSession();
-    const branchedTitle = (sessionTitleRef.current || 'Chat') + ' (branch)';
+    // Avoid stacking "(branch)" suffixes
+    const baseTitle = (sessionTitleRef.current || 'Chat').replace(/ \(branch\)$/, '');
+    const branchedTitle = baseTitle + ' (branch)';
     const newSession: ChatSession = {
       id: newId,
       title: branchedTitle,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       uiMessages: branchedMessages,
-      conversation: sessionState.conversation,
+      conversation: branchedConversation,
       allResultUrls: [...new Set(branchedResultUrls)],
+      audioResultUrls: branchedAudioUrls.length > 0 ? [...new Set(branchedAudioUrls)] : undefined,
       analysisSuggestions: [],
+      sessionModel: sessionState.sessionModel,
+      uploadedFiles: uploadedFilesRef.current,
     };
 
     await saveCurrentSession(newId, newSession);
     await switchSession(newId);
 
+    // Immediately update the ref so save functions see the new session ID
+    activeSessionIdRef.current = newId;
+
     // Load the branched session state into useChat (mirrors handleSelectSession)
     chat.loadFromSession(newSession);
-    setSelectedModelVariant(DEFAULT_VARIANT_ID);
+
+    // Preserve model variant from parent session
+    if (newSession.sessionModel === CHAT_MODEL_ABLITERATED) {
+      setSelectedModelVariant('unrestricted');
+    } else if (!newSession.sessionModel) {
+      setSelectedModelVariant(DEFAULT_VARIANT_ID);
+    }
+
     sessionTitleRef.current = branchedTitle;
     sessionCreatedAtRef.current = newSession.createdAt;
     sessionUpdatedAtRef.current = newSession.updatedAt;
@@ -808,8 +865,11 @@ export default function ChatPage() {
     setResultUrls(newSession.allResultUrls);
     setUploadIntent(null);
 
+    // Restore uploaded files
+    loadFiles(legacySessionToUploadedFiles(newSession));
+
     setTimeout(() => { isRestoringRef.current = false; }, 2000);
-  }, [chat, createNewSession, saveCurrentSession, switchSession, saveActiveSession, setSelectedModelVariant]);
+  }, [chat, createNewSession, saveCurrentSession, switchSession, saveActiveSession, setSelectedModelVariant, loadFiles]);
 
   /** Retry a tool execution with an optional model override */
   const handleRetry = useCallback(async (message: UIChatMessage, modelKey?: string) => {
