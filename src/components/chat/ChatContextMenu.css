@@ -1,0 +1,66 @@
+/* Context menu for chat history items */
+
+.chat-context-menu {
+  position: fixed;
+  z-index: 99999;
+  min-width: 160px;
+  background: #2f2f2f;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  padding: 4px 0;
+  animation: contextMenuFadeIn 0.12s ease-out;
+}
+
+@keyframes contextMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.chat-context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  color: #ececec;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.12s;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.chat-context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.chat-context-menu-item.danger {
+  color: #f87171;
+}
+
+.chat-context-menu-item.danger:hover {
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.chat-context-menu-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.chat-context-menu-icon svg {
+  width: 14px;
+  height: 14px;
+}

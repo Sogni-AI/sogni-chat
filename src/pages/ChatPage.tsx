@@ -127,8 +127,10 @@ export default function ChatPage() {
     switchSession,
     deleteSessionById,
     saveCurrentSession,
-    getThumbnailUrl,
     updateThumbnail,
+    renameSession,
+    togglePinSession,
+    refreshSessions,
     initialized: sessionsInitialized,
     pendingRestore,
     clearPendingRestore,
@@ -160,9 +162,11 @@ export default function ChatPage() {
   const sessionTitleRef = useRef<string>('New Session');
   const sessionCreatedAtRef = useRef<number>(Date.now());
   const sessionUpdatedAtRef = useRef<number>(Date.now());
+  const sessionPinnedRef = useRef<boolean | undefined>(undefined);
   const sessionDirtyRef = useRef(false);
   const isRestoringRef = useRef(false);
   const generatingTitleRef = useRef(false);
+  const userRenamedRef = useRef(false);
 
   // Keep refs for save function dependencies so effects don't re-run on every render
   const activeSessionIdRef = useRef(activeSessionId);
@@ -209,6 +213,8 @@ export default function ChatPage() {
     sessionTitleRef.current = pendingRestore.title;
     sessionCreatedAtRef.current = pendingRestore.createdAt;
     sessionUpdatedAtRef.current = pendingRestore.updatedAt;
+    sessionPinnedRef.current = pendingRestore.pinned;
+    userRenamedRef.current = false;
     sessionDirtyRef.current = false;
     gallerySavedRef.current = pendingRestore.allResultUrls.length > 0;
     setResultUrls(pendingRestore.allResultUrls);
@@ -239,6 +245,7 @@ export default function ChatPage() {
       title: sessionTitleRef.current,
       createdAt: sessionCreatedAtRef.current,
       updatedAt,
+      pinned: sessionPinnedRef.current,
       uiMessages: state.uiMessages,
       conversation: state.conversation,
       allResultUrls: state.allResultUrls,
@@ -464,6 +471,7 @@ export default function ChatPage() {
   // Auto-name session from analysis text via LLM, or first user text message.
   // Wait until the message is fully streamed before generating a title.
   useEffect(() => {
+    if (userRenamedRef.current) return;
     if (!isGenericTitle(sessionTitleRef.current)) return;
     if (generatingTitleRef.current) return;
 
@@ -576,6 +584,10 @@ export default function ChatPage() {
       chat.reset({ keepBackground: true });
       sessionTitleRef.current = deriveSessionTitle(file.name, sessions.length + 1);
       sessionCreatedAtRef.current = Date.now();
+      sessionUpdatedAtRef.current = Date.now();
+      sessionPinnedRef.current = undefined;
+      userRenamedRef.current = false;
+      sessionDirtyRef.current = false;
       setActiveSessionId(null);
       setTimeout(() => { isRestoringRef.current = false; }, 2000);
 
@@ -603,6 +615,8 @@ export default function ChatPage() {
     sessionTitleRef.current = `New Session #${sessions.length + 1}`;
     sessionCreatedAtRef.current = Date.now();
     sessionUpdatedAtRef.current = Date.now();
+    sessionPinnedRef.current = undefined;
+    userRenamedRef.current = false;
     sessionDirtyRef.current = false;
     setActiveSessionId(null);
     // Short timeout: just enough for React state to settle after reset.
@@ -644,6 +658,8 @@ export default function ChatPage() {
     sessionTitleRef.current = session.title;
     sessionCreatedAtRef.current = session.createdAt;
     sessionUpdatedAtRef.current = session.updatedAt;
+    sessionPinnedRef.current = session.pinned;
+    userRenamedRef.current = false;
     sessionDirtyRef.current = false;
     // Mark gallery as already saved for restored sessions to prevent duplicate saves
     gallerySavedRef.current = session.allResultUrls.length > 0;
@@ -685,6 +701,10 @@ export default function ChatPage() {
       chat.reset();
       sessionTitleRef.current = `New Session #${sessions.length + 1}`;
       sessionCreatedAtRef.current = Date.now();
+      sessionUpdatedAtRef.current = Date.now();
+      sessionPinnedRef.current = undefined;
+      userRenamedRef.current = false;
+      sessionDirtyRef.current = false;
     }
 
     await deleteSessionById(id);
@@ -695,6 +715,30 @@ export default function ChatPage() {
 
     setTimeout(() => { isRestoringRef.current = false; }, 2000);
   }, [deleteSessionById, clearMediaFiles, chat, setActiveSessionId, sessions.length]);
+
+  const handleRenameSession = useCallback(async (id: string, newTitle: string) => {
+    if (id === activeSessionIdRef.current) {
+      // For the active session, update the ref and trigger a save through the normal path.
+      // This avoids a race between updateSessionFields and saveActiveSession.
+      sessionTitleRef.current = newTitle;
+      userRenamedRef.current = true;
+      sessionDirtyRef.current = true;
+      saveActiveSession();
+      // Still refresh sidebar so the new title appears immediately
+      await refreshSessions();
+    } else {
+      // For inactive sessions, update IndexedDB directly
+      await renameSession(id, newTitle);
+    }
+  }, [renameSession, saveActiveSession, refreshSessions]);
+
+  const handleTogglePinSession = useCallback(async (id: string) => {
+    const newPinned = await togglePinSession(id);
+    // Update the local ref so saveActiveSession preserves the new state
+    if (id === activeSessionIdRef.current) {
+      sessionPinnedRef.current = newPinned;
+    }
+  }, [togglePinSession]);
 
   const handleTokenSwitch = useCallback((newType: TokenType) => {
     switchPaymentMethod(newType);
@@ -758,9 +802,10 @@ export default function ChatPage() {
         <ChatHistorySidebar
           sessions={sessions}
           activeSessionId={activeSessionId}
-          getThumbnailUrl={getThumbnailUrl}
           onSelectSession={handleSelectSession}
           onDeleteSession={handleDeleteSession}
+          onRenameSession={handleRenameSession}
+          onTogglePinSession={handleTogglePinSession}
           onNewProject={handleNewPhoto}
           onFileDrop={handleFileDrop}
           unreadSessionIds={unreadSessionIds}
@@ -830,9 +875,10 @@ export default function ChatPage() {
           <MobileChatDrawer
             sessions={sessions}
             activeSessionId={activeSessionId}
-            getThumbnailUrl={getThumbnailUrl}
             onSelectSession={handleSelectSession}
             onDeleteSession={handleDeleteSession}
+            onRenameSession={handleRenameSession}
+            onTogglePinSession={handleTogglePinSession}
             onNewProject={handleUploadClick}
             onFileDrop={handleFileDrop}
             onClose={() => setDrawerOpen(false)}

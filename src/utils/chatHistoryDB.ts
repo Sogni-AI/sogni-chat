@@ -119,6 +119,7 @@ export async function getAllSessions(): Promise<ChatSessionSummary[]> {
           createdAt: s.createdAt,
           updatedAt: s.updatedAt,
           hasImage: !!s.imageData || !!(s.uploadedFiles?.some(f => f.type === 'image')),
+          pinned: s.pinned,
         });
         cursor.continue();
       } else {
@@ -148,6 +149,18 @@ export async function getSession(id: string): Promise<ChatSession | null> {
       reject(new Error('Failed to load chat session'));
     };
   });
+}
+
+/** Update specific fields on a session without loading/saving the entire object */
+export async function updateSessionFields(
+  id: string,
+  fields: Partial<Pick<ChatSession, 'title' | 'pinned'>>,
+): Promise<void> {
+  if (!id) return;
+  const session = await getSession(id);
+  if (!session) return;
+  const updated = { ...session, ...fields };
+  await saveSession(updated);
 }
 
 /** Delete a session and its thumbnail */

@@ -11,9 +11,10 @@ import { ChatHistorySidebar } from './ChatHistorySidebar';
 interface MobileChatDrawerProps {
   sessions: ChatSessionSummary[];
   activeSessionId: string | null;
-  getThumbnailUrl: (sessionId: string) => Promise<string | null>;
   onSelectSession: (id: string) => void;
   onDeleteSession: (id: string) => void;
+  onRenameSession: (id: string, newTitle: string) => void;
+  onTogglePinSession: (id: string) => void;
   onNewProject: () => void;
   onFileDrop?: (file: File) => void;
   onClose: () => void;
@@ -24,9 +25,10 @@ interface MobileChatDrawerProps {
 export function MobileChatDrawer({
   sessions,
   activeSessionId,
-  getThumbnailUrl,
   onSelectSession,
   onDeleteSession,
+  onRenameSession,
+  onTogglePinSession,
   onNewProject,
   onFileDrop,
   onClose,
@@ -99,9 +101,10 @@ export function MobileChatDrawer({
         <ChatHistorySidebar
           sessions={sessions}
           activeSessionId={activeSessionId}
-          getThumbnailUrl={getThumbnailUrl}
           onSelectSession={handleSelectSession}
           onDeleteSession={onDeleteSession}
+          onRenameSession={onRenameSession}
+          onTogglePinSession={onTogglePinSession}
           onNewProject={handleNewProject}
           onFileDrop={onFileDrop}
           onClose={handleClose}

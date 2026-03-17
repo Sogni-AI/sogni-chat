@@ -5,16 +5,17 @@
  * Mobile: Rendered inside MobileChatDrawer with full-width + close button.
  */
 
-import { useState, useCallback, type CSSProperties, type DragEvent } from 'react';
+import { useState, useCallback, useMemo, type CSSProperties, type DragEvent } from 'react';
 import type { ChatSessionSummary } from '@/types/chat';
 import { ChatHistoryItem } from './ChatHistoryItem';
 
 interface ChatHistorySidebarProps {
   sessions: ChatSessionSummary[];
   activeSessionId: string | null;
-  getThumbnailUrl: (sessionId: string) => Promise<string | null>;
   onSelectSession: (id: string) => void;
   onDeleteSession: (id: string) => void;
+  onRenameSession: (id: string, newTitle: string) => void;
+  onTogglePinSession: (id: string) => void;
   onNewProject: () => void;
   /** Called when a file is dropped onto the New Photo button */
   onFileDrop?: (file: File) => void;
@@ -37,9 +38,10 @@ interface ChatHistorySidebarProps {
 export function ChatHistorySidebar({
   sessions,
   activeSessionId,
-  getThumbnailUrl,
   onSelectSession,
   onDeleteSession,
+  onRenameSession,
+  onTogglePinSession,
   onNewProject,
   onFileDrop,
   onClose,
@@ -76,6 +78,13 @@ export function ChatHistorySidebar({
       onFileDrop(file);
     }
   }, [onFileDrop]);
+
+  // Sort pinned sessions to top while preserving updatedAt order within each group
+  const sortedSessions = useMemo(() => {
+    const pinned = sessions.filter(s => s.pinned);
+    const unpinned = sessions.filter(s => !s.pinned);
+    return [...pinned, ...unpinned];
+  }, [sessions]);
 
   const sidebarWidth = collapsed ? '52px' : '260px';
 
@@ -302,7 +311,7 @@ export function ChatHistorySidebar({
               padding: '0.25rem 0.5rem',
             }}
           >
-            {sessions.length === 0 ? (
+            {sortedSessions.length === 0 ? (
               <div
                 style={{
                   padding: '1.5rem 0.75rem',
@@ -314,16 +323,17 @@ export function ChatHistorySidebar({
                 No chats yet
               </div>
             ) : (
-              sessions.map((session) => (
+              sortedSessions.map((session) => (
                 <ChatHistoryItem
                   key={session.id}
                   session={session}
                   isActive={session.id === activeSessionId}
                   isUnread={unreadSessionIds?.has(session.id) ?? false}
                   hasActiveJob={activeJobSessionIds?.has(session.id) ?? false}
-                  getThumbnailUrl={getThumbnailUrl}
                   onSelect={onSelectSession}
                   onDelete={onDeleteSession}
+                  onRename={onRenameSession}
+                  onTogglePin={onTogglePinSession}
                   alwaysShowDelete={isMobile}
                 />
               ))

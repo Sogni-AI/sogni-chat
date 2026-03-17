@@ -46,6 +46,8 @@ export interface ChatSession {
   createdAt: number;
   /** Timestamp when session was last modified */
   updatedAt: number;
+  /** Whether this session is pinned to the top of the sidebar */
+  pinned?: boolean;
   /** UI messages for rendering */
   uiMessages: UIChatMessage[];
   /** LLM conversation history (raw ChatMessages for API) */
@@ -77,6 +79,8 @@ export interface ChatSessionSummary {
   updatedAt: number;
   /** Whether this session has an uploaded image */
   hasImage: boolean;
+  /** Whether this session is pinned to the top of the sidebar */
+  pinned?: boolean;
 }
 
 /** Thumbnail blob stored separately for efficient sidebar rendering */

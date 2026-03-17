@@ -12,6 +12,7 @@ import {
   getSession,
   saveSession,
   deleteSession as dbDeleteSession,
+  updateSessionFields,
   saveThumbnail,
   getThumbnail,
   generateThumbnail,
@@ -31,6 +32,8 @@ export interface UseChatSessionsReturn {
   getThumbnailUrl: (sessionId: string) => Promise<string | null>;
   updateThumbnail: (sessionId: string, imageBlob: Blob) => Promise<void>;
   refreshSessions: () => Promise<void>;
+  renameSession: (id: string, newTitle: string) => Promise<void>;
+  togglePinSession: (id: string) => Promise<boolean>;
   /** True once init (migration + session restore) has completed */
   initialized: boolean;
   /** The session to restore on mount (set once during init, consumed by parent) */
@@ -270,6 +273,32 @@ export function useChatSessions(): UseChatSessionsReturn {
     await loadSessions();
   }, [loadSessions]);
 
+  const renameSession = useCallback(async (id: string, newTitle: string) => {
+    try {
+      await updateSessionFields(id, { title: newTitle });
+      await loadSessions();
+      notifyOtherTabs();
+    } catch (err) {
+      console.error('[CHAT SESSIONS] Failed to rename session:', err);
+    }
+  }, [loadSessions]);
+
+  const togglePinSession = useCallback(async (id: string): Promise<boolean> => {
+    try {
+      // Read current state from IndexedDB (authoritative) to avoid stale closure
+      const session = await getSession(id);
+      if (!session) return false;
+      const newPinned = !session.pinned;
+      await updateSessionFields(id, { pinned: newPinned });
+      await loadSessions();
+      notifyOtherTabs();
+      return newPinned;
+    } catch (err) {
+      console.error('[CHAT SESSIONS] Failed to toggle pin:', err);
+      return false;
+    }
+  }, [loadSessions]);
+
   const clearPendingRestore = useCallback(() => {
     setPendingRestore(null);
   }, []);
@@ -285,6 +314,8 @@ export function useChatSessions(): UseChatSessionsReturn {
     getThumbnailUrl,
     updateThumbnail,
     refreshSessions,
+    renameSession,
+    togglePinSession,
     initialized,
     pendingRestore,
     clearPendingRestore,
