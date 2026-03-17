@@ -15,8 +15,14 @@ import {
   formatCredits,
 } from '../shared';
 import { applyStyle } from '@/services/sdk/styleTransfer';
+import type { ModelOverride } from '@/services/sdk/imageGeneration';
 import { fetchRestorationCostEstimate } from '@/services/creditsService';
 import { calculateOutputDimensions } from '@/utils/imageDimensions';
+
+/** Model configs for non-quality-tier models that apply_style can use via retry/switch */
+const EXTRA_MODELS: Record<string, ModelOverride> = {
+  flux2: { modelId: 'flux2_dev_fp8', name: 'Flux.2 Dev', steps: 20, guidance: 4.0 },
+};
 
 export async function execute(
   args: Record<string, unknown>,
@@ -27,7 +33,9 @@ export async function execute(
   const sourceIndex = args.sourceImageIndex as number | undefined;
   const scale = (args.scale as number) || 1;
   const aspectRatio = args.aspectRatio as string | undefined;
-  const qualityTier = context.qualityTier || 'fast';
+  const modelKey = args.model as string | undefined;
+  const modelOverride = modelKey ? EXTRA_MODELS[modelKey] : undefined;
+  const qualityTier = (args.quality as 'fast' | 'hq') || context.qualityTier || 'fast';
 
   if (!context.imageData && context.resultUrls.length === 0) {
     return JSON.stringify({ error: 'no_image', message: 'Please upload or generate an image first.' });
@@ -83,7 +91,7 @@ export async function execute(
     totalCount: 1,
     estimatedCost,
     sourceImageUrl,
-    modelName: `Qwen Image Edit 2511${qualityTier === 'fast' ? ' Lightning' : ''} — ${outputWidth}x${outputHeight}`,
+    modelName: `${modelOverride?.name ?? `Qwen Image Edit 2511${qualityTier === 'fast' ? ' Lightning' : ''}`} — ${outputWidth}x${outputHeight}`,
   });
 
   const billingId = estimatedCost > 0
@@ -101,6 +109,7 @@ export async function execute(
           tokenType,
           stylePrompt: prompt,
           qualityTier,
+          modelOverride,
         },
         (progress) => {
           callbacks.onToolProgress({

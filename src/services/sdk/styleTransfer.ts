@@ -5,6 +5,7 @@
 import { SogniClient } from '@sogni-ai/sogni-client';
 import { TokenType } from '@/types/wallet';
 import { QUALITY_PRESETS, type QualityTier } from '@/config/qualityPresets';
+import type { ModelOverride } from './imageGeneration';
 
 interface StyleTransferParams {
   imageData: Uint8Array;
@@ -14,6 +15,8 @@ interface StyleTransferParams {
   stylePrompt: string;
   outputFormat?: 'jpg' | 'png';
   qualityTier?: QualityTier;
+  /** When provided, bypasses quality-tier model selection */
+  modelOverride?: ModelOverride;
 }
 
 interface StyleTransferProgress {
@@ -48,6 +51,7 @@ export async function applyStyle(
   }
 
   const preset = QUALITY_PRESETS[qualityTier];
+  const model = params.modelOverride;
 
   console.log('[STYLE SERVICE] Starting style transfer...', {
     imageDataSize: imageData.length,
@@ -56,23 +60,24 @@ export async function applyStyle(
     tokenType,
     stylePrompt,
     qualityTier,
+    modelOverride: model?.name,
   });
 
-  // Create project with Qwen Image Edit model (same as restoration)
+  // Create project with the selected model (quality-preset or override)
   const projectConfig: any = {
     type: 'image',
     testnet: false,
     tokenType: tokenType,
-    modelId: preset.model,
+    modelId: model?.modelId ?? preset.model,
     positivePrompt: stylePrompt,
     negativePrompt: '',
     stylePrompt: '',
     sizePreset: 'custom',
     width,
     height,
-    steps: preset.steps,
-    guidance: preset.guidance,
-    numberOfMedia: 1, // Single variation for style transfer
+    steps: model?.steps ?? preset.steps,
+    guidance: model?.guidance ?? preset.guidance,
+    numberOfMedia: 1,
     outputFormat,
     disableNSFWFilter: true,
     contextImages: [imageData],

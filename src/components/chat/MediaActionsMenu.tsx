@@ -121,7 +121,6 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
           alignItems: 'center',
           justifyContent: 'center',
           transition: 'color 0.15s, background 0.15s',
-          // Ensure minimum 44px touch target on mobile
           minWidth: '28px',
           minHeight: '28px',
         }}
