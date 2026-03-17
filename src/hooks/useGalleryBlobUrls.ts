@@ -4,7 +4,7 @@
  * Returns a Map<number, string> keyed by array index for O(1) lookup.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getImage } from '@/utils/galleryDB';
 
 /**
@@ -15,9 +15,19 @@ export function useGalleryBlobUrls(
   galleryIds?: string[],
 ): Map<number, string> {
   const [blobUrls, setBlobUrls] = useState<Map<number, string>>(new Map());
+  // Stabilize array identity — only re-run when actual contents change
+  const prevIdsRef = useRef<string>('');
+  const stableIdsRef = useRef<string[] | undefined>(galleryIds);
+
+  const key = galleryIds?.join(',') ?? '';
+  if (key !== prevIdsRef.current) {
+    prevIdsRef.current = key;
+    stableIdsRef.current = galleryIds;
+  }
+  const stableIds = stableIdsRef.current;
 
   useEffect(() => {
-    if (!galleryIds || galleryIds.length === 0) {
+    if (!stableIds || stableIds.length === 0) {
       setBlobUrls(new Map());
       return;
     }
@@ -28,7 +38,7 @@ export function useGalleryBlobUrls(
     async function resolve() {
       const result = new Map<number, string>();
       await Promise.all(
-        galleryIds!.map(async (gid, i) => {
+        stableIds!.map(async (gid, i) => {
           if (!gid) return;
           try {
             const img = await getImage(gid);
@@ -50,7 +60,7 @@ export function useGalleryBlobUrls(
       cancelled = true;
       objectUrls.forEach(url => URL.revokeObjectURL(url));
     };
-  }, [galleryIds]);
+  }, [stableIds]);
 
   return blobUrls;
 }

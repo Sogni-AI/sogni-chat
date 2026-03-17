@@ -155,7 +155,7 @@ export async function execute(
   let sourceImageData = context.imageData;
   let sourceWidth = context.width;
   let sourceHeight = context.height;
-  // Track MIME type: fetchImageAsUint8Array outputs JPEG; uploads preserve original
+  // Track MIME type: fetchImageAsUint8Array returns actual content type; uploads preserve original
   let sourceImageMime = context.uploadedFiles.find(f => f.type === 'image')?.mimeType ?? 'image/jpeg';
 
   if (effectiveSourceIndex !== undefined && context.resultUrls[effectiveSourceIndex]) {
@@ -165,7 +165,7 @@ export async function execute(
       sourceImageData = fetched.data;
       sourceWidth = fetched.width;
       sourceHeight = fetched.height;
-      sourceImageMime = 'image/jpeg'; // fetchImageAsUint8Array always outputs JPEG via canvas
+      sourceImageMime = fetched.mimeType;
       console.log(`[ANIMATE] Successfully fetched result image: ${sourceWidth}x${sourceHeight}, ${sourceImageData.length} bytes`);
     } catch (err) {
       if (!context.imageData) {
@@ -309,6 +309,7 @@ export async function execute(
       height: sourceHeight,
       tokenType,
       prompt: composedPrompt,
+      imageMimeType: sourceImageMime,
       duration,
       videoModelId,
       numberOfMedia,

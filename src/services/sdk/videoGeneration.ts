@@ -22,6 +22,8 @@ export interface VideoGenerationParams {
   height: number;
   tokenType: TokenType;
   prompt: string;
+  /** MIME type of imageData (default: 'image/jpeg') */
+  imageMimeType?: string;
   /** Which video model to use (defaults to DEFAULT_VIDEO_MODEL) */
   videoModelId?: VideoModelId;
   /** Video duration in seconds (default: 5) */
@@ -89,7 +91,7 @@ export async function generateVideo(
   });
 
   // Convert Uint8Array to Blob for SDK referenceImage param
-  const referenceImageBlob = new Blob([new Uint8Array(imageData)], { type: 'image/jpeg' });
+  const referenceImageBlob = new Blob([new Uint8Array(imageData)], { type: params.imageMimeType || 'image/jpeg' });
 
   // Build project config — model-specific params applied dynamically
   const projectConfig: any = {

@@ -4,26 +4,14 @@
  * for saving photos AND videos to camera roll on iOS and Android.
  */
 
-/**
- * Detect if device is mobile
- */
-export const isMobile = (): boolean => {
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-};
+// Compute device detection once — userAgent never changes during a page's lifetime
+const _isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+const _isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+const _isAndroid = /Android/i.test(navigator.userAgent);
 
-/**
- * Detect if device is iOS
- */
-export const isIOS = (): boolean => {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent);
-};
-
-/**
- * Detect if device is Android
- */
-export const isAndroid = (): boolean => {
-  return /Android/i.test(navigator.userAgent);
-};
+export const isMobile = (): boolean => _isMobile;
+export const isIOS = (): boolean => _isIOS;
+export const isAndroid = (): boolean => _isAndroid;
 
 /** Infer MIME type from filename */
 function mimeFromFilename(filename: string): string {

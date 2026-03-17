@@ -24,14 +24,20 @@ interface ChatHistoryItemProps {
   hasActiveJob?: boolean;
 }
 
+// Pre-compiled regexes for displayTitle — avoids re-compiling on every sidebar render
+const RE_NUMERIC_ONLY = /^\d[\d\s_-]*$/;
+const RE_GENERIC_FILENAME = /^(images?|photos?|downloads?|pictures?|files?|untitled|screenshot)(\s*\(\d+\))?$/i;
+const RE_NON_ALNUM = /[^a-zA-Z0-9]/g;
+const RE_DIGIT = /\d/g;
+
 /** Fallback for raw numeric filenames or browser-generated names that slipped through as titles */
 function displayTitle(title: string): string {
   const trimmed = title.trim();
-  if (/^\d[\d\s_-]*$/.test(trimmed)) return 'Untitled Session';
-  if (/^(images?|photos?|downloads?|pictures?|files?|untitled|screenshot)(\s*\(\d+\))?$/i.test(trimmed)) return 'Untitled Session';
-  const alphanumeric = trimmed.replace(/[^a-zA-Z0-9]/g, '');
+  if (RE_NUMERIC_ONLY.test(trimmed)) return 'Untitled Session';
+  if (RE_GENERIC_FILENAME.test(trimmed)) return 'Untitled Session';
+  const alphanumeric = trimmed.replace(RE_NON_ALNUM, '');
   if (alphanumeric.length > 0) {
-    const digitCount = (trimmed.match(/\d/g) || []).length;
+    const digitCount = (trimmed.match(RE_DIGIT) || []).length;
     if (digitCount / alphanumeric.length > 0.6) return 'Untitled Session';
   }
   return title;

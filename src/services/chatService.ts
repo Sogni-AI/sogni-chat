@@ -54,26 +54,12 @@ const MAX_TOOL_ROUNDS = 5;
 const VISION_IMAGE_TOKENS = 1_300;
 
 /**
- * Prepare vision-ready data URIs from all relevant image sources.
- * Uses resizeImageForVision (1024px max, JPEG 0.85) for compact payloads.
- * Returns an empty array if no images are available or preparation fails.
+ * Prepare vision-ready data URIs from uploaded images.
+ * These don't change between tool rounds so we cache them.
  */
-async function prepareVisionDataUris(context: ToolExecutionContext): Promise<string[]> {
+async function prepareUploadedImageUris(context: ToolExecutionContext): Promise<string[]> {
   const uris: string[] = [];
   try {
-    // When a tool has produced results, try to show the latest result.
-    // resultUrls may contain non-image URLs (audio/video) so guard against
-    // resizeImageForVision failing on those.
-    if (context.resultUrls.length > 0) {
-      try {
-        const uri = await resizeImageForVision(context.resultUrls[context.resultUrls.length - 1]);
-        uris.push(uri);
-      } catch {
-        // Latest result is not an image (audio/video) — skip it
-      }
-    }
-    // Always include all uploaded images so the LLM retains context of user
-    // attachments even after tools produce results.
     const imgFiles = context.uploadedFiles.filter(f => f.type === 'image');
     for (const imgFile of imgFiles) {
       const buf = imgFile.data.buffer.slice(
@@ -106,6 +92,20 @@ async function prepareVisionDataUris(context: ToolExecutionContext): Promise<str
     console.warn('[CHAT SERVICE] Vision image preparation failed:', err);
   }
   return uris;
+}
+
+/**
+ * Prepare the latest tool result as a vision data URI.
+ * Returns null if the latest result is not an image (audio/video).
+ */
+async function prepareLatestResultUri(context: ToolExecutionContext): Promise<string | null> {
+  if (context.resultUrls.length === 0) return null;
+  try {
+    return await resizeImageForVision(context.resultUrls[context.resultUrls.length - 1]);
+  } catch {
+    // Latest result is not an image (audio/video) — skip it
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -142,11 +142,14 @@ export async function sendChatMessage(
     onGallerySaved: callbacks.onGallerySaved,
   };
 
-  // Prepare vision context once before the loop: resize all current images
-  // to compact data URIs so the VLM can "see" them on every round.
-  // Re-prepared inside the loop only when new results are generated.
-  let visionDataUris = await prepareVisionDataUris(context);
+  // Cache uploaded image URIs once — they never change between tool rounds.
+  // Only the latest result URI needs refreshing when new results appear.
+  const uploadedImageUris = await prepareUploadedImageUris(context);
+  let latestResultUri = await prepareLatestResultUri(context);
   let visionResultCount = context.resultUrls.length;
+  let visionDataUris = latestResultUri
+    ? [latestResultUri, ...uploadedImageUris]
+    : uploadedImageUris;
 
   while (toolRound < MAX_TOOL_ROUNDS) {
     toolRound++;
@@ -172,10 +175,13 @@ export async function sendChatMessage(
         ...updatedMessages,
       ];
 
-      // If a tool generated new results since last round, refresh the cached URIs
+      // If a tool generated new results since last round, only refresh the result URI
       if (context.resultUrls.length > visionResultCount) {
-        visionDataUris = await prepareVisionDataUris(context);
+        latestResultUri = await prepareLatestResultUri(context);
         visionResultCount = context.resultUrls.length;
+        visionDataUris = latestResultUri
+          ? [latestResultUri, ...uploadedImageUris]
+          : uploadedImageUris;
       }
 
       // Attach cached vision context to the latest user message.

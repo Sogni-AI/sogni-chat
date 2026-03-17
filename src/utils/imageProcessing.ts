@@ -3,13 +3,8 @@
  */
 
 /**
- * Resize an image for vision analysis.
- * Scales proportionally so the longest side is at most `maxDimension` pixels,
- * converts to JPEG, and returns a base64 data URI.
- */
-/**
  * Resize a Uint8Array image for vision analysis.
- * Converts to a blob URL, resizes via canvas, and returns a base64 data URI.
+ * Converts to a blob URL, resizes via canvas if needed, and returns a base64 data URI.
  */
 export async function resizeUint8ArrayForVision(
   data: Uint8Array,
@@ -29,35 +24,50 @@ export async function resizeImageForVision(
   maxDimension: number = 1024,
   quality: number = 0.92,
 ): Promise<string> {
+  // Check dimensions first to decide if resize is actually needed
+  const { img, width, height } = await loadImage(imageUrl);
+  const needsResize = width > maxDimension || height > maxDimension;
+
+  if (!needsResize) {
+    // Already within limits — convert to data URI without expensive canvas re-encode
+    return blobUrlToDataUri(imageUrl);
+  }
+
+  const scale = maxDimension / Math.max(width, height);
+  const tw = Math.round(width * scale);
+  const th = Math.round(height * scale);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = tw;
+  canvas.height = th;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Cannot create canvas context');
+  ctx.drawImage(img, 0, 0, tw, th);
+
+  console.log(`[IMAGE] Resized for vision: ${width}x${height} -> ${tw}x${th}`);
+  return canvas.toDataURL('image/jpeg', quality);
+}
+
+/** Load an image element and return it with its dimensions */
+function loadImage(url: string): Promise<{ img: HTMLImageElement; width: number; height: number }> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      let { naturalWidth: w, naturalHeight: h } = img;
+    img.onload = () => resolve({ img, width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => reject(new Error('Failed to load image'));
+    img.src = url;
+  });
+}
 
-      // Scale down proportionally if needed
-      if (w > maxDimension || h > maxDimension) {
-        const scale = maxDimension / Math.max(w, h);
-        w = Math.round(w * scale);
-        h = Math.round(h * scale);
-      }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('Cannot create canvas context'));
-        return;
-      }
-      ctx.drawImage(img, 0, 0, w, h);
-
-      const dataUri = canvas.toDataURL('image/jpeg', quality);
-      console.log(`[IMAGE] Resized for vision: ${img.naturalWidth}x${img.naturalHeight} -> ${w}x${h}`);
-      resolve(dataUri);
-    };
-    img.onerror = () => reject(new Error('Failed to load image for vision resize'));
-    img.src = imageUrl;
+/** Convert a blob/http URL to a data URI via fetch (no canvas re-encode) */
+async function blobUrlToDataUri(url: string): Promise<string> {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Failed to convert blob to data URI'));
+    reader.readAsDataURL(blob);
   });
 }
 

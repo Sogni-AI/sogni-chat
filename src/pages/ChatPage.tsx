@@ -29,24 +29,27 @@ import type { QualityTier } from '@/config/qualityPresets';
 import { CHAT_MODEL_ABLITERATED } from '@/config/chat';
 import { DEFAULT_VARIANT_ID } from '@/config/modelVariants';
 import { QUALITY_PRESETS, getSavedQualityTier, saveQualityTier } from '@/config/qualityPresets';
-import { useRestorationCostEstimation } from '@/hooks/useRestorationCostEstimation';
 import type { TokenType } from '@/types/wallet';
 import { SogniTVPreview } from '@/components/shared/SogniTVPreview';
 import { warmUpAudio } from '@/utils/sonicLogos';
 import '@/components/chat/chat.css';
 
+// Pre-compiled regexes for title detection — avoids re-compiling on every call
+const RE_TITLE_NUMERIC = /^\d[\d\s_-]*$/;
+const RE_TITLE_GENERIC = /^(images?|photos?|downloads?|pictures?|files?|untitled|screenshot)([\s_-]*\(?\d+\)?)?$/i;
+const RE_TITLE_NON_ALNUM = /[^a-zA-Z0-9]/g;
+const RE_TITLE_DIGIT = /\d/g;
+const RE_CAMERA_PATTERN = /^[A-Z]{0,4}[-_\s]?\d{3,}[-_\s\d]*$/i;
+
 /** Returns true if a title is predominantly numeric or a known placeholder — not human-readable */
 function isGenericTitle(title: string): boolean {
   if (!title) return true;
   if (title === 'New Photo' || title.startsWith('Photo Restore') || title.startsWith('New Session')) return true;
-  // All numbers/separators (e.g. "646376662 10226279100")
-  if (/^\d[\d\s_-]*$/.test(title.trim())) return true;
-  // Browser-generated filenames: "images (3)", "photo-2", "image_3", "download", "Untitled", etc.
-  if (/^(images?|photos?|downloads?|pictures?|files?|untitled|screenshot)([\s_-]*\(?\d+\)?)?$/i.test(title.trim())) return true;
-  // Predominantly digits: if >60% of alphanumeric chars are digits, it's likely a camera/social filename
-  const alphanumeric = title.replace(/[^a-zA-Z0-9]/g, '');
+  if (RE_TITLE_NUMERIC.test(title.trim())) return true;
+  if (RE_TITLE_GENERIC.test(title.trim())) return true;
+  const alphanumeric = title.replace(RE_TITLE_NON_ALNUM, '');
   if (alphanumeric.length > 0) {
-    const digitCount = (title.match(/\d/g) || []).length;
+    const digitCount = (title.match(RE_TITLE_DIGIT) || []).length;
     if (digitCount / alphanumeric.length > 0.6) return true;
   }
   return false;
@@ -57,16 +60,12 @@ function deriveSessionTitle(filename?: string, sessionNumber?: number): string {
   const placeholder = sessionNumber ? `New Session #${sessionNumber}` : 'New Session';
   if (!filename) return placeholder;
   const base = filename.replace(/\.[^.]+$/, '');
-  // Camera/social media patterns: IMG_1234, DSC-5678, 646376662_10226279100_n, etc.
-  if (/^[A-Z]{0,4}[-_\s]?\d{3,}[-_\s\d]*$/i.test(base)) return placeholder;
-  // Browser-generated filenames: "images (3)", "photo-2", "image_3", "download", "Untitled", etc.
-  if (/^(images?|photos?|downloads?|pictures?|files?|untitled|screenshot)([\s_-]*\(?\d+\)?)?$/i.test(base.trim())) return placeholder;
-  // Clean up underscores/dashes to spaces, collapse whitespace
+  if (RE_CAMERA_PATTERN.test(base)) return placeholder;
+  if (RE_TITLE_GENERIC.test(base.trim())) return placeholder;
   const cleaned = base.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
-  // Predominantly digits (>60%): social media filenames like "646376662_10226279100_n"
-  const alphanumeric = cleaned.replace(/[^a-zA-Z0-9]/g, '');
+  const alphanumeric = cleaned.replace(RE_TITLE_NON_ALNUM, '');
   if (alphanumeric.length > 0) {
-    const digitCount = (cleaned.match(/\d/g) || []).length;
+    const digitCount = (cleaned.match(RE_TITLE_DIGIT) || []).length;
     if (digitCount / alphanumeric.length > 0.6) return placeholder;
   }
   return cleaned || placeholder;
@@ -152,11 +151,6 @@ export default function ChatPage() {
     setQualityTierState(tier);
     saveQualityTier(tier);
   }, []);
-  const { cost: estimatedCost, loading: costLoading } = useRestorationCostEstimation({
-    qualityTier,
-    imageCount: 1,
-    tokenType,
-  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const gallerySavedRef = useRef(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -764,6 +758,12 @@ export default function ChatPage() {
       }
     }
 
+    // Kill any pending debounced save so it can't race with the new session
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+
     // Save current session first
     if (activeSessionIdRef.current) await saveActiveSession();
 
@@ -779,14 +779,15 @@ export default function ChatPage() {
     if (message.imageResults?.length) {
       for (const url of message.imageResults) {
         try {
-          const { data, width, height } = await fetchImageAsUint8Array(url);
+          const fetched = await fetchImageAsUint8Array(url);
+          const ext = fetched.mimeType === 'image/png' ? 'png' : 'jpg';
           branchedFiles.push({
             type: 'image',
-            data,
-            width,
-            height,
-            mimeType: 'image/jpeg',
-            filename: `image-${branchedFiles.length + 1}.jpg`,
+            data: fetched.data,
+            width: fetched.width,
+            height: fetched.height,
+            mimeType: fetched.mimeType,
+            filename: `image-${branchedFiles.length + 1}.${ext}`,
           });
           branchedResultUrls.push(url);
         } catch (err) {
@@ -852,12 +853,17 @@ export default function ChatPage() {
     };
 
     await saveCurrentSession(newId, newSession);
-    await switchSession(newId);
 
-    // Immediately update the ref so save functions see the new session ID
+    // Point everything at the new session BEFORE loading state.
+    // Using setActiveSessionId directly (instead of switchSession) avoids an
+    // unnecessary IndexedDB round-trip and removes a window where the state
+    // and ref could momentarily disagree.
+    setActiveSessionId(newId);
     activeSessionIdRef.current = newId;
 
-    // Load the clean session into useChat
+    // Load the clean session into useChat — must happen in the same
+    // synchronous block as the ID updates so React batches everything
+    // into a single render with (newId + empty messages).
     chat.loadFromSession(newSession);
 
     // Reset to default model variant for the fresh session
@@ -869,15 +875,18 @@ export default function ChatPage() {
     sessionPinnedRef.current = undefined;
     userRenamedRef.current = false;
     sessionDirtyRef.current = false;
-    gallerySavedRef.current = false;
+    // Artifacts came from a session that already saved to gallery — skip re-save
+    gallerySavedRef.current = true;
     setResultUrls(newSession.allResultUrls);
     setUploadIntent(null);
 
     // Load the fetched artifacts as uploaded files
     loadFiles(branchedFiles);
 
+    console.log(`[BRANCH] Created clean session ${newId}: 0 msgs, ${branchedFiles.length} files, ${branchedResultUrls.length} result URLs`);
+
     setTimeout(() => { isRestoringRef.current = false; }, 2000);
-  }, [chat, createNewSession, saveCurrentSession, switchSession, saveActiveSession, setSelectedModelVariant, loadFiles]);
+  }, [chat, createNewSession, saveCurrentSession, setActiveSessionId, saveActiveSession, setSelectedModelVariant, loadFiles]);
 
   /** Retry a tool execution with an optional model override */
   const handleRetry = useCallback(async (message: UIChatMessage, modelKey?: string) => {
@@ -994,8 +1003,6 @@ export default function ChatPage() {
               safeContentFilter={safeContentFilter}
               onContentFilterChange={setSafeContentFilter}
 
-              estimatedCost={estimatedCost}
-              costLoading={costLoading}
               onResultsChange={handleResultsChange}
               onLoadingChange={handleLoadingChange}
               onUploadClick={handleUploadClick}

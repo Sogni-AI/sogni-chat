@@ -219,8 +219,7 @@ export async function execute(
         console.log(`[GENERATE IMAGE] Using result image #${effectiveSourceIndex} as starting image`);
         const fetched = await fetchImageAsUint8Array(context.resultUrls[effectiveSourceIndex]);
         startingImageData = fetched.data;
-        // fetchImageAsUint8Array always outputs JPEG via canvas
-        startingImageMime = 'image/jpeg';
+        startingImageMime = fetched.mimeType;
       } catch (err) {
         console.error('[GENERATE IMAGE] Failed to fetch starting image from results, trying original:', err);
       }

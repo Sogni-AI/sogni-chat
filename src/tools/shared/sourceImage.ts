@@ -31,55 +31,37 @@ export async function fetchAudioAsUint8Array(
 
 /**
  * Fetch an image URL and convert to Uint8Array with dimensions.
- * Uses an off-screen canvas to decode the image in the browser.
+ * Uses direct fetch (no canvas re-encode). Returns the actual MIME type
+ * from the response so callers don't need to assume the format.
  */
 export async function fetchImageAsUint8Array(
   url: string,
-): Promise<{ data: Uint8Array; width: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      img.src = '';
-      reject(new Error('Image fetch timed out'));
-    }, 30_000);
+): Promise<{ data: Uint8Array; width: number; height: number; mimeType: string }> {
+  const controller = new AbortController();
+  // Single 30s deadline for the entire operation (image load + fetch)
+  const deadline = setTimeout(() => controller.abort(), 30_000);
 
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      clearTimeout(timeout);
-      const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('Cannot create canvas context'));
-        return;
-      }
-      ctx.drawImage(img, 0, 0);
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            reject(new Error('Canvas toBlob returned null'));
-            return;
-          }
-          blob.arrayBuffer()
-            .then((buffer) => {
-              resolve({
-                data: new Uint8Array(buffer),
-                width: img.naturalWidth,
-                height: img.naturalHeight,
-              });
-            })
-            .catch(reject);
-        },
-        'image/jpeg',
-        0.95,
-      );
-    };
-    img.onerror = () => {
-      clearTimeout(timeout);
-      reject(new Error('Failed to load image'));
-    };
-    img.src = url;
-  });
+  try {
+    // Get dimensions via Image element
+    const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      controller.signal.addEventListener('abort', () => { img.src = ''; reject(new Error('Image fetch timed out')); });
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = url;
+    });
+
+    // Fetch raw bytes directly — avoids canvas re-encode
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`Image fetch failed: ${response.status}`);
+    const mimeType = response.headers.get('content-type')?.split(';')[0]?.trim() || 'image/jpeg';
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength === 0) throw new Error('Image fetch returned empty data');
+
+    return { data: new Uint8Array(buffer), width, height, mimeType };
+  } finally {
+    clearTimeout(deadline);
+  }
 }
 
