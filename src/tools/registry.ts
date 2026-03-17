@@ -17,8 +17,8 @@ class ToolRegistry {
   private static readonly TIMEOUT_OVERRIDES: Record<string, number> = {
     generate_music: 660_000,
     video_to_video: 660_000,
-    generate_video: 300_000,
-    animate_photo: 300_000,
+    generate_video: 600_000,
+    animate_photo: 600_000,
     extract_metadata: 60_000,
   };
 
@@ -132,15 +132,34 @@ class ToolRegistry {
       originalSignal?.addEventListener('abort', () => timeoutController.abort(), { once: true });
     }
 
-    const timeoutId = setTimeout(() => {
+    let timeoutId = setTimeout(() => {
       console.warn(`[TOOL REGISTRY] Timeout: "${name}" exceeded ${timeoutMs / 1000}s — aborting`);
       timeoutController.abort();
     }, timeoutMs);
 
+    // Reset the timeout whenever the tool reports progress — as long as the
+    // tool is actively sending updates (progress, ETA, etc.) it should not
+    // be killed by the hard timeout.
+    const resetTimeout = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        console.warn(`[TOOL REGISTRY] Timeout: "${name}" exceeded ${timeoutMs / 1000}s of inactivity — aborting`);
+        timeoutController.abort();
+      }, timeoutMs);
+    };
+
+    const activityCallbacks: ToolCallbacks = {
+      ...callbacks,
+      onToolProgress: (...args) => {
+        resetTimeout();
+        return callbacks.onToolProgress(...args);
+      },
+    };
+
     const timeoutContext = { ...context, signal: timeoutController.signal };
 
     try {
-      const result = await handler.execute(effectiveArgs, timeoutContext, callbacks);
+      const result = await handler.execute(effectiveArgs, timeoutContext, activityCallbacks);
       clearTimeout(timeoutId);
       return result;
     } catch (err) {
