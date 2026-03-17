@@ -18,7 +18,7 @@ interface GalleryProjectCardProps {
   project: GalleryProject;
   onClick: () => void;
   onDelete: (projectId: string) => void;
-  getFirstResultUrl: (projectId: string) => Promise<{ url: string; mediaType?: 'image' | 'video'; width?: number; height?: number } | null>;
+  getFirstResultUrl: (projectId: string) => Promise<{ url: string; mediaType?: 'image' | 'video' | 'audio'; width?: number; height?: number } | null>;
   onThumbnailDimensions?: (projectId: string, width: number, height: number) => void;
   index?: number;
 }
@@ -63,7 +63,7 @@ const GalleryProjectCard: React.FC<GalleryProjectCardProps> = ({
   index = 0,
 }) => {
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
-  const [thumbnailMediaType, setThumbnailMediaType] = useState<'image' | 'video' | undefined>();
+  const [thumbnailMediaType, setThumbnailMediaType] = useState<'image' | 'video' | 'audio' | undefined>();
   const [thumbnailLoading, setThumbnailLoading] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -147,6 +147,33 @@ const GalleryProjectCard: React.FC<GalleryProjectCardProps> = ({
             background: 'var(--color-bg-elevated)',
           }}
         />
+      ) : thumbnailMediaType === 'audio' ? (
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <svg
+            width="40"
+            height="40"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ color: 'rgba(255,255,255,0.6)' }}
+          >
+            <path d="M9 18V5l12-2v13" />
+            <circle cx="6" cy="18" r="3" />
+            <circle cx="18" cy="16" r="3" />
+          </svg>
+        </div>
       ) : thumbnailUrl && thumbnailMediaType === 'video' ? (
         <video
           ref={videoRef}

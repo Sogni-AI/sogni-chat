@@ -122,6 +122,7 @@ export interface UseChatResult {
     sessionId: string,
     galleryImageIds: string[],
     galleryVideoIds: string[],
+    galleryAudioIds?: string[],
   ) => void) | null) => void;
   /** Dismiss the current error */
   clearError: () => void;
@@ -159,13 +160,14 @@ function cleanForStorage(messages: UIChatMessage[]): UIChatMessage[] {
 }
 
 /**
- * Apply gallery image/video IDs to the most recent matching messages.
- * Shared by onGallerySaved (video saves) and setGalleryIds (image saves).
+ * Apply gallery image/video/audio IDs to the most recent matching messages.
+ * Shared by onGallerySaved (video/audio saves) and setGalleryIds (image saves).
  */
 export function applyGalleryIdsToMessages(
   messages: UIChatMessage[],
   galleryImageIds: string[],
   galleryVideoIds?: string[],
+  galleryAudioIds?: string[],
 ): UIChatMessage[] {
   const updated = [...messages];
   if (galleryImageIds.length > 0) {
@@ -183,6 +185,16 @@ export function applyGalleryIdsToMessages(
         const existing = updated[i].galleryVideoIds || [];
         const merged = [...new Set([...existing, ...galleryVideoIds])];
         updated[i] = { ...updated[i], galleryVideoIds: merged };
+        break;
+      }
+    }
+  }
+  if (galleryAudioIds && galleryAudioIds.length > 0) {
+    for (let i = updated.length - 1; i >= 0; i--) {
+      if (updated[i].audioResults && updated[i].audioResults!.length > 0) {
+        const existing = updated[i].galleryAudioIds || [];
+        const merged = [...new Set([...existing, ...galleryAudioIds])];
+        updated[i] = { ...updated[i], galleryAudioIds: merged };
         break;
       }
     }
@@ -245,6 +257,7 @@ export function useChat(): UseChatResult {
     sessionId: string,
     galleryImageIds: string[],
     galleryVideoIds: string[],
+    galleryAudioIds?: string[],
   ) => void) | null>(null);
 
   /**
@@ -810,17 +823,17 @@ export function useChat(): UseChatResult {
 
               onInsufficientCredits: context.onInsufficientCredits,
 
-              onGallerySaved: (galleryImageIds: string[], galleryVideoIds: string[]) => {
+              onGallerySaved: (galleryImageIds: string[], galleryVideoIds: string[], galleryAudioIds?: string[]) => {
                 if (thisRequest.aborted) return;
                 if (!isActiveSession()) {
                   const effectiveGallerySessionId = capturedSessionId || sessionIdRef.current;
                   if (effectiveGallerySessionId) {
-                    onBackgroundGallerySavedRef.current?.(effectiveGallerySessionId, galleryImageIds, galleryVideoIds);
+                    onBackgroundGallerySavedRef.current?.(effectiveGallerySessionId, galleryImageIds, galleryVideoIds, galleryAudioIds);
                   }
                   return;
                 }
-                console.log(`[CHAT HOOK] onGallerySaved: ${galleryImageIds.length} image IDs, ${galleryVideoIds.length} video IDs`);
-                setUIMessages((prev) => applyGalleryIdsToMessages(prev, galleryImageIds, galleryVideoIds));
+                console.log(`[CHAT HOOK] onGallerySaved: ${galleryImageIds.length} image IDs, ${galleryVideoIds.length} video IDs, ${galleryAudioIds?.length || 0} audio IDs`);
+                setUIMessages((prev) => applyGalleryIdsToMessages(prev, galleryImageIds, galleryVideoIds, galleryAudioIds));
               },
 
               onContextTrimmed: () => {
@@ -1328,14 +1341,14 @@ export function useChat(): UseChatResult {
             audioResultUrlsRef.current = [...new Set([...audioResultUrlsRef.current, ...retryResultUrls])];
           }
         },
-        onGallerySaved: (galleryImageIds, galleryVideoIds) => {
+        onGallerySaved: (galleryImageIds, galleryVideoIds, galleryAudioIds) => {
           if (isActiveSession()) {
-            setUIMessages(prev => applyGalleryIdsToMessages(prev, galleryImageIds, galleryVideoIds));
+            setUIMessages(prev => applyGalleryIdsToMessages(prev, galleryImageIds, galleryVideoIds, galleryAudioIds));
           } else {
             // Background: notify parent for IndexedDB persistence
             const effectiveSessionId = capturedSessionId || sessionIdRef.current;
             if (effectiveSessionId) {
-              onBackgroundGallerySavedRef.current?.(effectiveSessionId, galleryImageIds, galleryVideoIds);
+              onBackgroundGallerySavedRef.current?.(effectiveSessionId, galleryImageIds, galleryVideoIds, galleryAudioIds);
             }
           }
         },

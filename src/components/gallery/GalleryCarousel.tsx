@@ -20,7 +20,7 @@ interface GalleryCarouselProps {
 interface SlideItem {
   type: 'source' | 'result';
   url: string;
-  mediaType: 'image' | 'video';
+  mediaType: 'image' | 'video' | 'audio';
   image?: GalleryImage;
   label?: string;
 }
@@ -212,8 +212,9 @@ export default function GalleryCarousel({
     if (slide.type === 'source' && data) {
       downloadBlob(data.sourceImage.blob, buildDownloadFilename(data.project.name || undefined, undefined, 'original'));
     } else if (slide.image && data) {
-      const isVideo = slide.mediaType === 'video';
-      const type = isVideo ? 'video' as const : 'restored' as const;
+      const type = slide.mediaType === 'video' ? 'video' as const
+        : slide.mediaType === 'audio' ? 'audio' as const
+        : 'restored' as const;
       downloadBlob(slide.image.blob, buildDownloadFilename(data.project.name || undefined, slide.image.index + 1, type));
     }
   }, [slides, currentIndex, data]);
@@ -308,7 +309,36 @@ export default function GalleryCarousel({
                   position: 'relative',
                 }}
               >
-                {slide.mediaType === 'video' ? (
+                {slide.mediaType === 'audio' ? (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '24px',
+                  }}>
+                    <svg
+                      width="64"
+                      height="64"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{ color: 'rgba(255,255,255,0.5)' }}
+                    >
+                      <path d="M9 18V5l12-2v13" />
+                      <circle cx="6" cy="18" r="3" />
+                      <circle cx="18" cy="16" r="3" />
+                    </svg>
+                    <audio
+                      src={slide.url}
+                      controls
+                      autoPlay={idx === currentIndex}
+                      style={{ width: '320px' }}
+                    />
+                  </div>
+                ) : slide.mediaType === 'video' ? (
                   <video
                     ref={(el) => {
                       if (el) videoRefs.current.set(idx, el);

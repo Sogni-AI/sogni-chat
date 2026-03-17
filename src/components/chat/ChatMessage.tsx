@@ -328,6 +328,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
               onRetry={onRetry}
               mediaType="audio"
               mediaUrls={message.audioResults}
+              galleryImageIds={message.galleryAudioIds}
               downloadSlug={downloadSlug}
             />
             {message.modelName && (

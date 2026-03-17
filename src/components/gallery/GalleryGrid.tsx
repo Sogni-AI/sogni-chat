@@ -21,7 +21,7 @@ interface GalleryGridProps {
   activeTab: 'all' | 'favorites';
   onSelectProject: (projectId: string) => void;
   onDeleteProject: (projectId: string) => void;
-  getFirstResultUrl: (projectId: string) => Promise<{ url: string; mediaType?: 'image' | 'video'; width?: number; height?: number } | null>;
+  getFirstResultUrl: (projectId: string) => Promise<{ url: string; mediaType?: 'image' | 'video' | 'audio'; width?: number; height?: number } | null>;
   onToggleFavorite: (imageId: string) => Promise<boolean>;
 }
 

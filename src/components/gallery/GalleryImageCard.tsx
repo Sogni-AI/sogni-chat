@@ -75,8 +75,9 @@ const GalleryImageCard: React.FC<GalleryImageCardProps> = ({
 
   const handleDownload = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    const isVideo = image.mediaType === 'video';
-    const type = isVideo ? 'video' as const : 'restored' as const;
+    const type = image.mediaType === 'video' ? 'video' as const
+      : image.mediaType === 'audio' ? 'audio' as const
+      : 'restored' as const;
     const filename = buildDownloadFilename(undefined, image.index + 1, type);
     const downloadFn = onDownload || ((blob: Blob, fn: string) => downloadBlob(blob, fn));
     downloadFn(image.blob, filename);
@@ -144,6 +145,42 @@ const GalleryImageCard: React.FC<GalleryImageCardProps> = ({
               background: 'var(--color-bg-elevated)',
             }}
           />
+        ) : image.mediaType === 'audio' ? (
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+              padding: '16px',
+            }}
+          >
+            <svg
+              width="32"
+              height="32"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              style={{ color: 'rgba(255,255,255,0.6)' }}
+            >
+              <path d="M9 18V5l12-2v13" />
+              <circle cx="6" cy="18" r="3" />
+              <circle cx="18" cy="16" r="3" />
+            </svg>
+            <audio
+              src={imageUrl}
+              controls
+              style={{ width: '90%', maxWidth: '200px', height: '32px' }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
         ) : image.mediaType === 'video' ? (
           <video
             ref={videoRef}

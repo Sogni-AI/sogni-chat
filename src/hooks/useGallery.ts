@@ -49,7 +49,7 @@ export interface UseGalleryReturn {
 
   // Thumbnail helpers
   getSourceImageUrl: (sourceImageId: string) => Promise<string | null>;
-  getFirstResultUrl: (projectId: string) => Promise<{ url: string; mediaType?: 'image' | 'video' } | null>;
+  getFirstResultUrl: (projectId: string) => Promise<{ url: string; mediaType?: 'image' | 'video' | 'audio' } | null>;
 
   // Refresh
   refresh: () => Promise<void>;
@@ -313,7 +313,7 @@ export function useGallery(): UseGalleryReturn {
 
   const getFirstResultUrl = useCallback(async (
     projectId: string
-  ): Promise<{ url: string; mediaType?: 'image' | 'video'; width?: number; height?: number } | null> => {
+  ): Promise<{ url: string; mediaType?: 'image' | 'video' | 'audio'; width?: number; height?: number } | null> => {
     if (!isSupported) return null;
 
     const cacheKey = `thumb-${projectId}`;
@@ -324,7 +324,7 @@ export function useGallery(): UseGalleryReturn {
       const [url, mediaType, w, h] = cached.split('|');
       return {
         url,
-        mediaType: (mediaType as 'image' | 'video') || undefined,
+        mediaType: (mediaType as 'image' | 'video' | 'audio') || undefined,
         width: w ? parseInt(w, 10) : undefined,
         height: h ? parseInt(h, 10) : undefined,
       };

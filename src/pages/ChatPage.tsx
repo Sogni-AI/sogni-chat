@@ -277,10 +277,10 @@ export default function ChatPage() {
     [chat.messages],
   );
 
-  // Count gallery IDs so saves trigger when video gallery IDs arrive via onGallerySaved
+  // Count gallery IDs so saves trigger when video/audio gallery IDs arrive via onGallerySaved
   const galleryIdCount = useMemo(() =>
     chat.messages.reduce((count, msg) =>
-      count + (msg.galleryImageIds?.length || 0) + (msg.galleryVideoIds?.length || 0), 0),
+      count + (msg.galleryImageIds?.length || 0) + (msg.galleryVideoIds?.length || 0) + (msg.galleryAudioIds?.length || 0), 0),
     [chat.messages],
   );
 
@@ -457,13 +457,13 @@ export default function ChatPage() {
       });
     });
 
-    setOnBackgroundGallerySaved(async (sessionId, galleryImageIds, galleryVideoIds) => {
-      console.log(`[CHAT PAGE] Background gallery saved for session ${sessionId}: ${galleryImageIds.length} images, ${galleryVideoIds.length} videos`);
+    setOnBackgroundGallerySaved(async (sessionId, galleryImageIds, galleryVideoIds, galleryAudioIds) => {
+      console.log(`[CHAT PAGE] Background gallery saved for session ${sessionId}: ${galleryImageIds.length} images, ${galleryVideoIds.length} videos, ${galleryAudioIds?.length || 0} audio`);
 
       const { updateSessionMessages } = await import('@/utils/chatHistoryDB');
       const { applyGalleryIdsToMessages } = await import('@/hooks/useChat');
       await updateSessionMessages(sessionId, (messages) =>
-        applyGalleryIdsToMessages(messages, galleryImageIds, galleryVideoIds),
+        applyGalleryIdsToMessages(messages, galleryImageIds, galleryVideoIds, galleryAudioIds),
       );
     });
   }, [setOnBackgroundComplete, setOnBackgroundGallerySaved, showToast]);
