@@ -28,3 +28,5 @@ export {
 } from './llmHelpers';
 export { uint8ArrayToDataUri } from './imageEncoding';
 export { needsCreativeRefinement, refineVideoPrompt } from './videoPromptRefinement';
+export { getModelOptions, getAlternativeModels, getModelArgKey } from './modelRegistry';
+export type { ModelOption } from './modelRegistry';

@@ -69,6 +69,10 @@ interface ChatPanelProps {
   onFileDrop?: (file: File) => void;
   /** Get a blob URL preview for an image at the given index */
   getPreviewUrl?: (index: number) => string | null;
+  /** Called when user clicks "Branch in new chat" in media actions menu */
+  onBranchChat?: (message: UIChatMessage) => void;
+  /** Called when user clicks "Try again" or switches model in media actions menu */
+  onRetry?: (message: UIChatMessage, modelKey?: string) => void;
 }
 
 /** Minimal dropdown for quality tier selection */
@@ -210,6 +214,8 @@ export function ChatPanel({
   onRemoveMediaFile,
   onFileDrop,
   getPreviewUrl,
+  onBranchChat,
+  onRetry,
 }: ChatPanelProps) {
   const { selectedModelVariant, setSelectedModelVariant } = useLayout();
   const isMobile = useMediaQuery('(max-width: 743px)');
@@ -740,6 +746,8 @@ export function ChatPanel({
                 onAcceptModelSwitch={msg.modelRefusal ? handleAcceptModelSwitch : undefined}
                 onDeclineModelSwitch={msg.modelRefusal ? chat.declineModelSwitch : undefined}
                 downloadSlug={downloadSlug}
+                onBranchChat={onBranchChat}
+                onRetry={onRetry}
               />
             );
           })}

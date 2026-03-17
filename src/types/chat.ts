@@ -32,6 +32,10 @@ export interface UIChatMessage {
   videoAspectRatio?: string;
   /** Display name of the AI model used for this result (e.g. "Z-Image Turbo") */
   modelName?: string;
+  /** Original tool arguments used for this result (for retry/switch model) */
+  toolArgs?: Record<string, unknown>;
+  /** Model key used for this result (e.g. "z-turbo", "qwen-lightning") */
+  toolModelKey?: string;
   /** Transient flag: true for messages restored from session history (not persisted) */
   isFromHistory?: boolean;
 }

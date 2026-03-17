@@ -6,7 +6,9 @@ import { useState, useCallback, useRef } from 'react';
 import type { ChatMessage } from '@sogni-ai/sogni-client';
 import type { SogniClient } from '@sogni-ai/sogni-client';
 import { sendChatMessage, sendVisionAnalysis } from '@/services/chatService';
-import type { ToolExecutionContext, ToolExecutionProgress, ToolName, UploadedFile } from '@/tools/types';
+import type { ToolExecutionContext, ToolExecutionProgress, ToolCallbacks, ToolName, UploadedFile } from '@/tools/types';
+import { toolRegistry } from '@/tools/registry';
+import { getModelArgKey } from '@/tools/shared/modelRegistry';
 import type { TokenType, Balances } from '@/types/wallet';
 import type { Suggestion } from '@/utils/chatSuggestions';
 import { parseAnalysisSuggestions, stripSuggestTagsForDisplay } from '@/utils/chatSuggestions';
@@ -78,6 +80,26 @@ export interface UseChatResult {
   declineModelSwitch: () => void;
   /** Whether a model refusal confirmation is pending */
   pendingRefusal: boolean;
+  /** Retry a tool execution directly with optional model override */
+  retryToolExecution: (
+    message: UIChatMessage,
+    context: {
+      sogniClient: SogniClient;
+      imageData: Uint8Array | null;
+      width: number;
+      height: number;
+      tokenType: TokenType;
+      balances: Balances | null;
+      qualityTier?: 'fast' | 'hq';
+      safeContentFilter?: boolean;
+      onContentFilterChange?: (enabled: boolean) => void;
+      uploadedFiles?: UploadedFile[];
+      onTokenSwitch?: (newType: TokenType) => void;
+      onInsufficientCredits?: () => void;
+      modelVariantId?: string;
+    },
+    modelKeyOverride?: string,
+  ) => Promise<void>;
   /** Set gallery image/video IDs on messages that have matching results */
   setGalleryIds: (galleryImageIds: string[], galleryVideoIds?: string[]) => void;
   /** Set the current session ID (for background job detection) */
@@ -502,7 +524,7 @@ export function useChat(): UseChatResult {
                 );
               },
 
-              onToolCall: (toolName: ToolName, _args: Record<string, unknown>) => {
+              onToolCall: (toolName: ToolName, toolCallArgs: Record<string, unknown>) => {
                 if (thisRequest.aborted) return;
                 if (!isActiveSession()) return;
                 console.log('[CHAT HOOK] Tool called:', toolName);
@@ -512,6 +534,7 @@ export function useChat(): UseChatResult {
                     msg.id === targetId
                       ? {
                           ...msg,
+                          toolArgs: toolCallArgs,
                           toolProgress: {
                             type: 'started',
                             toolName,
@@ -671,6 +694,10 @@ export function useChat(): UseChatResult {
                     const srcUrl = msg.toolProgress?.sourceImageUrl;
                     const vidAR = msg.toolProgress?.videoAspectRatio;
                     const mdlName = msg.toolProgress?.modelName;
+                    // Extract model key from stored tool args for retry/switch model
+                    const toolModelKey = (msg.toolArgs?.model as string)
+                      || (msg.toolArgs?.videoModel as string)
+                      || undefined;
                     return {
                       ...msg,
                       imageResults: !isAudioTool && uniqueUrls.length > 0 ? uniqueUrls : undefined,
@@ -680,6 +707,7 @@ export function useChat(): UseChatResult {
                       sourceImageUrl: srcUrl || undefined,
                       videoAspectRatio: vidAR || undefined,
                       modelName: mdlName || undefined,
+                      toolModelKey,
                     };
                   }),
                 );
@@ -1041,6 +1069,213 @@ export function useChat(): UseChatResult {
     onBackgroundGallerySavedRef.current = cb;
   }, []);
 
+  /**
+   * Retry a tool execution directly (bypassing the LLM) with optional model override.
+   * Used by the MediaActionsMenu "Try Again" / "Switch Model" actions.
+   */
+  const retryToolExecution = useCallback(
+    async (
+      targetMessage: UIChatMessage,
+      context: {
+        sogniClient: SogniClient;
+        imageData: Uint8Array | null;
+        width: number;
+        height: number;
+        tokenType: TokenType;
+        balances: Balances | null;
+        qualityTier?: 'fast' | 'hq';
+        safeContentFilter?: boolean;
+        onContentFilterChange?: (enabled: boolean) => void;
+        uploadedFiles?: UploadedFile[];
+        onTokenSwitch?: (newType: TokenType) => void;
+        onInsufficientCredits?: () => void;
+        modelVariantId?: string;
+      },
+      modelKeyOverride?: string,
+    ) => {
+      const toolName = targetMessage.lastCompletedTool as ToolName;
+      const toolArgs = targetMessage.toolArgs;
+      if (!toolName || !toolArgs) return;
+
+      // Build modified args with model override
+      const modifiedArgs = { ...toolArgs };
+      if (modelKeyOverride) {
+        modifiedArgs[getModelArgKey(toolName)] = modelKeyOverride;
+      }
+
+      setError(null);
+      setIsLoading(true);
+      setIsSending(true);
+
+      // Add a user message indicating retry
+      const userMsgId = `user-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const userMsg: UIChatMessage = {
+        id: userMsgId,
+        role: 'user',
+        content: modelKeyOverride ? 'Retry with different model' : 'Retry generation',
+        timestamp: Date.now(),
+      };
+
+      // Add streaming assistant message for tool progress
+      const assistantMsgId = `assistant-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const assistantMsg: UIChatMessage = {
+        id: assistantMsgId,
+        role: 'assistant',
+        content: '',
+        timestamp: Date.now(),
+        isStreaming: true,
+        toolArgs: modifiedArgs,
+        toolProgress: { type: 'started', toolName, totalCount: 0 },
+      };
+
+      setUIMessages(prev => [...prev, userMsg, assistantMsg]);
+
+      // Add user message to conversation for context
+      conversationRef.current.push({ role: 'user', content: userMsg.content });
+
+      const variant = context.modelVariantId ? getVariantById(context.modelVariantId) : undefined;
+      const effectiveModel = sessionModelRef.current || (variant ? variant.modelId : undefined);
+      const effectiveThink = variant?.think;
+
+      const toolAbortController = new AbortController();
+      const controllersSet = toolAbortControllersRef.current;
+      controllersSet.add(toolAbortController);
+
+      const executionContext: ToolExecutionContext = {
+        sogniClient: context.sogniClient,
+        imageData: context.imageData,
+        width: context.width,
+        height: context.height,
+        tokenType: context.tokenType,
+        uploadedFiles: context.uploadedFiles || [],
+        get resultUrls() { return allResultUrlsRef.current; },
+        get audioResultUrls() { return audioResultUrlsRef.current; },
+        balances: context.balances,
+        qualityTier: context.qualityTier,
+        safeContentFilter: context.safeContentFilter,
+        onContentFilterChange: context.onContentFilterChange,
+        onTokenSwitch: context.onTokenSwitch,
+        onInsufficientCredits: context.onInsufficientCredits,
+        signal: toolAbortController.signal,
+        model: effectiveModel,
+        think: effectiveThink,
+      };
+
+      let retryResultUrls: string[] = [];
+      let retryVideoUrls: string[] = [];
+
+      const callbacks: ToolCallbacks = {
+        onToolProgress: (progress) => {
+          if (progress.resultUrls) {
+            retryResultUrls = [...new Set([...retryResultUrls, ...progress.resultUrls])];
+          }
+          if (progress.videoResultUrls) {
+            retryVideoUrls = [...new Set([...retryVideoUrls, ...progress.videoResultUrls])];
+          }
+          setUIMessages(prev => prev.map(msg => {
+            if (msg.id !== assistantMsgId) return msg;
+            const prevProgress = msg.toolProgress;
+            const merged: ToolExecutionProgress = progress.type === 'started'
+              ? progress
+              : {
+                  ...prevProgress,
+                  ...progress,
+                  progress: progress.progress ?? prevProgress?.progress,
+                  etaSeconds: progress.etaSeconds ?? prevProgress?.etaSeconds,
+                  estimatedCost: progress.estimatedCost ?? prevProgress?.estimatedCost,
+                  sourceImageUrl: progress.sourceImageUrl ?? prevProgress?.sourceImageUrl,
+                  videoAspectRatio: progress.videoAspectRatio ?? prevProgress?.videoAspectRatio,
+                  modelName: progress.modelName ?? prevProgress?.modelName,
+                };
+            const videoResults = retryVideoUrls.length > 0 ? [...retryVideoUrls] : msg.videoResults;
+            return { ...msg, toolProgress: merged, videoResults };
+          }));
+        },
+        onToolComplete: (completedToolName, resultUrls, videoResultUrls) => {
+          retryResultUrls = [...new Set([...retryResultUrls, ...resultUrls])];
+          if (videoResultUrls) {
+            retryVideoUrls = [...new Set([...retryVideoUrls, ...videoResultUrls])];
+          }
+
+          const isAudioTool = completedToolName === 'generate_music';
+          setUIMessages(prev => prev.map(msg => {
+            if (msg.id !== assistantMsgId) return msg;
+            const srcUrl = msg.toolProgress?.sourceImageUrl;
+            const vidAR = msg.toolProgress?.videoAspectRatio;
+            const mdlName = msg.toolProgress?.modelName;
+            const retryModelKey = (modifiedArgs.model as string)
+              || (modifiedArgs.videoModel as string)
+              || undefined;
+            return {
+              ...msg,
+              imageResults: !isAudioTool && retryResultUrls.length > 0 ? retryResultUrls : undefined,
+              videoResults: retryVideoUrls.length > 0 ? retryVideoUrls : undefined,
+              audioResults: isAudioTool && retryResultUrls.length > 0 ? retryResultUrls : undefined,
+              toolProgress: null,
+              isStreaming: false,
+              lastCompletedTool: completedToolName,
+              sourceImageUrl: srcUrl || undefined,
+              videoAspectRatio: vidAR || undefined,
+              modelName: mdlName || undefined,
+              toolModelKey: retryModelKey,
+              content: '',
+            };
+          }));
+
+          // Update result URLs
+          if (retryResultUrls.length > 0) {
+            const combined = [...new Set([...allResultUrlsRef.current, ...retryResultUrls])];
+            allResultUrlsRef.current = combined;
+            setAllResultUrls(combined);
+          }
+          if (isAudioTool && retryResultUrls.length > 0) {
+            audioResultUrlsRef.current = [...new Set([...audioResultUrlsRef.current, ...retryResultUrls])];
+          }
+
+          // Add tool result to conversation for context
+          conversationRef.current.push({
+            role: 'assistant',
+            content: `[Tool ${completedToolName} completed successfully]`,
+          });
+        },
+        onGallerySaved: (galleryImageIds, galleryVideoIds) => {
+          setUIMessages(prev => applyGalleryIdsToMessages(prev, galleryImageIds, galleryVideoIds));
+          const effectiveSessionId = sessionIdRef.current;
+          if (effectiveSessionId) {
+            onBackgroundGallerySavedRef.current?.(effectiveSessionId, galleryImageIds, galleryVideoIds);
+          }
+        },
+      };
+
+      try {
+        const result = await toolRegistry.execute(toolName, modifiedArgs, executionContext, callbacks);
+        // If the tool returned an error and onToolComplete wasn't called, show error
+        try {
+          const parsed = JSON.parse(result);
+          if (parsed.error) {
+            setUIMessages(prev => prev.map(msg =>
+              msg.id === assistantMsgId && msg.isStreaming
+                ? { ...msg, content: `Error: ${parsed.error}`, isStreaming: false, toolProgress: null }
+                : msg,
+            ));
+          }
+        } catch { /* not JSON, ignore */ }
+      } catch (err: any) {
+        setError(err.message || 'Retry failed');
+        setUIMessages(prev => prev.map(msg =>
+          msg.id === assistantMsgId
+            ? { ...msg, content: 'Retry failed', isStreaming: false, toolProgress: null }
+            : msg,
+        ));
+      } finally {
+        controllersSet.delete(toolAbortController);
+        setIsLoading(false);
+        setIsSending(false);
+      }
+    },
+    [],
+  );
+
   return {
     messages: uiMessages,
     isLoading,
@@ -1053,6 +1288,7 @@ export function useChat(): UseChatResult {
     analyzeImage,
     reset,
     cancelToolExecution,
+    retryToolExecution,
     getSessionState,
     loadFromSession,
     acceptModelSwitch,

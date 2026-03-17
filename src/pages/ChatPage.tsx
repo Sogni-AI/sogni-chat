@@ -22,7 +22,7 @@ import { MobileChatDrawer } from '@/components/chat/MobileChatDrawer';
 import { saveRestorationToGallery } from '@/services/galleryService';
 import { generateSessionTitle } from '@/services/chatService';
 import { slugify } from '@/utils/downloadFilename';
-import type { ChatSession } from '@/types/chat';
+import type { ChatSession, UIChatMessage } from '@/types/chat';
 import type { UploadedFile } from '@/tools/types';
 import type { QualityTier } from '@/config/qualityPresets';
 import { CHAT_MODEL_ABLITERATED } from '@/config/chat';
@@ -136,7 +136,7 @@ export default function ChatPage() {
     clearPendingRestore,
   } = useChatSessions();
   const isDesktop = useMediaQuery('(min-width: 900px)');
-  const { showOutOfCreditsPopup, showSignupModal, sidebarCollapsed, toggleSidebar, setSelectedModelVariant, safeContentFilter, setSafeContentFilter, isLoginModalOpen } = useLayout();
+  const { showOutOfCreditsPopup, showSignupModal, sidebarCollapsed, toggleSidebar, selectedModelVariant, setSelectedModelVariant, safeContentFilter, setSafeContentFilter, isLoginModalOpen } = useLayout();
   const { showToast } = useToastContext();
 
   const [resultUrls, setResultUrls] = useState<string[]>([]);
@@ -753,6 +753,85 @@ export default function ChatPage() {
     showOutOfCreditsPopup();
   }, [showOutOfCreditsPopup]);
 
+  /** Branch conversation at a specific message into a new chat session */
+  const handleBranchChat = useCallback(async (message: UIChatMessage) => {
+    const currentMessages = chat.messages;
+    const messageIndex = currentMessages.findIndex(m => m.id === message.id);
+    if (messageIndex < 0) return;
+
+    // Save current session first
+    if (activeSessionIdRef.current) await saveActiveSession();
+
+    isRestoringRef.current = true;
+
+    // Copy messages up to and including the target
+    const branchedMessages = currentMessages.slice(0, messageIndex + 1);
+
+    // Get conversation state
+    const sessionState = chat.getSessionState();
+
+    // Collect result URLs from branched messages
+    const branchedResultUrls: string[] = [];
+    for (const msg of branchedMessages) {
+      if (msg.imageResults) branchedResultUrls.push(...msg.imageResults);
+      if (msg.videoResults) branchedResultUrls.push(...msg.videoResults);
+      if (msg.audioResults) branchedResultUrls.push(...msg.audioResults);
+    }
+
+    // Create and save the new session
+    const newId = createNewSession();
+    const branchedTitle = (sessionTitleRef.current || 'Chat') + ' (branch)';
+    const newSession: ChatSession = {
+      id: newId,
+      title: branchedTitle,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      uiMessages: branchedMessages,
+      conversation: sessionState.conversation,
+      allResultUrls: [...new Set(branchedResultUrls)],
+      analysisSuggestions: [],
+    };
+
+    await saveCurrentSession(newId, newSession);
+    await switchSession(newId);
+
+    // Load the branched session state into useChat (mirrors handleSelectSession)
+    chat.loadFromSession(newSession);
+    setSelectedModelVariant(DEFAULT_VARIANT_ID);
+    sessionTitleRef.current = branchedTitle;
+    sessionCreatedAtRef.current = newSession.createdAt;
+    sessionUpdatedAtRef.current = newSession.updatedAt;
+    sessionPinnedRef.current = undefined;
+    userRenamedRef.current = false;
+    sessionDirtyRef.current = false;
+    gallerySavedRef.current = branchedResultUrls.length > 0;
+    setResultUrls(newSession.allResultUrls);
+    setUploadIntent(null);
+
+    setTimeout(() => { isRestoringRef.current = false; }, 2000);
+  }, [chat, createNewSession, saveCurrentSession, switchSession, saveActiveSession, setSelectedModelVariant]);
+
+  /** Retry a tool execution with an optional model override */
+  const handleRetry = useCallback(async (message: UIChatMessage, modelKey?: string) => {
+    const client = getSogniClient();
+    if (!client) return;
+    await chat.retryToolExecution(message, {
+      sogniClient: client,
+      imageData,
+      width,
+      height,
+      tokenType,
+      balances,
+      qualityTier,
+      safeContentFilter,
+      onContentFilterChange: setSafeContentFilter,
+      uploadedFiles,
+      onTokenSwitch: handleTokenSwitch,
+      onInsufficientCredits: handleInsufficientCredits,
+      modelVariantId: selectedModelVariant,
+    }, modelKey);
+  }, [chat, getSogniClient, imageData, width, height, tokenType, balances, qualityTier, safeContentFilter, setSafeContentFilter, uploadedFiles, handleTokenSwitch, handleInsufficientCredits, selectedModelVariant]);
+
   const sogniClient = getSogniClient();
 
   if (!isAuthenticated) {
@@ -866,6 +945,8 @@ export default function ChatPage() {
               onRemoveMediaFile={removeMediaFile}
               onFileDrop={handleFileDrop}
               getPreviewUrl={getPreviewUrl}
+              onBranchChat={handleBranchChat}
+              onRetry={handleRetry}
             />
           </div>
         </div>

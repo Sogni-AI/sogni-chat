@@ -12,6 +12,7 @@ import ChatAudioResults from './ChatAudioResults';
 import { ChatProgressIndicator } from './ChatProgressIndicator';
 import { SogniTVOffer } from './SogniTVOffer';
 import { LazyMedia } from './LazyMedia';
+import { MediaActionsMenu } from './MediaActionsMenu';
 import './chat.css';
 
 interface ChatMessageProps {
@@ -27,9 +28,13 @@ interface ChatMessageProps {
   onDeclineModelSwitch?: () => void;
   /** Descriptive slug for download filenames (e.g. from session title) */
   downloadSlug?: string;
+  /** Called when user clicks "Branch in new chat" from media actions menu */
+  onBranchChat?: (message: UIChatMessage) => void;
+  /** Called when user clicks "Try again" or selects a model from media actions menu */
+  onRetry?: (message: UIChatMessage, modelKey?: string) => void;
 }
 
-export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImageClick, onCancelTool, onAcceptModelSwitch, onDeclineModelSwitch, downloadSlug }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImageClick, onCancelTool, onAcceptModelSwitch, onDeclineModelSwitch, downloadSlug, onBranchChat, onRetry }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
   const isSystem = message.role === 'system';
@@ -268,11 +273,16 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
               downloadSlug={downloadSlug}
             />
           </LazyMedia>
-          {message.modelName && (
-            <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', marginTop: '0.25rem', opacity: 0.6 }}>
-              {message.modelName}
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+            {onBranchChat && onRetry && (
+              <MediaActionsMenu message={message} onBranchChat={onBranchChat} onRetry={onRetry} />
+            )}
+            {message.modelName && (
+              <span style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', opacity: 0.6 }}>
+                {message.modelName}
+              </span>
+            )}
+          </div>
         </div>
       )}
 
@@ -281,11 +291,16 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
       {message.videoResults && message.videoResults.length > 0 && !message.toolProgress && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
           <ChatVideoResults urls={message.videoResults} galleryVideoIds={message.galleryVideoIds} downloadSlug={downloadSlug} videoAspectRatio={message.videoAspectRatio} autoPlay={!message.isFromHistory} />
-          {message.modelName && (
-            <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', marginTop: '0.25rem', opacity: 0.6 }}>
-              {message.modelName}
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+            {onBranchChat && onRetry && (
+              <MediaActionsMenu message={message} onBranchChat={onBranchChat} onRetry={onRetry} />
+            )}
+            {message.modelName && (
+              <span style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', opacity: 0.6 }}>
+                {message.modelName}
+              </span>
+            )}
+          </div>
         </div>
       )}
 
@@ -295,11 +310,16 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
           <LazyMedia enabled={!!message.isFromHistory} placeholderHeight={80}>
             <ChatAudioResults audioUrls={message.audioResults} downloadSlug={downloadSlug} />
           </LazyMedia>
-          {message.modelName && (
-            <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', marginTop: '0.25rem', opacity: 0.6 }}>
-              {message.modelName}
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+            {onBranchChat && onRetry && (
+              <MediaActionsMenu message={message} onBranchChat={onBranchChat} onRetry={onRetry} />
+            )}
+            {message.modelName && (
+              <span style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', opacity: 0.6 }}>
+                {message.modelName}
+              </span>
+            )}
+          </div>
         </div>
       )}
     </div>
