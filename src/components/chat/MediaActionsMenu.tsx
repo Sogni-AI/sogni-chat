@@ -32,6 +32,8 @@ interface MediaActionsMenuProps {
   galleryVideoIds?: string[];
   /** Descriptive slug for download filenames */
   downloadSlug?: string;
+  /** Index of the currently active/playing media item (video or audio) */
+  activeMediaIndex?: number;
 }
 
 export const MediaActionsMenu = memo(function MediaActionsMenu({
@@ -43,6 +45,7 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
   galleryImageIds,
   galleryVideoIds,
   downloadSlug,
+  activeMediaIndex = 0,
 }: MediaActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const [showRetrySubmenu, setShowRetrySubmenu] = useState(false);
@@ -87,35 +90,46 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
     return () => { cancelled = true; };
   }, [galleryImageIds, hasGalleryIds]);
 
-  // Save label based on media type and count
-  const saveLabel = (() => {
-    if (!mediaUrls?.length) return 'Save';
-    if (mediaUrls.length === 1) {
-      return mediaType === 'video' ? 'Save video' : mediaType === 'audio' ? 'Save audio' : 'Save image';
-    }
-    return mediaType === 'video' ? 'Save all videos' : mediaType === 'audio' ? 'Save all tracks' : 'Save all images';
-  })();
+  // Whether we have multiple items and should show "Save current" + "Save all"
+  const isMulti = !!mediaUrls && mediaUrls.length > 1;
+  const filenameType = mediaType === 'video' ? 'video' as const : mediaType === 'audio' ? 'audio' as const : 'restored' as const;
 
-  const handleDownload = useCallback((e: React.MouseEvent) => {
+  // Labels for single vs multi
+  const singleLabel = mediaType === 'video' ? 'Save video' : mediaType === 'audio' ? 'Save audio' : 'Save image';
+  const currentLabel = mediaType === 'video' ? 'Save current video' : mediaType === 'audio' ? 'Save current track' : singleLabel;
+  const allLabel = mediaType === 'video' ? 'Save all videos' : mediaType === 'audio' ? 'Save all tracks' : 'Save all images';
+
+  // Download a single item by index
+  const downloadOne = useCallback((index: number) => {
+    if (!mediaUrls?.[index]) return;
+    const displayUrl = galleryBlobUrls.get(index) || mediaUrls[index];
+    const filename = buildDownloadFilename(
+      downloadSlug,
+      mediaUrls.length > 1 ? index + 1 : undefined,
+      filenameType,
+    );
+    downloadImage(displayUrl, filename).catch(err =>
+      console.error('[MEDIA MENU] Download failed:', err),
+    );
+  }, [mediaUrls, galleryBlobUrls, downloadSlug, filenameType]);
+
+  // Download all items
+  const handleDownloadAll = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     if (!mediaUrls?.length) return;
     setOpen(false);
-    mediaUrls.forEach((url, index) => {
-      const displayUrl = galleryBlobUrls.get(index) || url;
-      const filenameType = mediaType === 'video' ? 'video' : mediaType === 'audio' ? 'audio' : 'restored';
-      const filename = buildDownloadFilename(
-        downloadSlug,
-        mediaUrls.length > 1 ? index + 1 : undefined,
-        filenameType,
-      );
+    mediaUrls.forEach((_url, index) => {
       // Stagger downloads to avoid overwhelming the browser
-      setTimeout(() => {
-        downloadImage(displayUrl, filename).catch(err =>
-          console.error('[MEDIA MENU] Download failed:', err),
-        );
-      }, index * 300);
+      setTimeout(() => downloadOne(index), index * 300);
     });
-  }, [mediaUrls, mediaType, galleryBlobUrls, downloadSlug]);
+  }, [mediaUrls, downloadOne]);
+
+  // Download the currently active item
+  const handleDownloadCurrent = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOpen(false);
+    downloadOne(activeMediaIndex);
+  }, [downloadOne, activeMediaIndex]);
 
   const handleToggleFavorite = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -272,12 +286,31 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
         >
           {/* Save / Download */}
           {mediaUrls && mediaUrls.length > 0 && (
-            <MenuItem
-              icon={<DownloadIcon />}
-              label={saveLabel}
-              onClick={handleDownload}
-              isMobile={isMobile}
-            />
+            isMulti && (mediaType === 'video' || mediaType === 'audio') ? (
+              /* Video / Audio with multiple items: "Save current" + "Save all" */
+              <>
+                <MenuItem
+                  icon={<DownloadIcon />}
+                  label={currentLabel}
+                  onClick={handleDownloadCurrent}
+                  isMobile={isMobile}
+                />
+                <MenuItem
+                  icon={<DownloadIcon />}
+                  label={allLabel}
+                  onClick={handleDownloadAll}
+                  isMobile={isMobile}
+                />
+              </>
+            ) : (
+              /* Single item or images: single save button */
+              <MenuItem
+                icon={<DownloadIcon />}
+                label={isMulti ? allLabel : singleLabel}
+                onClick={handleDownloadAll}
+                isMobile={isMobile}
+              />
+            )
           )}
 
           {/* Favorite toggle — images with gallery IDs only */}

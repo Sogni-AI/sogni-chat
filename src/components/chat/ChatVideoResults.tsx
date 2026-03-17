@@ -12,8 +12,10 @@ import { isMobile } from '@/utils/mobileDownload';
 /** Individual video player that pauses all other chat videos when it starts playing.
  *  Hides the native player until the first frame is ready to prevent the
  *  ugly black unstyled rectangle that flashes while the video is loading. */
-function ChatVideoPlayer({ src, onError, aspectRatio, fillWidth, autoPlay = true, isLocalBlob = false }: { src: string; onError: () => void; aspectRatio?: string; fillWidth?: boolean; autoPlay?: boolean; isLocalBlob?: boolean }) {
+function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPlay = true, isLocalBlob = false }: { src: string; onError: () => void; onPlay?: () => void; aspectRatio?: string; fillWidth?: boolean; autoPlay?: boolean; isLocalBlob?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const onPlayRef = useRef(onPlay);
+  onPlayRef.current = onPlay;
   const [ready, setReady] = useState(false);
 
   // Compute placeholder dimensions that fit within maxWidth × maxHeight
@@ -43,6 +45,7 @@ function ChatVideoPlayer({ src, onError, aspectRatio, fillWidth, autoPlay = true
     const handlePlay = () => {
       pauseOtherVideos(el);
       if (el.muted) el.muted = false;
+      onPlayRef.current?.();
     };
     el.addEventListener('play', handlePlay);
 
@@ -133,6 +136,8 @@ interface ChatVideoResultsProps {
   videoAspectRatio?: string;
   /** Whether videos should auto-play (default: true). Set false for restored history. */
   autoPlay?: boolean;
+  /** Called when a different video starts playing (for menu sync) */
+  onActiveIndexChange?: (index: number) => void;
 }
 
 export const ChatVideoResults = memo(function ChatVideoResults({
@@ -140,6 +145,7 @@ export const ChatVideoResults = memo(function ChatVideoResults({
   galleryVideoIds,
   videoAspectRatio,
   autoPlay = true,
+  onActiveIndexChange,
 }: ChatVideoResultsProps) {
   // Resolve gallery IDs to blob URLs — persistent local copies that never expire
   const galleryBlobUrls = useGalleryBlobUrls(galleryVideoIds);
@@ -216,6 +222,7 @@ export const ChatVideoResults = memo(function ChatVideoResults({
             <ChatVideoPlayer
               src={displayUrl}
               onError={() => handleError(index)}
+              onPlay={() => onActiveIndexChange?.(index)}
               aspectRatio={videoAspectRatio}
               fillWidth={isGrid}
               autoPlay={autoPlay}

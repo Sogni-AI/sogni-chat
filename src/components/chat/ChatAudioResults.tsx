@@ -12,19 +12,22 @@ interface ChatAudioResultsProps {
   audioUrls: string[];
   /** Optional label shown above the player */
   label?: string;
+  /** Called when the active track changes (for menu sync) */
+  onActiveIndexChange?: (index: number) => void;
 }
 
-const ChatAudioResults: React.FC<ChatAudioResultsProps> = ({ audioUrls, label }) => {
+const ChatAudioResults: React.FC<ChatAudioResultsProps> = ({ audioUrls, label, onActiveIndexChange }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const audioRef = useRef<HTMLAudioElement>(null);
 
   const handleSelect = useCallback((index: number) => {
     setActiveIndex(index);
+    onActiveIndexChange?.(index);
     // Reset and play the newly selected track
     if (audioRef.current) {
       audioRef.current.load();
     }
-  }, []);
+  }, [onActiveIndexChange]);
 
   if (!audioUrls || audioUrls.length === 0) {
     return null;

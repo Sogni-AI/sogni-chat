@@ -3,8 +3,8 @@
  * Renders user messages, assistant messages (with streaming indicator),
  * system notifications, inline image results, and tool execution progress.
  */
-import { memo } from 'react';
-import ReactMarkdown from 'react-markdown';
+import { memo, useState, useCallback } from 'react';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import type { UIChatMessage } from '@/hooks/useChat';
 import { ChatImageResults } from './ChatImageResults';
 import { ChatVideoResults } from './ChatVideoResults';
@@ -14,6 +14,18 @@ import { SogniTVOffer } from './SogniTVOffer';
 import { LazyMedia } from './LazyMedia';
 import { MediaActionsMenu } from './MediaActionsMenu';
 import './chat.css';
+
+/** Shared ReactMarkdown component overrides — hoisted to avoid re-creation per render */
+const markdownComponents: Components = {
+  p: ({ children }) => <span className="chat-md-p" style={{ display: 'block' }}>{children}</span>,
+  strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
+  ol: ({ children }) => <ol style={{ margin: '0.5em 0', paddingLeft: '1.5em' }}>{children}</ol>,
+  ul: ({ children }) => <ul style={{ margin: '0.5em 0', paddingLeft: '1.5em' }}>{children}</ul>,
+  li: ({ children }) => <li style={{ marginBottom: '0.25em' }}>{children}</li>,
+  a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent)', textDecoration: 'underline' }}>{children}</a>,
+  pre: ({ children }) => <pre style={{ background: 'rgba(255,255,255,0.06)', padding: '0.75em 1em', borderRadius: '6px', overflowX: 'auto', margin: '0.5em 0', fontSize: '0.875em' }}>{children}</pre>,
+  code: ({ children }) => <code style={{ background: 'rgba(255,255,255,0.08)', padding: '0.125em 0.375em', borderRadius: '4px', fontSize: '0.875em' }}>{children}</code>,
+};
 
 interface ChatMessageProps {
   message: UIChatMessage;
@@ -56,6 +68,12 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
   const hasAudios = message.audioResults && message.audioResults.length > 0;
   const hasUploadedImage = !!message.uploadedImageUrl;
   const hasUploadedImages = message.uploadedImageUrls && message.uploadedImageUrls.length > 0;
+
+  // Track which video/audio is currently active (for "Save current" in menu)
+  const [activeVideoIndex, setActiveVideoIndex] = useState(0);
+  const [activeAudioIndex, setActiveAudioIndex] = useState(0);
+  const handleVideoIndexChange = useCallback((i: number) => setActiveVideoIndex(i), []);
+  const handleAudioIndexChange = useCallback((i: number) => setActiveAudioIndex(i), []);
 
   // Don't render empty assistant messages (but keep streaming ones visible for the cursor)
   if (isAssistant && !hasVisibleContent && !hasProgress && !hasImages && !hasVideos && !hasAudios && !message.isStreaming) {
@@ -143,18 +161,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
           {isAssistant ? (
             <>
               {hasVisibleContent && (
-                <ReactMarkdown
-                  components={{
-                    p: ({ children }) => <span className="chat-md-p" style={{ display: 'block' }}>{children}</span>,
-                    strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
-                    ol: ({ children }) => <ol style={{ margin: '0.5em 0', paddingLeft: '1.5em' }}>{children}</ol>,
-                    ul: ({ children }) => <ul style={{ margin: '0.5em 0', paddingLeft: '1.5em' }}>{children}</ul>,
-                    li: ({ children }) => <li style={{ marginBottom: '0.25em' }}>{children}</li>,
-                    a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent)', textDecoration: 'underline' }}>{children}</a>,
-                    pre: ({ children }) => <pre style={{ background: 'rgba(255,255,255,0.06)', padding: '0.75em 1em', borderRadius: '6px', overflowX: 'auto', margin: '0.5em 0', fontSize: '0.875em' }}>{children}</pre>,
-                    code: ({ children }) => <code style={{ background: 'rgba(255,255,255,0.08)', padding: '0.125em 0.375em', borderRadius: '4px', fontSize: '0.875em' }}>{children}</code>,
-                  }}
-                >
+                <ReactMarkdown components={markdownComponents}>
                   {displayContent}
                 </ReactMarkdown>
               )}
@@ -295,7 +302,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
            the player has its own loading spinner and gallery blobs are local */}
       {message.videoResults && message.videoResults.length > 0 && !message.toolProgress && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
-          <ChatVideoResults urls={message.videoResults} galleryVideoIds={message.galleryVideoIds} videoAspectRatio={message.videoAspectRatio} autoPlay={!message.isFromHistory} />
+          <ChatVideoResults urls={message.videoResults} galleryVideoIds={message.galleryVideoIds} videoAspectRatio={message.videoAspectRatio} autoPlay={!message.isFromHistory} onActiveIndexChange={handleVideoIndexChange} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.25rem' }}>
             <MediaActionsMenu
               message={message}
@@ -305,6 +312,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
               mediaUrls={message.videoResults}
               galleryVideoIds={message.galleryVideoIds}
               downloadSlug={downloadSlug}
+              activeMediaIndex={activeVideoIndex}
             />
             {message.modelName && (
               <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', opacity: 0.6 }}>
@@ -319,7 +327,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
       {message.audioResults && message.audioResults.length > 0 && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
           <LazyMedia enabled={!!message.isFromHistory} placeholderHeight={80}>
-            <ChatAudioResults audioUrls={message.audioResults} />
+            <ChatAudioResults audioUrls={message.audioResults} onActiveIndexChange={handleAudioIndexChange} />
           </LazyMedia>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.25rem' }}>
             <MediaActionsMenu
@@ -328,8 +336,8 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
               onRetry={onRetry}
               mediaType="audio"
               mediaUrls={message.audioResults}
-              galleryImageIds={message.galleryAudioIds}
               downloadSlug={downloadSlug}
+              activeMediaIndex={activeAudioIndex}
             />
             {message.modelName && (
               <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', opacity: 0.6 }}>
