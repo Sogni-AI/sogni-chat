@@ -17,6 +17,8 @@ import type { ChatSession, UIChatMessage } from '@/types/chat';
 import { CHAT_MODEL_ABLITERATED } from '@/config/chat';
 import { sogniTVController } from '@/services/sogniTVController';
 import { getVariantById } from '@/config/modelVariants';
+import { projectSessionMap } from '@/services/projectSessionMap';
+import { updateSessionMessages } from '@/utils/chatHistoryDB';
 
 // Re-export UIChatMessage from the canonical location
 export type { UIChatMessage } from '@/types/chat';
@@ -127,6 +129,10 @@ export interface UseChatResult {
   ) => void) | null) => void;
   /** Dismiss the current error */
   clearError: () => void;
+  /** Attach SDK recovery listeners. Call once when sogniClient is available. Returns cleanup fn. */
+  attachRecoveryListeners: (sogniClient: SogniClient) => () => void;
+  /** Set callback for recovery toast notifications */
+  setOnRecoveryToast: (cb: ((message: string) => void) | null) => void;
 }
 
 const MAX_CONCURRENT_REQUESTS = 2;
@@ -260,6 +266,9 @@ export function useChat(): UseChatResult {
     galleryVideoIds: string[],
     galleryAudioIds?: string[],
   ) => void) | null>(null);
+
+  // Callback for showing recovery toasts (set by parent component)
+  const onRecoveryToastRef = useRef<((message: string) => void) | null>(null);
 
   /**
    * Analyze an uploaded image using vision and stream the analysis into chat.
@@ -1089,6 +1098,182 @@ export function useChat(): UseChatResult {
     onBackgroundGallerySavedRef.current = cb;
   }, []);
 
+  const setOnRecoveryToast = useCallback((cb: typeof onRecoveryToastRef.current) => {
+    onRecoveryToastRef.current = cb;
+  }, []);
+
+  /**
+   * Attach SDK recovery event listeners. Called once when sogniClient is available.
+   * Returns cleanup function to remove listeners.
+   */
+  const attachRecoveryListeners = useCallback((sogniClient: SogniClient) => {
+    const handleCompletedRecovery = async (projects: any[]) => {
+      await projectSessionMap.ready;
+      console.log(`[CHAT HOOK] Recovery: ${projects.length} completed projects recovered`);
+      for (const project of projects) {
+        const sessionId = projectSessionMap.getSessionId(project.id);
+        if (!sessionId) continue;
+
+        const modelType = project.model?.type || 'image';
+        const mediaLabel = modelType === 'video' ? 'video'
+          : modelType === 'music' ? 'music'
+          : 'image';
+        const resultUrls: string[] = project.resultUrls || [];
+        if (resultUrls.length === 0) continue;
+
+        const isImage = modelType === 'image';
+        const isVideo = modelType === 'video';
+        const isAudio = modelType === 'music';
+
+        const recoveryMsg: UIChatMessage = {
+          id: `recovery-${project.id}-${Date.now()}`,
+          role: 'assistant',
+          content: `Your ${mediaLabel} finished while you were away.`,
+          timestamp: Date.now(),
+          ...(isImage ? { imageResults: resultUrls } : {}),
+          ...(isVideo ? { videoResults: resultUrls } : {}),
+          ...(isAudio ? { audioResults: resultUrls } : {}),
+          modelName: project.model?.name,
+          isRecoveryMessage: true,
+        };
+
+        if (sessionId === sessionIdRef.current) {
+          if (isImage) {
+            allResultUrlsRef.current = [...allResultUrlsRef.current, ...resultUrls];
+            setAllResultUrls((prev) => [...prev, ...resultUrls]);
+          }
+          if (isAudio) {
+            audioResultUrlsRef.current = [...audioResultUrlsRef.current, ...resultUrls];
+          }
+          setUIMessages((prev) => [...prev, recoveryMsg]);
+        } else {
+          updateSessionMessages(sessionId, (msgs) => [...msgs, recoveryMsg]);
+          onRecoveryToastRef.current?.(
+            `A ${mediaLabel} generation completed in another chat`
+          );
+        }
+
+        projectSessionMap.remove(project.id);
+      }
+    };
+
+    const handleActiveRecovery = async (projects: any[]) => {
+      await projectSessionMap.ready;
+      console.log(`[CHAT HOOK] Recovery: ${projects.length} active projects still processing`);
+      for (const project of projects) {
+        const sessionId = projectSessionMap.getSessionId(project.id);
+        if (!sessionId) continue;
+
+        const modelType = project.model?.type || 'image';
+        const mediaLabel = modelType === 'video' ? 'video'
+          : modelType === 'music' ? 'music'
+          : 'image';
+
+        const sdkProject = (sogniClient as any).projects?.trackedProjects?.find(
+          (p: any) => p.id === project.id
+        );
+
+        const recoveryMsgId = `recovery-active-${project.id}-${Date.now()}`;
+
+        if (sessionId === sessionIdRef.current) {
+          const toolName = (modelType === 'video' ? 'generate_video'
+            : modelType === 'music' ? 'generate_music'
+            : 'generate_image') as ToolName;
+
+          const progressMsg: UIChatMessage = {
+            id: recoveryMsgId,
+            role: 'assistant',
+            content: `Your ${mediaLabel} is still being processed...`,
+            timestamp: Date.now(),
+            toolProgress: { type: 'started', toolName },
+            isRecoveryMessage: true,
+          };
+          setUIMessages((prev) => [...prev, progressMsg]);
+
+          if (sdkProject) {
+            sdkProject.on('completed', (urls: string[]) => {
+              const isImage = modelType === 'image';
+              const isVideo = modelType === 'video';
+              const isAudio = modelType === 'music';
+              if (isImage) {
+                allResultUrlsRef.current = [...allResultUrlsRef.current, ...urls];
+                setAllResultUrls((prev) => [...prev, ...urls]);
+              }
+              if (isAudio) {
+                audioResultUrlsRef.current = [...audioResultUrlsRef.current, ...urls];
+              }
+              setUIMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === recoveryMsgId
+                    ? {
+                        ...msg,
+                        content: `Your ${mediaLabel} finished while you were away.`,
+                        toolProgress: null,
+                        ...(isImage ? { imageResults: urls } : {}),
+                        ...(isVideo ? { videoResults: urls } : {}),
+                        ...(isAudio ? { audioResults: urls } : {}),
+                        modelName: project.model?.name,
+                      }
+                    : msg,
+                ),
+              );
+              projectSessionMap.remove(project.id);
+            });
+            sdkProject.on('failed', () => {
+              setUIMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === recoveryMsgId
+                    ? {
+                        ...msg,
+                        content: `Your ${mediaLabel} generation failed.`,
+                        toolProgress: null,
+                      }
+                    : msg,
+                ),
+              );
+              projectSessionMap.remove(project.id);
+            });
+          }
+        } else {
+          onRecoveryToastRef.current?.(
+            `A ${mediaLabel} generation is still in progress in another chat`
+          );
+          if (sdkProject) {
+            sdkProject.on('completed', (urls: string[]) => {
+              const isImage = modelType === 'image';
+              const isVideo = modelType === 'video';
+              const isAudio = modelType === 'music';
+              const completedMsg: UIChatMessage = {
+                id: `recovery-${project.id}-done-${Date.now()}`,
+                role: 'assistant',
+                content: `Your ${mediaLabel} finished while you were away.`,
+                timestamp: Date.now(),
+                ...(isImage ? { imageResults: urls } : {}),
+                ...(isVideo ? { videoResults: urls } : {}),
+                ...(isAudio ? { audioResults: urls } : {}),
+                modelName: project.model?.name,
+                isRecoveryMessage: true,
+              };
+              updateSessionMessages(sessionId, (msgs) => [...msgs, completedMsg]);
+              onRecoveryToastRef.current?.(
+                `A ${mediaLabel} generation completed in another chat`
+              );
+              projectSessionMap.remove(project.id);
+            });
+          }
+        }
+      }
+    };
+
+    (sogniClient as any).projects?.on?.('completedProjectsRecovered', handleCompletedRecovery);
+    (sogniClient as any).projects?.on?.('activeProjectsRecovered', handleActiveRecovery);
+
+    return () => {
+      (sogniClient as any).projects?.off?.('completedProjectsRecovered', handleCompletedRecovery);
+      (sogniClient as any).projects?.off?.('activeProjectsRecovered', handleActiveRecovery);
+    };
+  }, []);
+
   /**
    * Retry a tool execution directly (bypassing the LLM) with optional model override.
    * Used by the MediaActionsMenu "Try Again" / "Switch Model" actions.
@@ -1426,5 +1611,7 @@ export function useChat(): UseChatResult {
     setOnBackgroundComplete,
     setOnBackgroundGallerySaved,
     clearError: useCallback(() => setError(null), []),
+    attachRecoveryListeners,
+    setOnRecoveryToast,
   };
 }

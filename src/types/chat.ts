@@ -39,6 +39,8 @@ export interface UIChatMessage {
   toolModelKey?: string;
   /** Transient flag: true for messages restored from session history (not persisted) */
   isFromHistory?: boolean;
+  /** True for messages created by the offline recovery system */
+  isRecoveryMessage?: boolean;
 }
 
 /** Full chat session stored in IndexedDB */
