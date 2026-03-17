@@ -32,6 +32,8 @@ export interface UIChatMessage {
   videoAspectRatio?: string;
   /** Display name of the AI model used for this result (e.g. "Z-Image Turbo") */
   modelName?: string;
+  /** Transient flag: true for messages restored from session history (not persisted) */
+  isFromHistory?: boolean;
 }
 
 /** Full chat session stored in IndexedDB */

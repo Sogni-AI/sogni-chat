@@ -11,6 +11,7 @@ import { ChatVideoResults } from './ChatVideoResults';
 import ChatAudioResults from './ChatAudioResults';
 import { ChatProgressIndicator } from './ChatProgressIndicator';
 import { SogniTVOffer } from './SogniTVOffer';
+import { LazyMedia } from './LazyMedia';
 import './chat.css';
 
 interface ChatMessageProps {
@@ -33,7 +34,17 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
   const isAssistant = message.role === 'assistant';
   const isSystem = message.role === 'system';
 
-  const hasVisibleContent = message.content?.trim();
+  // Safety net: strip any leaked LLM XML blocks (<think>, <tool_call>) from
+  // assistant content. The streaming layer strips these in real-time, but this
+  // catches edge cases where partial tags or race conditions let XML through.
+  const displayContent = isAssistant
+    ? message.content
+        .replace(/<(?:tool_call|think)>[\s\S]*?<\/(?:tool_call|think)>/g, '')
+        .replace(/<(?:tool_call|think)>[\s\S]*$/g, '')
+        .trim()
+    : message.content;
+
+  const hasVisibleContent = displayContent?.trim();
   const hasProgress = !!message.toolProgress;
   const hasImages = message.imageResults && message.imageResults.length > 0;
   const hasVideos = message.videoResults && message.videoResults.length > 0;
@@ -93,7 +104,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
     return (
       <div style={{ display: 'flex', justifyContent: 'center', padding: '0.25rem 0' }}>
         <span style={{ fontSize: '0.75rem', color: '#666666', fontStyle: 'italic' }}>
-          {message.content.trim()}
+          {displayContent.trim()}
         </span>
       </div>
     );
@@ -139,7 +150,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
                     code: ({ children }) => <code style={{ background: 'rgba(255,255,255,0.08)', padding: '0.125em 0.375em', borderRadius: '4px', fontSize: '0.875em' }}>{children}</code>,
                   }}
                 >
-                  {message.content.trim()}
+                  {displayContent}
                 </ReactMarkdown>
               )}
               {message.isStreaming && !message.toolProgress && (
@@ -167,7 +178,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
             </>
           ) : (
             <>
-              {message.content.trim()}
+              {displayContent.trim()}
               {message.isStreaming && !message.toolProgress && (
                 <span className="chat-streaming-cursor" />
               )}
@@ -248,13 +259,15 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
       {/* Image results */}
       {message.imageResults && message.imageResults.length > 0 && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
-          <ChatImageResults
-            urls={message.imageResults}
-            sourceImageUrl={message.sourceImageUrl || imageUrl || undefined}
-            onImageClick={onImageClick}
-            galleryImageIds={message.galleryImageIds}
-            downloadSlug={downloadSlug}
-          />
+          <LazyMedia enabled={!!message.isFromHistory} placeholderHeight={200}>
+            <ChatImageResults
+              urls={message.imageResults}
+              sourceImageUrl={message.sourceImageUrl || imageUrl || undefined}
+              onImageClick={onImageClick}
+              galleryImageIds={message.galleryImageIds}
+              downloadSlug={downloadSlug}
+            />
+          </LazyMedia>
           {message.modelName && (
             <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', marginTop: '0.25rem', opacity: 0.6 }}>
               {message.modelName}
@@ -266,7 +279,9 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
       {/* Video results */}
       {message.videoResults && message.videoResults.length > 0 && !message.toolProgress && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
-          <ChatVideoResults urls={message.videoResults} galleryVideoIds={message.galleryVideoIds} downloadSlug={downloadSlug} videoAspectRatio={message.videoAspectRatio} />
+          <LazyMedia enabled={!!message.isFromHistory} placeholderHeight={280}>
+            <ChatVideoResults urls={message.videoResults} galleryVideoIds={message.galleryVideoIds} downloadSlug={downloadSlug} videoAspectRatio={message.videoAspectRatio} autoPlay={!message.isFromHistory} />
+          </LazyMedia>
           {message.modelName && (
             <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', marginTop: '0.25rem', opacity: 0.6 }}>
               {message.modelName}
@@ -278,7 +293,9 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
       {/* Audio results */}
       {message.audioResults && message.audioResults.length > 0 && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
-          <ChatAudioResults audioUrls={message.audioResults} downloadSlug={downloadSlug} />
+          <LazyMedia enabled={!!message.isFromHistory} placeholderHeight={80}>
+            <ChatAudioResults audioUrls={message.audioResults} downloadSlug={downloadSlug} />
+          </LazyMedia>
           {message.modelName && (
             <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', marginTop: '0.25rem', opacity: 0.6 }}>
               {message.modelName}

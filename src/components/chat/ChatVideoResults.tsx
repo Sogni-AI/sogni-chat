@@ -13,7 +13,7 @@ import { activeVideos, pauseOtherVideos } from './videoCoordination';
 /** Individual video player that pauses all other chat videos when it starts playing.
  *  Hides the native player until the first frame is ready to prevent the
  *  ugly black unstyled rectangle that flashes while the video is loading. */
-function ChatVideoPlayer({ src, onError, aspectRatio, fillWidth }: { src: string; onError: () => void; aspectRatio?: string; fillWidth?: boolean }) {
+function ChatVideoPlayer({ src, onError, aspectRatio, fillWidth, autoPlay = true }: { src: string; onError: () => void; aspectRatio?: string; fillWidth?: boolean; autoPlay?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [ready, setReady] = useState(false);
 
@@ -103,11 +103,12 @@ function ChatVideoPlayer({ src, onError, aspectRatio, fillWidth }: { src: string
       <video
         ref={videoRef}
         src={src}
-        autoPlay
+        autoPlay={autoPlay}
         controls
         loop
         playsInline
-        preload="auto"
+        preload={autoPlay ? 'auto' : 'metadata'}
+        onLoadedMetadata={() => { if (!autoPlay) setReady(true); }}
         onLoadedData={() => setReady(true)}
         onError={onError}
         style={{
@@ -133,6 +134,8 @@ interface ChatVideoResultsProps {
   downloadSlug?: string;
   /** Video aspect ratio as CSS string (e.g. "9 / 16") — prevents reflow when video loads */
   videoAspectRatio?: string;
+  /** Whether videos should auto-play (default: true). Set false for restored history. */
+  autoPlay?: boolean;
 }
 
 export const ChatVideoResults = memo(function ChatVideoResults({
@@ -140,6 +143,7 @@ export const ChatVideoResults = memo(function ChatVideoResults({
   galleryVideoIds,
   downloadSlug,
   videoAspectRatio,
+  autoPlay = true,
 }: ChatVideoResultsProps) {
   // Resolve gallery IDs to blob URLs — persistent local copies that never expire
   const galleryBlobUrls = useGalleryBlobUrls(galleryVideoIds);
@@ -224,6 +228,7 @@ export const ChatVideoResults = memo(function ChatVideoResults({
               onError={() => handleError(index)}
               aspectRatio={videoAspectRatio}
               fillWidth={isGrid}
+              autoPlay={autoPlay}
             />
           )}
 

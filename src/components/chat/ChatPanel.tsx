@@ -3,7 +3,7 @@
  * Renders message history, handles auto-scroll, and manages input.
  * State is owned by the parent (ChatPage) and passed in as props.
  */
-import { useRef, useEffect, useCallback, useMemo, useState } from 'react';
+import { useRef, useEffect, useCallback, useMemo, useState, useLayoutEffect } from 'react';
 import type { SogniClient } from '@sogni-ai/sogni-client';
 import type { TokenType, Balances } from '@/types/wallet';
 import type { UseChatResult } from '@/hooks/useChat';
@@ -21,6 +21,9 @@ import { ChatInput } from './ChatInput';
 import { SuggestionChips } from './SuggestionChips';
 import { FileDropZone } from './FileDropZone';
 import { IntentCaptureCard } from './IntentCaptureCard';
+
+/** Number of messages to show per pagination page */
+const PAGE_SIZE = 40;
 
 interface ChatPanelProps {
   sogniClient: SogniClient | null;
@@ -226,6 +229,10 @@ export function ChatPanel({
   const isUserNearBottomRef = useRef(true);
   const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
 
+  // Message pagination — show last PAGE_SIZE messages initially, expand on scroll-up
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
+
   // Wrap acceptModelSwitch to also update the header model selector
   const handleAcceptModelSwitch = useCallback(() => {
     // Pick the unrestricted variant that matches the current think setting
@@ -364,6 +371,63 @@ export function ChatPanel({
     return msgs;
   }, [messages, uploadedFiles, getPreviewUrl, imageUrl]);
 
+  // Paginated messages — show the most recent `visibleCount` messages
+  const paginatedMessages = useMemo(() => {
+    if (processedMessages.length <= visibleCount) return processedMessages;
+    return processedMessages.slice(-visibleCount);
+  }, [processedMessages, visibleCount]);
+
+  const hasMoreMessages = processedMessages.length > visibleCount;
+
+  // Reset pagination when the session changes (detected by first message ID changing)
+  const prevFirstMsgIdRef = useRef(processedMessages[0]?.id);
+  useEffect(() => {
+    const firstId = processedMessages[0]?.id;
+    if (firstId !== prevFirstMsgIdRef.current) {
+      prevFirstMsgIdRef.current = firstId;
+      setVisibleCount(PAGE_SIZE);
+    }
+  }, [processedMessages]);
+
+  // Load more messages when scrolling near the top
+  const isLoadingMoreRef = useRef(false);
+  const prevScrollHeightRef = useRef(0);
+
+  useEffect(() => {
+    if (!hasMoreMessages) return;
+    const sentinel = loadMoreSentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !isLoadingMoreRef.current) {
+          isLoadingMoreRef.current = true;
+          // Capture scroll height synchronously before the state update triggers re-render
+          const container = scrollContainerRef.current;
+          if (container) {
+            prevScrollHeightRef.current = container.scrollHeight;
+          }
+          setVisibleCount((prev) => prev + PAGE_SIZE);
+        }
+      },
+      { root: scrollContainerRef.current, rootMargin: '200px' },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMoreMessages]);
+
+  // Maintain scroll position when loading older messages (prevents jumping to top)
+  useLayoutEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || !prevScrollHeightRef.current || !isLoadingMoreRef.current) return;
+    const heightDiff = container.scrollHeight - prevScrollHeightRef.current;
+    if (heightDiff > 0) {
+      container.scrollTop += heightDiff;
+    }
+    prevScrollHeightRef.current = 0;
+    isLoadingMoreRef.current = false;
+  }, [paginatedMessages]);
+
   const galleryItems = useMemo(
     () => allResultUrls.map((url) => ({ before: imageUrl || '', after: url })),
     [allResultUrls, imageUrl],
@@ -471,7 +535,7 @@ export function ChatPanel({
               {messages.length > 1 && (
                 <button
                   onClick={onClearAll || (() => reset())}
-                  title="Clear conversation and start fresh"
+                  title={isMobile ? 'Start a new conversation' : 'Clear conversation and start fresh'}
                   style={{
                     padding: '0.25rem 0.625rem',
                     fontSize: '0.75rem',
@@ -492,7 +556,7 @@ export function ChatPanel({
                     e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
                   }}
                 >
-                  Clear
+                  {isMobile ? 'New' : 'Clear'}
                 </button>
               )}
             </>
@@ -655,8 +719,13 @@ export function ChatPanel({
             </div>
           )}
 
+          {/* Load-more sentinel — triggers pagination when scrolled near top */}
+          {hasMoreMessages && (
+            <div ref={loadMoreSentinelRef} style={{ height: 1, flexShrink: 0 }} />
+          )}
+
           {/* Chat messages — skip welcome message when in no-image empty state */}
-          {processedMessages.map((msg) => {
+          {paginatedMessages.map((msg) => {
             // Hide the welcome sentinel message when the empty state UI is showing
             // Always hide the welcome sentinel — it's only used to detect the empty state,
             // never displayed as an actual chat bubble.

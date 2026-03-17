@@ -151,6 +151,7 @@ export async function sendChatMessage(
   while (toolRound < MAX_TOOL_ROUNDS) {
     toolRound++;
     let insideThink = false;
+    let insideToolCall = false;
 
     try {
       // Sliding window: trim conversation if approaching context limit.
@@ -222,8 +223,9 @@ export async function sendChatMessage(
           break;
         }
         if (chunk.content) {
-          const { cleaned, insideThink: stillInThink } = stripThinkBlocks(chunk.content, insideThink);
+          const { cleaned, insideThink: stillInThink, insideToolCall: stillInToolCall } = stripThinkBlocks(chunk.content, insideThink, insideToolCall);
           insideThink = stillInThink;
+          insideToolCall = stillInToolCall;
           if (cleaned) {
             callbacks.onToken(cleaned);
           }
@@ -291,9 +293,14 @@ export async function sendChatMessage(
               name: toolName,
             });
 
-            // Detect error results from the registry (it catches handler exceptions
-            // and returns error JSON strings rather than throwing). Notify the UI so
-            // the spinner is cleared and the user sees the failure immediately.
+            // Parse result to detect errors from the registry (it catches handler
+            // exceptions and returns error JSON strings rather than throwing).
+            // NOTE: We intentionally do NOT fire onToolProgress({ type: 'error' })
+            // here. The error result is already in the conversation history for the
+            // LLM to see. On the next round, the LLM will either retry with a
+            // different tool (making a UI error flash confusing) or explain the
+            // failure in text (making an error box redundant). Showing the error
+            // briefly before the LLM responds caused a distracting "flash" effect.
             let parsed: Record<string, unknown> | null = null;
             try {
               parsed = JSON.parse(toolResult);
@@ -303,28 +310,18 @@ export async function sendChatMessage(
             }
 
             if (parsed?.error) {
-              callbacks.onToolProgress({
-                type: 'error',
-                toolName,
-                error: typeof parsed.error === 'string'
-                  ? parsed.error
-                  : (parsed.message as string) || `${toolName} failed`,
-              });
+              console.warn(`[CHAT SERVICE] Tool "${toolName}" error: ${parsed.error}`);
             } else if (parsed && !('success' in parsed)) {
               console.warn(`[CHAT SERVICE] Tool "${toolName}" result missing success field`);
             }
           } catch (err: any) {
             const errorMsg = err.message || 'Tool execution failed';
+            console.warn(`[CHAT SERVICE] Tool "${toolName}" threw: ${errorMsg}`);
             updatedMessages.push({
               role: 'tool',
               content: JSON.stringify({ error: errorMsg }),
               tool_call_id: toolCall.id,
               name: toolName,
-            });
-            callbacks.onToolProgress({
-              type: 'error',
-              toolName,
-              error: errorMsg,
             });
           }
         }
@@ -407,6 +404,7 @@ export async function sendVisionAnalysis(
 
   let fullContent = '';
   let insideThink = false;
+  let insideToolCall = false;
 
   try {
     const stream = await sogniClient.chat.completions.create({
@@ -419,8 +417,9 @@ export async function sendVisionAnalysis(
 
     for await (const chunk of stream) {
       if (chunk.content) {
-        const { cleaned, insideThink: stillInThink } = stripThinkBlocks(chunk.content, insideThink);
+        const { cleaned, insideThink: stillInThink, insideToolCall: stillInToolCall } = stripThinkBlocks(chunk.content, insideThink, insideToolCall);
         insideThink = stillInThink;
+        insideToolCall = stillInToolCall;
         if (cleaned) {
           fullContent += cleaned;
           callbacks.onToken(cleaned);
@@ -484,10 +483,12 @@ export async function generateSessionTitle(
 
     let title = '';
     let insideThink = false;
+    let insideToolCall = false;
     for await (const chunk of stream) {
       if (chunk.content) {
-        const { cleaned, insideThink: stillInThink } = stripThinkBlocks(chunk.content, insideThink);
+        const { cleaned, insideThink: stillInThink, insideToolCall: stillInToolCall } = stripThinkBlocks(chunk.content, insideThink, insideToolCall);
         insideThink = stillInThink;
+        insideToolCall = stillInToolCall;
         title += cleaned;
       }
     }

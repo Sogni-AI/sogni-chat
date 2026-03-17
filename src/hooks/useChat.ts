@@ -132,6 +132,7 @@ function cleanForStorage(messages: UIChatMessage[]): UIChatMessage[] {
     chatModelLabel: undefined,
     uploadedImageUrl: undefined,
     uploadedImageUrls: undefined,
+    isFromHistory: undefined,
   }));
 }
 
@@ -484,7 +485,18 @@ export function useChat(): UseChatResult {
                 setUIMessages((prev) =>
                   prev.map((msg) =>
                     msg.id === targetId
-                      ? { ...msg, content: currentContent, streamingStatus: undefined }
+                      ? {
+                          ...msg,
+                          content: currentContent,
+                          streamingStatus: undefined,
+                          // Clear stale toolProgress when LLM starts streaming.
+                          // After a tool error (no onToolComplete), the previous
+                          // 'started'/'progress' state persists. Tokens arriving
+                          // means the LLM is responding, so any previous tool
+                          // progress is stale. (onToken only fires during the
+                          // streaming phase, never during tool execution.)
+                          toolProgress: null,
+                        }
                       : msg,
                   ),
                 );
@@ -996,7 +1008,7 @@ export function useChat(): UseChatResult {
     queuedRequestsRef.current = [];
     // Reset active request count for the new session's UI state
     activeRequestCountRef.current = 0;
-    setUIMessages(session.uiMessages);
+    setUIMessages(session.uiMessages.map(m => ({ ...m, isFromHistory: true })));
     setAllResultUrls(session.allResultUrls);
     setAnalysisSuggestions(session.analysisSuggestions);
     setIsLoading(false);

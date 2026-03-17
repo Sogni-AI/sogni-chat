@@ -29,35 +29,58 @@ export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): 
   return raced;
 }
 
-/**
- * Strip Qwen `<think>...</think>` blocks from streamed content.
- * Returns the cleaned text and whether we're still inside a think block.
- */
-export function stripThinkBlocks(text: string, insideThink: boolean): { cleaned: string; insideThink: boolean } {
+/** Strip a specific XML-like tag pair from text, tracking streaming state. */
+function stripXmlTag(
+  text: string,
+  inside: boolean,
+  openTag: string,
+  closeTag: string,
+): { cleaned: string; inside: boolean } {
   let result = '';
-  let inThink = insideThink;
+  let inTag = inside;
   let i = 0;
 
   while (i < text.length) {
-    if (!inThink) {
-      const openIdx = text.indexOf('<think>', i);
+    if (!inTag) {
+      const openIdx = text.indexOf(openTag, i);
       if (openIdx === -1) {
         result += text.slice(i);
         break;
       }
       result += text.slice(i, openIdx);
-      inThink = true;
-      i = openIdx + 7; // length of '<think>'
+      inTag = true;
+      i = openIdx + openTag.length;
     } else {
-      const closeIdx = text.indexOf('</think>', i);
+      const closeIdx = text.indexOf(closeTag, i);
       if (closeIdx === -1) {
-        // Still inside think block, consume the rest
+        // Still inside tag, consume the rest
         break;
       }
-      inThink = false;
-      i = closeIdx + 8; // length of '</think>'
+      inTag = false;
+      i = closeIdx + closeTag.length;
     }
   }
 
-  return { cleaned: result, insideThink: inThink };
+  return { cleaned: result, inside: inTag };
+}
+
+/**
+ * Strip Qwen `<think>...</think>` and leaked `<tool_call>...</tool_call>` blocks
+ * from streamed content. Tool call XML leaks when the LLM emits tool calls as
+ * text instead of structured JSON — these must never be shown to the user.
+ * Returns the cleaned text and state flags for tracking across streamed chunks.
+ */
+export function stripThinkBlocks(
+  text: string,
+  insideThink: boolean,
+  insideToolCall = false,
+): { cleaned: string; insideThink: boolean; insideToolCall: boolean } {
+  const thinkResult = stripXmlTag(text, insideThink, '<think>', '</think>');
+  const toolCallResult = stripXmlTag(thinkResult.cleaned, insideToolCall, '<tool_call>', '</tool_call>');
+
+  return {
+    cleaned: toolCallResult.cleaned,
+    insideThink: thinkResult.inside,
+    insideToolCall: toolCallResult.inside,
+  };
 }
