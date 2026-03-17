@@ -367,11 +367,13 @@ export function ChatPanel({
       msgs = [...msgs, uploadMsg];
     }
 
-    // Refresh blob URLs on messages that have uploaded images (handles page
-    // refresh where old blob URLs become stale but file data is restored).
+    // Refresh blob URLs on the synthetic user-upload message and on sent
+    // messages whose stale blob URLs need replacing after a page refresh.
+    // Only refresh when the image count matches to avoid cross-contaminating
+    // messages that were sent with a different set of images.
     if (freshImageUrls.length > 0) {
       msgs = msgs.map((msg) =>
-        msg.uploadedImageUrls && msg.uploadedImageUrls.length > 0
+        msg.uploadedImageUrls && msg.uploadedImageUrls.length === freshImageUrls.length
           ? { ...msg, uploadedImageUrls: freshImageUrls }
           : msg,
       );
