@@ -1072,6 +1072,11 @@ export function useChat(): UseChatResult {
   /**
    * Retry a tool execution directly (bypassing the LLM) with optional model override.
    * Used by the MediaActionsMenu "Try Again" / "Switch Model" actions.
+   *
+   * Mirrors sendMessage's session safety, concurrency, and abort patterns.
+   * Does NOT modify conversationRef — retries bypass the LLM entirely,
+   * so adding synthetic entries would confuse the LLM's context on the next real message.
+   * Empty deps array is intentional: all mutable state accessed via refs/stable setters.
    */
   const retryToolExecution = useCallback(
     async (
@@ -1097,12 +1102,26 @@ export function useChat(): UseChatResult {
       const toolArgs = targetMessage.toolArgs;
       if (!toolName || !toolArgs) return;
 
+      // Concurrency guard: block retry if already loading (matches sendMessage pattern)
+      if (activeRequestCountRef.current >= MAX_CONCURRENT_REQUESTS) {
+        console.log('[CHAT HOOK] Retry blocked — max concurrent requests reached');
+        return;
+      }
+
       // Build modified args with model override
       const modifiedArgs = { ...toolArgs };
       if (modelKeyOverride) {
         modifiedArgs[getModelArgKey(toolName)] = modelKeyOverride;
       }
 
+      // Session safety: capture session ID for background detection (mirrors sendMessage)
+      const capturedSessionId = sessionIdRef.current;
+      const isActiveSession = () =>
+        capturedSessionId === null
+          ? !toolAbortController.signal.aborted
+          : sessionIdRef.current === capturedSessionId;
+
+      activeRequestCountRef.current++;
       setError(null);
       setIsLoading(true);
       setIsSending(true);
@@ -1117,6 +1136,7 @@ export function useChat(): UseChatResult {
       };
 
       // Add streaming assistant message for tool progress
+      // NOTE: toolArgs is preserved via ...msg spread in onToolComplete for re-retry support
       const assistantMsgId = `assistant-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const assistantMsg: UIChatMessage = {
         id: assistantMsgId,
@@ -1129,9 +1149,6 @@ export function useChat(): UseChatResult {
       };
 
       setUIMessages(prev => [...prev, userMsg, assistantMsg]);
-
-      // Add user message to conversation for context
-      conversationRef.current.push({ role: 'user', content: userMsg.content });
 
       const variant = context.modelVariantId ? getVariantById(context.modelVariantId) : undefined;
       const effectiveModel = sessionModelRef.current || (variant ? variant.modelId : undefined);
@@ -1166,17 +1183,48 @@ export function useChat(): UseChatResult {
 
       const callbacks: ToolCallbacks = {
         onToolProgress: (progress) => {
+          if (toolAbortController.signal.aborted) return;
+          // Always accumulate URLs even for background sessions
           if (progress.resultUrls) {
             retryResultUrls = [...new Set([...retryResultUrls, ...progress.resultUrls])];
           }
           if (progress.videoResultUrls) {
             retryVideoUrls = [...new Set([...retryVideoUrls, ...progress.videoResultUrls])];
           }
+          // SogniTV progress overlay
+          if (progress.type === 'progress' && progress.progress != null) {
+            sogniTVController.updateProgress({
+              progress: progress.progress,
+              etaSeconds: progress.etaSeconds,
+              toolName: progress.toolName,
+              stepLabel: progress.stepLabel,
+            });
+          } else if (progress.type === 'started' || progress.type === 'error' || progress.type === 'completed') {
+            sogniTVController.clearProgress();
+          }
+          if (!isActiveSession()) return; // Skip React state update for background sessions
           setUIMessages(prev => prev.map(msg => {
             if (msg.id !== assistantMsgId) return msg;
             const prevProgress = msg.toolProgress;
+            // Build per-job progress for multi-job operations (e.g., batch video gen)
+            let perJobProgress = progress.type === 'started'
+              ? undefined
+              : prevProgress?.perJobProgress;
+            if (progress.jobIndex !== undefined) {
+              const prevJob = perJobProgress?.[progress.jobIndex];
+              const resultUrl = progress.videoResultUrls?.[0] || progress.resultUrls?.[0];
+              perJobProgress = {
+                ...perJobProgress,
+                [progress.jobIndex]: {
+                  progress: progress.progress ?? prevJob?.progress,
+                  etaSeconds: progress.etaSeconds ?? prevJob?.etaSeconds,
+                  ...(resultUrl ? { resultUrl } : prevJob?.resultUrl ? { resultUrl: prevJob.resultUrl } : {}),
+                  ...(progress.error ? { error: progress.error } : prevJob?.error ? { error: prevJob.error } : {}),
+                },
+              };
+            }
             const merged: ToolExecutionProgress = progress.type === 'started'
-              ? progress
+              ? { ...progress, perJobProgress }
               : {
                   ...prevProgress,
                   ...progress,
@@ -1186,15 +1234,36 @@ export function useChat(): UseChatResult {
                   sourceImageUrl: progress.sourceImageUrl ?? prevProgress?.sourceImageUrl,
                   videoAspectRatio: progress.videoAspectRatio ?? prevProgress?.videoAspectRatio,
                   modelName: progress.modelName ?? prevProgress?.modelName,
+                  perJobProgress,
                 };
             const videoResults = retryVideoUrls.length > 0 ? [...retryVideoUrls] : msg.videoResults;
-            return { ...msg, toolProgress: merged, videoResults };
+            // Clear stale gallery IDs on restart
+            const galleryVideoIds = progress.type === 'started' ? undefined : msg.galleryVideoIds;
+            return { ...msg, toolProgress: merged, videoResults, galleryVideoIds };
           }));
         },
         onToolComplete: (completedToolName, resultUrls, videoResultUrls) => {
+          sogniTVController.notifyToolComplete();
+          if (toolAbortController.signal.aborted) return;
+
           retryResultUrls = [...new Set([...retryResultUrls, ...resultUrls])];
           if (videoResultUrls) {
             retryVideoUrls = [...new Set([...retryVideoUrls, ...videoResultUrls])];
+          }
+
+          if (!isActiveSession()) {
+            // Background completion — notify parent to persist to IndexedDB
+            const effectiveSessionId = capturedSessionId || sessionIdRef.current;
+            if (effectiveSessionId) {
+              onBackgroundCompleteRef.current?.(effectiveSessionId, {
+                toolName: completedToolName,
+                resultUrls: [...new Set(retryResultUrls)],
+                videoResultUrls: retryVideoUrls.length > 0 ? [...new Set(retryVideoUrls)] : undefined,
+                assistantContent: '',
+                streamingMsgId: assistantMsgId,
+              });
+            }
+            return;
           }
 
           const isAudioTool = completedToolName === 'generate_music';
@@ -1208,6 +1277,7 @@ export function useChat(): UseChatResult {
               || undefined;
             return {
               ...msg,
+              // toolArgs preserved via ...msg spread for re-retry support
               imageResults: !isAudioTool && retryResultUrls.length > 0 ? retryResultUrls : undefined,
               videoResults: retryVideoUrls.length > 0 ? retryVideoUrls : undefined,
               audioResults: isAudioTool && retryResultUrls.length > 0 ? retryResultUrls : undefined,
@@ -1231,25 +1301,25 @@ export function useChat(): UseChatResult {
           if (isAudioTool && retryResultUrls.length > 0) {
             audioResultUrlsRef.current = [...new Set([...audioResultUrlsRef.current, ...retryResultUrls])];
           }
-
-          // Add tool result to conversation for context
-          conversationRef.current.push({
-            role: 'assistant',
-            content: `[Tool ${completedToolName} completed successfully]`,
-          });
         },
         onGallerySaved: (galleryImageIds, galleryVideoIds) => {
-          setUIMessages(prev => applyGalleryIdsToMessages(prev, galleryImageIds, galleryVideoIds));
-          const effectiveSessionId = sessionIdRef.current;
-          if (effectiveSessionId) {
-            onBackgroundGallerySavedRef.current?.(effectiveSessionId, galleryImageIds, galleryVideoIds);
+          if (isActiveSession()) {
+            setUIMessages(prev => applyGalleryIdsToMessages(prev, galleryImageIds, galleryVideoIds));
+          } else {
+            // Background: notify parent for IndexedDB persistence
+            const effectiveSessionId = capturedSessionId || sessionIdRef.current;
+            if (effectiveSessionId) {
+              onBackgroundGallerySavedRef.current?.(effectiveSessionId, galleryImageIds, galleryVideoIds);
+            }
           }
         },
       };
 
       try {
         const result = await toolRegistry.execute(toolName, modifiedArgs, executionContext, callbacks);
-        // If the tool returned an error and onToolComplete wasn't called, show error
+        if (toolAbortController.signal.aborted || !isActiveSession()) return;
+        // If the tool returned an error JSON and onToolComplete wasn't called, show error.
+        // Guard on isStreaming: if onToolComplete already fired, the message is finalized.
         try {
           const parsed = JSON.parse(result);
           if (parsed.error) {
@@ -1261,19 +1331,28 @@ export function useChat(): UseChatResult {
           }
         } catch { /* not JSON, ignore */ }
       } catch (err: any) {
-        setError(err.message || 'Retry failed');
-        setUIMessages(prev => prev.map(msg =>
-          msg.id === assistantMsgId
-            ? { ...msg, content: 'Retry failed', isStreaming: false, toolProgress: null }
-            : msg,
-        ));
+        if (toolAbortController.signal.aborted) return;
+        if (isActiveSession()) {
+          setError(err.message || 'Retry failed');
+          setUIMessages(prev => prev.map(msg =>
+            msg.id === assistantMsgId
+              ? { ...msg, content: 'Retry failed', isStreaming: false, toolProgress: null }
+              : msg,
+          ));
+        }
       } finally {
         controllersSet.delete(toolAbortController);
-        setIsLoading(false);
-        setIsSending(false);
+        if (isActiveSession()) {
+          activeRequestCountRef.current--;
+          if (activeRequestCountRef.current <= 0) {
+            activeRequestCountRef.current = 0;
+            setIsLoading(false);
+            setIsSending(false);
+          }
+        }
       }
     },
-    [],
+    [], // No dependencies needed - all mutable state accessed via refs/stable setters
   );
 
   return {

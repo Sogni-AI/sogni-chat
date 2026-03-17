@@ -85,6 +85,7 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
       <button
         onClick={handleToggle}
         aria-label="Media actions"
+        aria-haspopup="menu"
         aria-expanded={open}
         style={{
           background: 'none',
