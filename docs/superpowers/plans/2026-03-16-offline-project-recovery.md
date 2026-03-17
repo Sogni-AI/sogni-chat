@@ -10,6 +10,10 @@
 
 **Spec:** `docs/superpowers/specs/2026-03-16-offline-project-recovery-design.md`
 
+**Notes:**
+- `src/utils/chatHistoryDB.ts` requires **no changes** — the ProjectSessionMap uses a separate IndexedDB database to avoid migration concerns.
+- The chat app uses `as any` casts when accessing SDK recovery events because the SDK's public type exports don't yet include the recovery types. This is acceptable for now; proper type exports can be added as a follow-up.
+
 ---
 
 ## Chunk 1: SDK — Types and Disconnect Fix
@@ -316,7 +320,7 @@ import { ProjectStatus } from './Project';
 
 - [ ] **Step 2: Add socket listener in constructor**
 
-In the constructor (after line 203 `this.on('job', this.handleJobEvent.bind(this));`), add:
+In the constructor (after line 206 `this.on('job', this.handleJobEvent.bind(this));`), add:
 
 ```typescript
     this.client.socket.on('authenticated', this.handleSocketAuthenticated.bind(this));
@@ -480,7 +484,11 @@ After the `handleServerDisconnected` method, add:
         workerName: wj.worker?.username
       });
     }
-    tracked._update({ status: 'completed' });
+    // Only mark completed if we resolved at least one job
+    const completedJobCount = tracked.jobs.filter((j: any) => j.finished).length;
+    if (completedJobCount >= recovered.imageCount) {
+      tracked._update({ status: 'completed' });
+    }
   }
 ```
 
@@ -591,10 +599,12 @@ interface ProjectSessionEntry {
 class ProjectSessionMap {
   private map = new Map<string, string>();
   private dbReady: Promise<IDBDatabase>;
+  /** Resolves when IndexedDB entries are loaded into the in-memory map */
+  ready: Promise<void>;
 
   constructor() {
     this.dbReady = this.openDB();
-    this.loadFromDB();
+    this.ready = this.loadFromDB();
   }
 
   /** Register a project → session mapping */
@@ -677,16 +687,23 @@ class ProjectSessionMap {
   private async loadFromDB(): Promise<void> {
     try {
       const db = await this.dbReady;
-      const tx = db.transaction(STORE_NAME, 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-      const request = store.getAll();
-      request.onsuccess = () => {
-        const entries = request.result as ProjectSessionEntry[];
-        for (const entry of entries) {
-          this.map.set(entry.projectId, entry.sessionId);
-        }
-        console.log(`[PROJECT SESSION MAP] Loaded ${entries.length} mappings from IndexedDB`);
-      };
+      return new Promise<void>((resolve) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.getAll();
+        request.onsuccess = () => {
+          const entries = request.result as ProjectSessionEntry[];
+          for (const entry of entries) {
+            this.map.set(entry.projectId, entry.sessionId);
+          }
+          console.log(`[PROJECT SESSION MAP] Loaded ${entries.length} mappings from IndexedDB`);
+          resolve();
+        };
+        request.onerror = () => {
+          console.warn('[PROJECT SESSION MAP] Failed to load from IndexedDB');
+          resolve(); // Don't reject — degrade gracefully
+        };
+      });
     } catch {
       // IndexedDB unavailable — start with empty map
       console.warn('[PROJECT SESSION MAP] IndexedDB unavailable, using in-memory only');
@@ -717,7 +734,7 @@ git commit -m "feat: add projectSessionMap service for offline recovery"
 
 - [ ] **Step 1: Add `sessionId` field**
 
-In the `ToolExecutionContext` interface, after the `safeContentFilter` field (line 61) and before the closing `}`, add:
+In the `ToolExecutionContext` interface, after the `onContentFilterChange` field (line 63) and before the closing `}` (line 64), add:
 
 ```typescript
   /** Current chat session ID — used by projectSessionMap for offline recovery */
@@ -734,7 +751,7 @@ After `think: effectiveThink,` (line 505), add:
           sessionId: capturedSessionId || '',
 ```
 
-Also in the `retryToolExecution` method (around line 1158-1169), the execution context is constructed similarly. Find the execution context construction there and add the same `sessionId` field. (Search for `const executionContext: ToolExecutionContext` in the retry section.)
+Also in the `retryToolExecution` method, the execution context is constructed at lines 1202-1220. Find `think: effectiveThink,` around line 1219 and add `sessionId: capturedSessionId || '',` after it.
 
 - [ ] **Step 3: Verify TypeScript compiles**
 
@@ -755,7 +772,9 @@ git commit -m "feat: add sessionId to ToolExecutionContext for recovery mapping"
 
 ### Task 8: Add `projectSessionMap.register()` to all project creation sites
 
-**Files (11 call sites across 10 files):**
+**Files (11 call sites across 10 files + 5 callers that pass sessionId through):**
+
+Direct `projects.create()` call sites:
 - Modify: `/Users/markledford/Documents/git/sogni-chat/src/tools/generate-image/handler.ts:423`
 - Modify: `/Users/markledford/Documents/git/sogni-chat/src/tools/generate-video/handler.ts:365`
 - Modify: `/Users/markledford/Documents/git/sogni-chat/src/tools/generate-music/handler.ts:202`
@@ -766,6 +785,13 @@ git commit -m "feat: add sessionId to ToolExecutionContext for recovery mapping"
 - Modify: `/Users/markledford/Documents/git/sogni-chat/src/services/sdk/videoGeneration.ts:133`
 - Modify: `/Users/markledford/Documents/git/sogni-chat/src/services/sdk/styleTransfer.ts:98`
 - Modify: `/Users/markledford/Documents/git/sogni-chat/src/services/sdk/angleGeneration.ts:112`
+
+Callers of SDK service functions (need to pass `context.sessionId` through):
+- Modify: `/Users/markledford/Documents/git/sogni-chat/src/tools/restore-photo/handler.ts`
+- Modify: `/Users/markledford/Documents/git/sogni-chat/src/tools/apply-style/handler.ts`
+- Modify: `/Users/markledford/Documents/git/sogni-chat/src/tools/change-angle/handler.ts`
+- Modify: `/Users/markledford/Documents/git/sogni-chat/src/tools/animate-photo/handler.ts`
+- Modify: `/Users/markledford/Documents/git/sogni-chat/src/tools/refine-result/handler.ts`
 
 The pattern is the same everywhere. After every `projects.create()` call, add one line.
 
@@ -900,7 +926,9 @@ Create a new function inside the `useChat` hook (after the `setOnRecoveryToast`)
    * Returns cleanup function to remove listeners.
    */
   const attachRecoveryListeners = useCallback((sogniClient: SogniClient) => {
-    const handleCompletedRecovery = (projects: any[]) => {
+    const handleCompletedRecovery = async (projects: any[]) => {
+      // Ensure IndexedDB mappings are loaded (critical for page-refresh recovery)
+      await projectSessionMap.ready;
       console.log(`[CHAT HOOK] Recovery: ${projects.length} completed projects recovered`);
       for (const project of projects) {
         const sessionId = projectSessionMap.getSessionId(project.id);
@@ -951,7 +979,8 @@ Create a new function inside the `useChat` hook (after the `setOnRecoveryToast`)
       }
     };
 
-    const handleActiveRecovery = (projects: any[]) => {
+    const handleActiveRecovery = async (projects: any[]) => {
+      await projectSessionMap.ready;
       console.log(`[CHAT HOOK] Recovery: ${projects.length} active projects still processing`);
       for (const project of projects) {
         const sessionId = projectSessionMap.getSessionId(project.id);
@@ -976,7 +1005,12 @@ Create a new function inside the `useChat` hook (after the `setOnRecoveryToast`)
             role: 'assistant',
             content: `Your ${mediaLabel} is still being processed...`,
             timestamp: Date.now(),
-            toolProgress: { type: 'started', toolName: 'generate_image' as ToolName },
+            toolProgress: {
+              type: 'started',
+              toolName: (modelType === 'video' ? 'generate_video'
+                : modelType === 'music' ? 'generate_music'
+                : 'generate_image') as ToolName,
+            },
             isRecoveryMessage: true,
           };
           setUIMessages((prev) => [...prev, progressMsg]);
