@@ -785,35 +785,42 @@ export default function ChatPage() {
     // Get conversation state
     const sessionState = chat.getSessionState();
 
-    // Truncate conversation to match branched messages: count user+assistant turns
-    // in the branched messages and slice the conversation array to match
-    let userTurns = 0;
-    let assistantTurns = 0;
+    // Truncate conversation to match branched messages.
+    // The raw conversation array has user, assistant (with tool_calls), tool, and
+    // assistant entries. A single UI tool-call turn maps to multiple conversation
+    // entries. We count real user messages (excluding synthetic welcome/upload) in
+    // the branched UI, then find the matching conversation slice by counting user
+    // role entries in the conversation array. After the last matching user entry,
+    // we include all subsequent non-user entries (assistant, tool) that belong to
+    // that turn, stopping before the next user entry.
+    let branchedUserCount = 0;
     for (const msg of branchedMessages) {
-      if (msg.role === 'user' && msg.id !== 'user-upload' && msg.content?.trim()) userTurns++;
-      if (msg.role === 'assistant') assistantTurns++;
-    }
-    const totalTurns = userTurns + assistantTurns;
-    // Slice conversation to match (conversation entries are user/assistant pairs)
-    let convCount = 0;
-    let convSliceEnd = 0;
-    for (let i = 0; i < sessionState.conversation.length; i++) {
-      convCount++;
-      if (convCount >= totalTurns) {
-        convSliceEnd = i + 1;
-        break;
+      if (msg.role === 'user' && msg.id !== 'user-upload' && msg.id !== 'welcome' && msg.content?.trim()) {
+        branchedUserCount++;
       }
     }
-    const branchedConversation = convSliceEnd > 0
-      ? sessionState.conversation.slice(0, convSliceEnd)
-      : sessionState.conversation;
+    let convUserCount = 0;
+    let convSliceEnd = sessionState.conversation.length; // default: keep all
+    for (let i = 0; i < sessionState.conversation.length; i++) {
+      if (sessionState.conversation[i].role === 'user') {
+        convUserCount++;
+        if (convUserCount > branchedUserCount) {
+          // This user entry is beyond the branch point — slice here
+          convSliceEnd = i;
+          break;
+        }
+      }
+    }
+    const branchedConversation = sessionState.conversation.slice(0, convSliceEnd);
 
-    // Collect result URLs from branched messages
+    // Collect result URLs from branched messages.
+    // allResultUrls tracks image/audio results only (not video) — video URLs are
+    // stored per-message on videoResults. Including video URLs would break the
+    // FullscreenBeforeAfter gallery which expects image-only entries.
     const branchedResultUrls: string[] = [];
     const branchedAudioUrls: string[] = [];
     for (const msg of branchedMessages) {
       if (msg.imageResults) branchedResultUrls.push(...msg.imageResults);
-      if (msg.videoResults) branchedResultUrls.push(...msg.videoResults);
       if (msg.audioResults) {
         branchedResultUrls.push(...msg.audioResults);
         branchedAudioUrls.push(...msg.audioResults);

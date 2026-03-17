@@ -1350,6 +1350,9 @@ export function useChat(): UseChatResult {
             setIsSending(false);
           }
         }
+        // Dequeue next queued request (matches sendMessage pattern)
+        const next = queuedRequestsRef.current.shift();
+        if (next) next();
       }
     },
     [], // No dependencies needed - all mutable state accessed via refs/stable setters
