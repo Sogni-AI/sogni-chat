@@ -14,8 +14,14 @@ import {
   formatCredits,
 } from '../shared';
 import { restorePhoto } from '@/services/sdk/imageGeneration';
+import type { ModelOverride } from '@/services/sdk/imageGeneration';
 import { fetchRestorationCostEstimate } from '@/services/creditsService';
 import { calculateOutputDimensions } from '@/utils/imageDimensions';
+
+/** Model configs for non-quality-tier models that restore_photo can use via retry/switch */
+const EXTRA_MODELS: Record<string, ModelOverride> = {
+  flux2: { modelId: 'flux2_dev_fp8', name: 'Flux.2 Dev', steps: 20, guidance: 4.0 },
+};
 
 export async function execute(
   args: Record<string, unknown>,
@@ -24,7 +30,11 @@ export async function execute(
 ): Promise<string> {
   const prompt = args.prompt as string;
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
-  const qualityTier = (args.quality as 'fast' | 'hq') || context.qualityTier || 'fast';
+  const modelKey = args.model as string | undefined;
+  const modelOverride = modelKey ? EXTRA_MODELS[modelKey] : undefined;
+  const qualityTier = modelOverride
+    ? (context.qualityTier || 'fast')                              // model override — qualityTier only affects output format
+    : (args.quality as 'fast' | 'hq') || context.qualityTier || 'fast';
   const scale = (args.scale as number) || 1;
   const aspectRatio = args.aspectRatio as string | undefined;
 
@@ -51,7 +61,7 @@ export async function execute(
     toolName: 'restore_photo',
     totalCount: numberOfMedia,
     estimatedCost,
-    modelName: `Qwen Image Edit 2511${qualityTier === 'fast' ? ' Lightning' : ''} — ${outputWidth}x${outputHeight}`,
+    modelName: `${modelOverride?.name ?? `Qwen Image Edit 2511${qualityTier === 'fast' ? ' Lightning' : ''}`} — ${outputWidth}x${outputHeight}`,
   });
 
   const billingId = estimatedCost > 0
@@ -70,6 +80,7 @@ export async function execute(
           customPrompt: prompt,
           numberOfMedia,
           qualityTier,
+          modelOverride,
         },
         (progress) => {
           if (progress.type === 'progress' || progress.type === 'completed') {

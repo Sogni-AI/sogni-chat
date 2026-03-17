@@ -15,8 +15,14 @@ import {
   formatCredits,
 } from '../shared';
 import { restorePhoto } from '@/services/sdk/imageGeneration';
+import type { ModelOverride } from '@/services/sdk/imageGeneration';
 import { fetchRestorationCostEstimate } from '@/services/creditsService';
 import { calculateOutputDimensions } from '@/utils/imageDimensions';
+
+/** Model configs for non-quality-tier models that refine_result can use via retry/switch */
+const EXTRA_MODELS: Record<string, ModelOverride> = {
+  flux2: { modelId: 'flux2_dev_fp8', name: 'Flux.2 Dev', steps: 20, guidance: 4.0 },
+};
 
 export async function execute(
   args: Record<string, unknown>,
@@ -27,6 +33,8 @@ export async function execute(
   // Default to latest result (last index) when not specified
   const sourceIndex = (args.sourceImageIndex as number | undefined) ?? (context.resultUrls.length > 0 ? context.resultUrls.length - 1 : 0);
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
+  const modelKey = args.model as string | undefined;
+  const modelOverride = modelKey ? EXTRA_MODELS[modelKey] : undefined;
   const scale = (args.scale as number) || 1;
   const aspectRatio = args.aspectRatio as string | undefined;
 
@@ -73,7 +81,7 @@ export async function execute(
     totalCount: numberOfMedia,
     estimatedCost,
     sourceImageUrl,
-    modelName: `Qwen Image Edit 2511${qualityTier === 'fast' ? ' Lightning' : ''} — ${outputWidth}x${outputHeight}`,
+    modelName: `${modelOverride?.name ?? `Qwen Image Edit 2511${qualityTier === 'fast' ? ' Lightning' : ''}`} — ${outputWidth}x${outputHeight}`,
   });
 
   const billingId = estimatedCost > 0
@@ -92,6 +100,7 @@ export async function execute(
           customPrompt: prompt,
           numberOfMedia,
           qualityTier,
+          modelOverride,
         },
         (progress) => {
           if (progress.type === 'progress' || progress.type === 'completed') {

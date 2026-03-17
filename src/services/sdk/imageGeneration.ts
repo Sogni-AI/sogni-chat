@@ -13,6 +13,14 @@ import { TokenType } from '@/types/wallet';
 import { getPresetsForCount, type RestorationPreset, type RestorationModeId } from '@/config/restorationPresets';
 import { QUALITY_PRESETS, DEFAULT_QUALITY, type QualityTier } from '@/config/qualityPresets';
 
+/** Override the quality-preset model with explicit model/steps/guidance */
+export interface ModelOverride {
+  modelId: string;
+  name: string;
+  steps: number;
+  guidance: number;
+}
+
 interface RestorationParams {
   imageData: Uint8Array;
   width: number;
@@ -23,6 +31,8 @@ interface RestorationParams {
   numberOfMedia?: number;
   qualityTier?: QualityTier;
   restorationMode?: RestorationModeId;
+  /** When provided, bypasses quality-tier model selection */
+  modelOverride?: ModelOverride;
 }
 
 export interface RestorationProgress {
@@ -62,22 +72,24 @@ function buildProjectConfig(
     numberOfMedia: number;
     imageData: Uint8Array;
     qualityTier: QualityTier;
+    modelOverride?: ModelOverride;
   }
 ): any {
   const preset = QUALITY_PRESETS[params.qualityTier];
+  const model = params.modelOverride;
   return {
     type: 'image',
     testnet: false,
     tokenType: params.tokenType,
-    modelId: preset.model,
+    modelId: model?.modelId ?? preset.model,
     positivePrompt: prompt,
     negativePrompt: '',
     stylePrompt: '',
     sizePreset: 'custom',
     width: params.width,
     height: params.height,
-    steps: preset.steps,
-    guidance: preset.guidance,
+    steps: model?.steps ?? preset.steps,
+    guidance: model?.guidance ?? preset.guidance,
     numberOfMedia: params.numberOfMedia,
     outputFormat: params.outputFormat,
     disableNSFWFilter: true,
@@ -379,6 +391,7 @@ async function restoreWithSinglePrompt(
     numberOfMedia,
     imageData: params.imageData,
     qualityTier: params.qualityTier,
+    modelOverride: params.modelOverride,
   });
 
   if (signal?.aborted) {
@@ -660,7 +673,7 @@ export async function restorePhoto(
     return restoreWithSinglePrompt(
       sogniClient,
       customPrompt,
-      { imageData, width, height, tokenType, outputFormat: effectiveFormat, numberOfMedia, qualityTier },
+      { imageData, width, height, tokenType, outputFormat: effectiveFormat, numberOfMedia, qualityTier, modelOverride: params.modelOverride },
       onProgress,
       signal
     );

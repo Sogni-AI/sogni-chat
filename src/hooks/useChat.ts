@@ -1101,7 +1101,7 @@ export function useChat(): UseChatResult {
       },
       modelKeyOverride?: string,
     ) => {
-      let effectiveToolName = targetMessage.lastCompletedTool as ToolName;
+      const effectiveToolName = targetMessage.lastCompletedTool as ToolName;
       const toolArgs = targetMessage.toolArgs;
       if (!effectiveToolName || !toolArgs) return;
 
@@ -1114,22 +1114,18 @@ export function useChat(): UseChatResult {
       // Build modified args with model override
       const modifiedArgs = { ...toolArgs };
       // For quality-tier tools (restore_photo, apply_style, etc.), the override
-      // key is "quality" (fast/hq). We also need to override context.qualityTier
-      // since some tools read from context rather than args.
-      // Special case: if a non-quality key (e.g. "flux2") is selected on a quality-tier
-      // tool, switch to edit_image tool which supports that model directly.
+      // key is "quality" (fast/hq) OR a model key (e.g. "flux2").
+      // Quality keys override the "quality" arg + context.qualityTier.
+      // Non-quality keys (e.g. "flux2") are passed as a "model" arg — the handler
+      // uses it to override the quality preset's model selection.
       let isQualityOverride = false;
       if (modelKeyOverride && isQualityTierTool(effectiveToolName)) {
         if (modelKeyOverride === 'fast' || modelKeyOverride === 'hq') {
           isQualityOverride = true;
           modifiedArgs[getModelArgKey(effectiveToolName)] = modelKeyOverride;
         } else {
-          // Non-quality model (e.g. flux2) — switch to edit_image tool
-          effectiveToolName = 'edit_image' as ToolName;
+          // Non-quality model key (e.g. "flux2") — pass as "model" arg
           modifiedArgs.model = modelKeyOverride;
-          // Remove quality-tier-specific args that edit_image doesn't use
-          delete modifiedArgs.quality;
-          delete modifiedArgs.scale;
         }
       } else if (modelKeyOverride) {
         modifiedArgs[getModelArgKey(effectiveToolName)] = modelKeyOverride;
