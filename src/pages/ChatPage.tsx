@@ -22,6 +22,7 @@ import { MobileChatDrawer } from '@/components/chat/MobileChatDrawer';
 import { saveRestorationToGallery } from '@/services/galleryService';
 import { generateSessionTitle } from '@/services/chatService';
 import { slugify } from '@/utils/downloadFilename';
+import { fetchImageAsUint8Array, fetchAudioAsUint8Array } from '@/tools/shared/sourceImage';
 import type { ChatSession, UIChatMessage } from '@/types/chat';
 import type { UploadedFile } from '@/tools/types';
 import type { QualityTier } from '@/config/qualityPresets';
@@ -755,10 +756,6 @@ export default function ChatPage() {
 
   /** Branch conversation at a specific message into a new chat session */
   const handleBranchChat = useCallback(async (message: UIChatMessage) => {
-    const currentMessages = chat.messages;
-    const messageIndex = currentMessages.findIndex(m => m.id === message.id);
-    if (messageIndex < 0) return;
-
     // Track background jobs if current session has running tools
     if (chatRef.current.isLoading || chatRef.current.isSending) {
       const currentId = activeSessionIdRef.current;
@@ -772,64 +769,73 @@ export default function ChatPage() {
 
     isRestoringRef.current = true;
 
-    // Copy messages up to and including the target, stripping transient fields
-    const branchedMessages = currentMessages.slice(0, messageIndex + 1).map(msg => ({
-      ...msg,
-      toolProgress: undefined,
-      isStreaming: undefined,
-      streamingStatus: undefined,
-      chatModelLabel: undefined,
-      isFromHistory: undefined,
-    }));
+    // Fetch artifact(s) from the message and convert to UploadedFiles.
+    // This creates a brand-new chat with the artifact loaded as an upload —
+    // no conversation history, no LLM memory, just a clean slate.
+    const branchedFiles: UploadedFile[] = [];
+    const branchedResultUrls: string[] = [];
+    const branchedAudioUrls: string[] = [];
 
-    // Get conversation state
-    const sessionState = chat.getSessionState();
-
-    // Truncate conversation to match branched messages.
-    // The raw conversation array has user, assistant (with tool_calls), tool, and
-    // assistant entries. A single UI tool-call turn maps to multiple conversation
-    // entries. We count real user messages (excluding synthetic welcome/upload) in
-    // the branched UI, then find the matching conversation slice by counting user
-    // role entries in the conversation array. After the last matching user entry,
-    // we include all subsequent non-user entries (assistant, tool) that belong to
-    // that turn, stopping before the next user entry.
-    let branchedUserCount = 0;
-    for (const msg of branchedMessages) {
-      if (msg.role === 'user' && msg.id !== 'user-upload' && msg.id !== 'welcome' && msg.content?.trim()) {
-        branchedUserCount++;
-      }
-    }
-    let convUserCount = 0;
-    let convSliceEnd = sessionState.conversation.length; // default: keep all
-    for (let i = 0; i < sessionState.conversation.length; i++) {
-      if (sessionState.conversation[i].role === 'user') {
-        convUserCount++;
-        if (convUserCount > branchedUserCount) {
-          // This user entry is beyond the branch point — slice here
-          convSliceEnd = i;
-          break;
+    if (message.imageResults?.length) {
+      for (const url of message.imageResults) {
+        try {
+          const { data, width, height } = await fetchImageAsUint8Array(url);
+          branchedFiles.push({
+            type: 'image',
+            data,
+            width,
+            height,
+            mimeType: 'image/jpeg',
+            filename: `image-${branchedFiles.length + 1}.jpg`,
+          });
+          branchedResultUrls.push(url);
+        } catch (err) {
+          console.error('[BRANCH] Failed to fetch image:', err);
         }
       }
     }
-    const branchedConversation = sessionState.conversation.slice(0, convSliceEnd);
 
-    // Collect result URLs from branched messages.
-    // allResultUrls tracks image/audio results only (not video) — video URLs are
-    // stored per-message on videoResults. Including video URLs would break the
-    // FullscreenBeforeAfter gallery which expects image-only entries.
-    const branchedResultUrls: string[] = [];
-    const branchedAudioUrls: string[] = [];
-    for (const msg of branchedMessages) {
-      if (msg.imageResults) branchedResultUrls.push(...msg.imageResults);
-      if (msg.audioResults) {
-        branchedResultUrls.push(...msg.audioResults);
-        branchedAudioUrls.push(...msg.audioResults);
+    if (message.audioResults?.length) {
+      for (const url of message.audioResults) {
+        try {
+          const { data, mimeType } = await fetchAudioAsUint8Array(url);
+          const ext = mimeType.includes('wav') ? 'wav' : mimeType.includes('flac') ? 'flac' : 'mp3';
+          branchedFiles.push({
+            type: 'audio',
+            data,
+            mimeType,
+            filename: `audio-${branchedFiles.length + 1}.${ext}`,
+          });
+          branchedResultUrls.push(url);
+          branchedAudioUrls.push(url);
+        } catch (err) {
+          console.error('[BRANCH] Failed to fetch audio:', err);
+        }
       }
     }
 
-    // Create and save the new session
+    if (message.videoResults?.length) {
+      for (const url of message.videoResults) {
+        try {
+          const response = await fetch(url);
+          if (!response.ok) throw new Error(`Video fetch failed: ${response.status}`);
+          const buffer = await response.arrayBuffer();
+          const contentType = response.headers.get('content-type') || 'video/mp4';
+          const ext = contentType.includes('webm') ? 'webm' : 'mp4';
+          branchedFiles.push({
+            type: 'video',
+            data: new Uint8Array(buffer),
+            mimeType: contentType,
+            filename: `video-${branchedFiles.length + 1}.${ext}`,
+          });
+        } catch (err) {
+          console.error('[BRANCH] Failed to fetch video:', err);
+        }
+      }
+    }
+
+    // Create a clean new session — no messages, no conversation history
     const newId = createNewSession();
-    // Avoid stacking "(branch)" suffixes
     const baseTitle = (sessionTitleRef.current || 'Chat').replace(/ \(branch\)$/, '');
     const branchedTitle = baseTitle + ' (branch)';
     const newSession: ChatSession = {
@@ -837,13 +843,12 @@ export default function ChatPage() {
       title: branchedTitle,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      uiMessages: branchedMessages,
-      conversation: branchedConversation,
+      uiMessages: [],
+      conversation: [],
       allResultUrls: [...new Set(branchedResultUrls)],
       audioResultUrls: branchedAudioUrls.length > 0 ? [...new Set(branchedAudioUrls)] : undefined,
       analysisSuggestions: [],
-      sessionModel: sessionState.sessionModel,
-      uploadedFiles: uploadedFilesRef.current,
+      uploadedFiles: branchedFiles,
     };
 
     await saveCurrentSession(newId, newSession);
@@ -852,15 +857,11 @@ export default function ChatPage() {
     // Immediately update the ref so save functions see the new session ID
     activeSessionIdRef.current = newId;
 
-    // Load the branched session state into useChat (mirrors handleSelectSession)
+    // Load the clean session into useChat
     chat.loadFromSession(newSession);
 
-    // Preserve model variant from parent session
-    if (newSession.sessionModel === CHAT_MODEL_ABLITERATED) {
-      setSelectedModelVariant('unrestricted');
-    } else if (!newSession.sessionModel) {
-      setSelectedModelVariant(DEFAULT_VARIANT_ID);
-    }
+    // Reset to default model variant for the fresh session
+    setSelectedModelVariant(DEFAULT_VARIANT_ID);
 
     sessionTitleRef.current = branchedTitle;
     sessionCreatedAtRef.current = newSession.createdAt;
@@ -868,12 +869,12 @@ export default function ChatPage() {
     sessionPinnedRef.current = undefined;
     userRenamedRef.current = false;
     sessionDirtyRef.current = false;
-    gallerySavedRef.current = branchedResultUrls.length > 0;
+    gallerySavedRef.current = false;
     setResultUrls(newSession.allResultUrls);
     setUploadIntent(null);
 
-    // Restore uploaded files
-    loadFiles(legacySessionToUploadedFiles(newSession));
+    // Load the fetched artifacts as uploaded files
+    loadFiles(branchedFiles);
 
     setTimeout(() => { isRestoringRef.current = false; }, 2000);
   }, [chat, createNewSession, saveCurrentSession, switchSession, saveActiveSession, setSelectedModelVariant, loadFiles]);
