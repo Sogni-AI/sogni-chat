@@ -58,9 +58,8 @@ const LTX2_V2V: V2VModelConfig = {
   scheduler: 'simple',
 };
 
-/** WAN 2.2 Animate — supports animate-move and animate-replace */
-const WAN_ANIMATE: V2VModelConfig = {
-  id: 'wan_v2.2-14b-fp8_animate_lightx2v',
+/** WAN 2.2 Animate — shared config for animate-move and animate-replace */
+const WAN_ANIMATE_BASE: Omit<V2VModelConfig, 'id'> = {
   name: 'WAN 2.2 Animate LightX2V',
   defaultWidth: 832,
   defaultHeight: 480,
@@ -81,8 +80,11 @@ const WAN_ANIMATE: V2VModelConfig = {
 type ControlMode = 'canny' | 'pose' | 'depth' | 'detailer' | 'animate-move' | 'animate-replace';
 
 function getModelForControlMode(mode: ControlMode): V2VModelConfig {
-  if (mode === 'animate-move' || mode === 'animate-replace') {
-    return WAN_ANIMATE;
+  if (mode === 'animate-move') {
+    return { id: 'wan_v2.2-14b-fp8_animate-move_lightx2v', ...WAN_ANIMATE_BASE };
+  }
+  if (mode === 'animate-replace') {
+    return { id: 'wan_v2.2-14b-fp8_animate-replace_lightx2v', ...WAN_ANIMATE_BASE };
   }
   return LTX2_V2V;
 }

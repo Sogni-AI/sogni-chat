@@ -91,7 +91,7 @@ const IMAGE_MODELS: Record<string, ImageModelConfig> = {
     supportsImg2Img: true,
   },
   'flux1-krea': {
-    id: 'flux1_krea_dev_bf16',
+    id: 'flux1-krea-dev_fp8_scaled',
     name: 'Flux.1 Krea',
     defaultWidth: 1024,
     defaultHeight: 1024,
