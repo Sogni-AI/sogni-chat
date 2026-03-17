@@ -14,7 +14,7 @@ import { isMobile } from '@/utils/mobileDownload';
 /** Individual video player that pauses all other chat videos when it starts playing.
  *  Hides the native player until the first frame is ready to prevent the
  *  ugly black unstyled rectangle that flashes while the video is loading. */
-function ChatVideoPlayer({ src, onError, aspectRatio, fillWidth, autoPlay = true }: { src: string; onError: () => void; aspectRatio?: string; fillWidth?: boolean; autoPlay?: boolean }) {
+function ChatVideoPlayer({ src, onError, aspectRatio, fillWidth, autoPlay = true, isLocalBlob = false }: { src: string; onError: () => void; aspectRatio?: string; fillWidth?: boolean; autoPlay?: boolean; isLocalBlob?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [ready, setReady] = useState(false);
 
@@ -108,7 +108,7 @@ function ChatVideoPlayer({ src, onError, aspectRatio, fillWidth, autoPlay = true
         controls
         loop
         playsInline={!isMobile()}
-        preload={autoPlay ? 'auto' : 'metadata'}
+        preload={(autoPlay || isLocalBlob) ? 'auto' : 'metadata'}
         onLoadedMetadata={() => { if (!autoPlay) setReady(true); }}
         onLoadedData={() => setReady(true)}
         onError={onError}
@@ -179,7 +179,8 @@ export const ChatVideoResults = memo(function ChatVideoResults({
     >
       {urls.map((url, index) => {
         // Prefer gallery blob URL (persistent) over remote URL (may expire)
-        const displayUrl = galleryBlobUrls.get(index) || url;
+        const blobUrl = galleryBlobUrls.get(index);
+        const displayUrl = blobUrl || url;
         const isFailed = failedVideos.has(index);
 
         return (
@@ -230,6 +231,7 @@ export const ChatVideoResults = memo(function ChatVideoResults({
               aspectRatio={videoAspectRatio}
               fillWidth={isGrid}
               autoPlay={autoPlay}
+              isLocalBlob={!!blobUrl}
             />
           )}
 

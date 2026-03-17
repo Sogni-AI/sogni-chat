@@ -276,12 +276,11 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
         </div>
       )}
 
-      {/* Video results */}
+      {/* Video results — no LazyMedia wrapper since videos lack thumbnails;
+           the player has its own loading spinner and gallery blobs are local */}
       {message.videoResults && message.videoResults.length > 0 && !message.toolProgress && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
-          <LazyMedia enabled={!!message.isFromHistory} placeholderHeight={280}>
-            <ChatVideoResults urls={message.videoResults} galleryVideoIds={message.galleryVideoIds} downloadSlug={downloadSlug} videoAspectRatio={message.videoAspectRatio} autoPlay={!message.isFromHistory} />
-          </LazyMedia>
+          <ChatVideoResults urls={message.videoResults} galleryVideoIds={message.galleryVideoIds} downloadSlug={downloadSlug} videoAspectRatio={message.videoAspectRatio} autoPlay={!message.isFromHistory} />
           {message.modelName && (
             <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', marginTop: '0.25rem', opacity: 0.6 }}>
               {message.modelName}
