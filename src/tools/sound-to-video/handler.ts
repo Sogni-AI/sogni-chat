@@ -75,7 +75,7 @@ const S2V_MODELS: Record<string, S2VModelConfig> = {
     defaultFps: 24,
     frameStep: 8,
     minFrames: 25,
-    maxFrames: 257,
+    maxFrames: 505,
     sampler: 'euler_ancestral',
     scheduler: 'simple',
     requiresReferenceImage: true,
@@ -93,7 +93,7 @@ const S2V_MODELS: Record<string, S2VModelConfig> = {
     defaultFps: 24,
     frameStep: 8,
     minFrames: 25,
-    maxFrames: 257,
+    maxFrames: 505,
     sampler: 'euler_ancestral',
     scheduler: 'simple',
     requiresReferenceImage: false,
@@ -124,6 +124,7 @@ function computeDimensions(
   config: S2VModelConfig,
   imageWidth?: number,
   imageHeight?: number,
+  targetResolution?: number,
 ): { width: number; height: number } {
   let w = requestedW ?? imageWidth ?? config.defaultWidth;
   let h = requestedH ?? imageHeight ?? config.defaultHeight;
@@ -137,6 +138,18 @@ function computeDimensions(
     const ratio = parsed.ratioW / parsed.ratioH;
     w = Math.sqrt(area * ratio);
     h = area / w;
+  }
+
+  // Apply target resolution: scale shorter side to the target value
+  if (targetResolution !== undefined) {
+    const roundedTarget = Math.round(targetResolution / config.dimensionStep) * config.dimensionStep;
+    if (w <= h) {
+      h = Math.round((h * roundedTarget / w) / config.dimensionStep) * config.dimensionStep;
+      w = roundedTarget;
+    } else {
+      w = Math.round((w * roundedTarget / h) / config.dimensionStep) * config.dimensionStep;
+      h = roundedTarget;
+    }
   }
 
   const step = config.dimensionStep;
@@ -159,7 +172,7 @@ export async function execute(
 ): Promise<string> {
   const prompt = args.prompt as string;
   const explicitModel = args.videoModel as string | undefined;
-  const duration = Math.max(2, Math.min(10, (args.duration as number) || 5));
+  const duration = Math.max(2, Math.min(20, (args.duration as number) || 5));
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
   const aspectRatio = args.aspectRatio as string | undefined;
   const audioSourceIndex = args.audioSourceIndex as number | undefined;
@@ -239,6 +252,13 @@ export async function execute(
     }
   }
 
+  // Quality-based resolution: Standard (fast) -> 720p (768), High (hq) -> 1080p (1088)
+  const isLTX = modelKey.startsWith('ltx');
+  const qualityTier = context.qualityTier || 'fast';
+  const targetResolution = isLTX
+    ? (qualityTier === 'hq' ? 1088 : 768)
+    : undefined;
+
   const { width, height } = computeDimensions(
     args.width as number | undefined,
     args.height as number | undefined,
@@ -246,6 +266,7 @@ export async function execute(
     config,
     imgWidth,
     imgHeight,
+    targetResolution,
   );
   const frames = computeFrames(duration, config);
   const fps = config.defaultFps;

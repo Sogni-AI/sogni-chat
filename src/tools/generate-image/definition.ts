@@ -29,7 +29,7 @@ Tips:
         },
         model: {
           type: 'string',
-          enum: ['z-turbo', 'z-image', 'chroma-v46-flash', 'chroma-detail', 'flux1-krea', 'flux2', 'pony-v7'],
+          enum: ['z-turbo', 'z-image', 'chroma-v46-flash', 'chroma-detail', 'flux1-krea', 'flux2', 'pony-v7', 'qwen-2512', 'qwen-2512-lightning'],
           description:
             'DO NOT SET THIS PARAMETER unless the user names a specific model. The app auto-selects based on quality settings. NSFW rule: "flux2"/"flux1-krea" CANNOT do nudity — use "pony-v7", "chroma-detail", "chroma-v46-flash", or "z-turbo" instead.',
         },

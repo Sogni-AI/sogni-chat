@@ -48,6 +48,7 @@ export interface UseChatResult {
       onTokenSwitch?: (newType: TokenType) => void;
       onInsufficientCredits?: () => void;
       modelVariantId?: string;
+      uploadedImageUrls?: string[];
     },
   ) => Promise<void>;
   analyzeImage: (context: {
@@ -406,6 +407,7 @@ export function useChat(): UseChatResult {
         onTokenSwitch?: (newType: TokenType) => void;
         onInsufficientCredits?: () => void;
         modelVariantId?: string;
+        uploadedImageUrls?: string[];
       },
     ) => {
       if (!content.trim()) return;
@@ -418,6 +420,7 @@ export function useChat(): UseChatResult {
         role: 'user',
         content: content.trim(),
         timestamp: Date.now(),
+        uploadedImageUrls: context.uploadedImageUrls,
       };
       setUIMessages((prev) => [...prev, userMsg]);
 

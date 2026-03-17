@@ -39,6 +39,8 @@ const TOOL_MODELS: Record<string, ModelOption[]> = {
     { key: 'flux1-krea', displayName: 'Flux.1 Krea' },
     { key: 'flux2', displayName: 'Flux.2 Dev' },
     { key: 'pony-v7', displayName: 'CyberRealistic Pony v7' },
+    { key: 'qwen-2512', displayName: 'Qwen Image 2512' },
+    { key: 'qwen-2512-lightning', displayName: 'Qwen Image 2512 Lightning' },
   ],
   edit_image: [
     { key: 'qwen-lightning', displayName: 'Qwen Image Edit Lightning' },

@@ -129,6 +129,32 @@ const IMAGE_MODELS: Record<string, ImageModelConfig> = {
     scheduler: 'karras',
     supportsImg2Img: true,
   },
+  'qwen-2512': {
+    id: 'qwen_image_2512_fp8',
+    name: 'Qwen Image 2512',
+    defaultWidth: 1024,
+    defaultHeight: 1024,
+    maxWidth: 2048,
+    maxHeight: 2048,
+    defaultSteps: 20,
+    defaultGuidance: 4.0,
+    sampler: 'euler',
+    scheduler: 'simple',
+    supportsImg2Img: true,
+  },
+  'qwen-2512-lightning': {
+    id: 'qwen_image_2512_fp8_lightning',
+    name: 'Qwen Image 2512 Lightning',
+    defaultWidth: 1024,
+    defaultHeight: 1024,
+    maxWidth: 2048,
+    maxHeight: 2048,
+    defaultSteps: 4,
+    defaultGuidance: 1.0,
+    sampler: 'euler',
+    scheduler: 'simple',
+    supportsImg2Img: true,
+  },
 };
 
 // ---------------------------------------------------------------------------

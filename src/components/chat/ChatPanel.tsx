@@ -39,8 +39,6 @@ interface ChatPanelProps {
   onQualityTierChange: (tier: 'fast' | 'hq') => void;
   safeContentFilter?: boolean;
   onContentFilterChange?: (enabled: boolean) => void;
-  estimatedCost?: number | null;
-  costLoading?: boolean;
   onResultsChange?: (urls: string[]) => void;
   onLoadingChange?: (isLoading: boolean) => void;
   onUploadClick?: (intent?: 'edit' | 'video' | 'restore') => void;
@@ -79,14 +77,11 @@ interface ChatPanelProps {
 const QualityDropdown: React.FC<{
   qualityTier: 'fast' | 'hq';
   onQualityTierChange: (tier: 'fast' | 'hq') => void;
-  estimatedCost?: number | null;
-  costLoading?: boolean;
   disabled?: boolean;
-}> = ({ qualityTier, onQualityTierChange, estimatedCost, costLoading, disabled }) => {
+}> = ({ qualityTier, onQualityTierChange, disabled }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const selected = QUALITY_PRESETS[qualityTier];
-  const showCost = estimatedCost != null && !costLoading;
 
   useEffect(() => {
     if (!open) return;
@@ -115,13 +110,8 @@ const QualityDropdown: React.FC<{
         }}
       >
         <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#8e8e8e' }}>
-          Quality: {selected.label}
+          Default Media Quality: {selected.label}
         </span>
-        {showCost && (
-          <span style={{ fontSize: '0.625rem', fontWeight: 400, color: '#666' }}>
-            ~{estimatedCost.toFixed(1)}cr
-          </span>
-        )}
         <svg width="8" height="8" viewBox="0 0 10 10" fill="none" style={{
           transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
           transition: 'transform 0.2s ease',
@@ -195,8 +185,6 @@ export function ChatPanel({
   onQualityTierChange,
   safeContentFilter,
   onContentFilterChange,
-  estimatedCost,
-  costLoading,
   onResultsChange,
   onLoadingChange,
   onUploadClick,
@@ -310,6 +298,16 @@ export function ChatPanel({
   const handleSend = useCallback(
     (content: string) => {
       if (!sogniClient) return;
+      // Collect current image preview URLs so the user message displays them inline
+      const uploadedImageUrls: string[] = [];
+      if (uploadedFiles && getPreviewUrl) {
+        uploadedFiles.forEach((f, i) => {
+          if (f.type === 'image') {
+            const url = getPreviewUrl(i);
+            if (url) uploadedImageUrls.push(url);
+          }
+        });
+      }
       sendMessage(content, {
         sogniClient,
         imageData,
@@ -324,9 +322,10 @@ export function ChatPanel({
         onTokenSwitch,
         onInsufficientCredits,
         modelVariantId: selectedModelVariant,
+        uploadedImageUrls: uploadedImageUrls.length > 0 ? uploadedImageUrls : undefined,
       });
     },
-    [sogniClient, imageData, width, height, tokenType, balances, qualityTier, safeContentFilter, onContentFilterChange, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, selectedModelVariant],
+    [sogniClient, imageData, width, height, tokenType, balances, qualityTier, safeContentFilter, onContentFilterChange, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, selectedModelVariant, getPreviewUrl],
   );
 
   const handleImageClick = useCallback((url: string, _index: number) => {
@@ -337,32 +336,45 @@ export function ChatPanel({
   const processedMessages = useMemo(() => {
     let msgs = messages;
 
-    // Synthesize a user-upload entry at the top of the conversation when
-    // image files are attached but no upload message exists in chat history.
-    // This is purely presentational — the synthetic message is never persisted.
-    const hasUploadEntry = msgs.some((m) => m.id === 'user-upload');
-    if (!hasUploadEntry && uploadedFiles && getPreviewUrl) {
-      const imageUrls: string[] = [];
+    // Build fresh image preview URLs from current uploadedFiles
+    const freshImageUrls: string[] = [];
+    if (uploadedFiles && getPreviewUrl) {
       uploadedFiles.forEach((f, i) => {
         if (f.type === 'image') {
           const url = getPreviewUrl(i);
-          if (url) imageUrls.push(url);
+          if (url) freshImageUrls.push(url);
         }
       });
-      if (imageUrls.length > 0) {
-        const uploadMsg: UIChatMessage = {
-          id: 'user-upload',
-          role: 'user',
-          content: '',
-          timestamp: 0,
-          uploadedImageUrls: imageUrls,
-        };
-        // Insert after the welcome sentinel (index 0) so it appears first
-        // when the welcome message is filtered out during rendering.
-        msgs = msgs.length > 0
-          ? [msgs[0], uploadMsg, ...msgs.slice(1)]
-          : [uploadMsg];
-      }
+    }
+
+    // Check whether any real message already displays the uploaded images
+    // (either the legacy 'user-upload' from analyzeImage, or a sent message
+    // that included uploadedImageUrls).
+    const hasUploadEntry = msgs.some(
+      (m) => m.id === 'user-upload' || (m.uploadedImageUrls && m.uploadedImageUrls.length > 0),
+    );
+
+    if (!hasUploadEntry && freshImageUrls.length > 0) {
+      // Synthesize a presentational upload entry at the end of the conversation
+      // so the uploaded image appears near the input, not pinned to the top.
+      const uploadMsg: UIChatMessage = {
+        id: 'user-upload',
+        role: 'user',
+        content: '',
+        timestamp: 0,
+        uploadedImageUrls: freshImageUrls,
+      };
+      msgs = [...msgs, uploadMsg];
+    }
+
+    // Refresh blob URLs on messages that have uploaded images (handles page
+    // refresh where old blob URLs become stale but file data is restored).
+    if (freshImageUrls.length > 0) {
+      msgs = msgs.map((msg) =>
+        msg.uploadedImageUrls && msg.uploadedImageUrls.length > 0
+          ? { ...msg, uploadedImageUrls: freshImageUrls }
+          : msg,
+      );
     }
 
     // Legacy: inject single imageUrl for old-style user-upload messages
@@ -533,8 +545,6 @@ export function ChatPanel({
               <QualityDropdown
                 qualityTier={qualityTier}
                 onQualityTierChange={onQualityTierChange}
-                estimatedCost={estimatedCost}
-                costLoading={costLoading}
                 disabled={isLoading}
               />
 

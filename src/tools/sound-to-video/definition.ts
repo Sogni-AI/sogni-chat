@@ -47,9 +47,9 @@ CONSTRAINTS:
         duration: {
           type: 'number',
           description:
-            'Video duration in seconds. Default: matches audio length (up to 10s). Range: 2-10.',
+            'Video duration in seconds. Default: 5. Range: 2-20. For music videos, use the MAXIMUM duration (20) since the audio is always longer than the video limit. Use when the user explicitly requests a specific length.',
           minimum: 2,
-          maximum: 10,
+          maximum: 20,
         },
         videoModel: {
           type: 'string',

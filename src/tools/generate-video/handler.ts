@@ -114,6 +114,7 @@ function computeDimensions(
   requestedH: number | undefined,
   aspectRatio: string | undefined,
   config: T2VModelConfig,
+  targetResolution?: number,
 ): { width: number; height: number } {
   let w = requestedW ?? config.defaultWidth;
   let h = requestedH ?? config.defaultHeight;
@@ -127,6 +128,18 @@ function computeDimensions(
     const ratio = parsed.ratioW / parsed.ratioH;
     w = Math.sqrt(area * ratio);
     h = area / w;
+  }
+
+  // Apply target resolution: scale shorter side to the target value
+  if (targetResolution !== undefined) {
+    const roundedTarget = Math.round(targetResolution / config.dimensionStep) * config.dimensionStep;
+    if (w <= h) {
+      h = Math.round((h * roundedTarget / w) / config.dimensionStep) * config.dimensionStep;
+      w = roundedTarget;
+    } else {
+      w = Math.round((w * roundedTarget / h) / config.dimensionStep) * config.dimensionStep;
+      h = roundedTarget;
+    }
   }
 
   const step = config.dimensionStep;
@@ -155,18 +168,26 @@ export async function execute(
   const aspectRatio = args.aspectRatio as string | undefined;
 
   const config = T2V_MODELS[modelKey];
+
+  // Quality-based resolution: Standard (fast) -> 720p (768), High (hq) -> 1080p (1088)
+  const isLTX = modelKey.startsWith('ltx');
+  const qualityTier = context.qualityTier || 'fast';
+  const targetResolution = isLTX
+    ? (qualityTier === 'hq' ? 1088 : 768)
+    : undefined;
+
   const { width, height } = computeDimensions(
     args.width as number | undefined,
     args.height as number | undefined,
     aspectRatio,
     config,
+    targetResolution,
   );
   const frames = computeFrames(duration, config);
   const fps = config.defaultFps;
   const steps = config.defaultSteps;
 
   const videoAspectRatio = `${width} / ${height}`;
-  const isLTX = modelKey.startsWith('ltx');
   const mediaLabel = `${config.name} — ${duration}s @ ${width}x${height}`;
 
   // Creative prompt refinement: expand shallow/intent-level prompts

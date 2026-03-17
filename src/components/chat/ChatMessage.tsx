@@ -80,7 +80,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
     return null;
   }
 
-  // User's uploaded images (multiple)
+  // User's uploaded images (multiple) — image-only message (no text)
   if (isUser && hasUploadedImages && !hasVisibleContent) {
     const urls = message.uploadedImageUrls!;
     return (
@@ -105,6 +105,27 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
       </div>
     );
   }
+
+  // Helper: uploaded image thumbnails for user messages that have both images and text
+  const uploadedImageThumbnails = isUser && hasUploadedImages && hasVisibleContent ? (
+    <div style={{
+      display: 'flex',
+      gap: '0.5rem',
+      flexWrap: 'wrap',
+      justifyContent: 'flex-end',
+    }}>
+      {message.uploadedImageUrls!.map((url, i) => (
+        <div key={i} style={{
+          maxWidth: message.uploadedImageUrls!.length === 1 ? '280px' : '200px',
+          borderRadius: 'var(--radius-lg)',
+          overflow: 'hidden',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
+        }}>
+          <img src={url} alt={`Uploaded photo${message.uploadedImageUrls!.length > 1 ? ` ${i + 1}` : ''}`} style={{ width: '100%', height: 'auto', display: 'block' }} />
+        </div>
+      ))}
+    </div>
+  ) : null;
 
   // User's uploaded image (legacy single-image)
   if (isUser && hasUploadedImage && !hasVisibleContent) {
@@ -143,6 +164,8 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
         maxWidth: '100%',
       }}
     >
+      {/* Uploaded image thumbnails above the text bubble */}
+      {uploadedImageThumbnails}
       {/* Message bubble */}
       {(hasVisibleContent || (isAssistant && message.isStreaming && !hasProgress)) && (
         <div
