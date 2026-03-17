@@ -94,12 +94,15 @@ class ToolRegistry {
     return { valid: true, cleaned };
   }
 
-  /** Execute a tool by name */
+  /** Execute a tool by name.
+   *  @param skipValidation — bypass schema validation (used for retries where
+   *    override args like `model`/`quality` may not be in the tool's LLM schema). */
   async execute(
     name: string,
     args: Record<string, unknown>,
     context: ToolExecutionContext,
     callbacks: ToolCallbacks,
+    { skipValidation = false }: { skipValidation?: boolean } = {},
   ): Promise<string> {
     const handler = this.handlers.get(name);
     if (!handler) {
@@ -107,11 +110,15 @@ class ToolRegistry {
       return JSON.stringify({ error: `Unknown tool: ${name}` });
     }
 
-    // Validate arguments against tool schema
-    const validation = this.validateArgs(handler.definition, args);
-    if (!validation.valid) {
-      console.warn(`[TOOL REGISTRY] Invalid args for "${name}": ${validation.error}`);
-      return JSON.stringify({ error: validation.error });
+    // Validate arguments against tool schema (skipped for retries with model overrides)
+    let effectiveArgs = args;
+    if (!skipValidation) {
+      const validation = this.validateArgs(handler.definition, args);
+      if (!validation.valid) {
+        console.warn(`[TOOL REGISTRY] Invalid args for "${name}": ${validation.error}`);
+        return JSON.stringify({ error: validation.error });
+      }
+      effectiveArgs = validation.cleaned;
     }
 
     const timeoutMs = ToolRegistry.TIMEOUT_OVERRIDES[name] ?? ToolRegistry.DEFAULT_TIMEOUT_MS;
@@ -133,7 +140,7 @@ class ToolRegistry {
     const timeoutContext = { ...context, signal: timeoutController.signal };
 
     try {
-      const result = await handler.execute(validation.cleaned, timeoutContext, callbacks);
+      const result = await handler.execute(effectiveArgs, timeoutContext, callbacks);
       clearTimeout(timeoutId);
       return result;
     } catch (err) {

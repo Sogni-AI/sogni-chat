@@ -1111,24 +1111,32 @@ export function useChat(): UseChatResult {
         return;
       }
 
-      // Build modified args with model override
+      // Build modified args with model override.
+      // When switching models, we must:
+      //  1. Set the correct model arg for the new model
+      //  2. Remove orphaned model args from previous switches (e.g. "model" leftover from flux2)
+      //  3. Remove model-specific numeric params (guidance, steps) so the new model's defaults apply
       const modifiedArgs = { ...toolArgs };
-      // For quality-tier tools (restore_photo, apply_style, etc.), the override
-      // key is "quality" (fast/hq) OR a model key (e.g. "flux2").
-      // Quality keys override the "quality" arg + context.qualityTier.
-      // Non-quality keys (e.g. "flux2") are passed as a "model" arg — the handler
-      // uses it to override the quality preset's model selection.
       let isQualityOverride = false;
       if (modelKeyOverride && isQualityTierTool(effectiveToolName)) {
         if (modelKeyOverride === 'fast' || modelKeyOverride === 'hq') {
           isQualityOverride = true;
           modifiedArgs[getModelArgKey(effectiveToolName)] = modelKeyOverride;
+          // Remove orphaned "model" arg from a previous non-quality switch (e.g. flux2 → hq)
+          delete modifiedArgs.model;
         } else {
           // Non-quality model key (e.g. "flux2") — pass as "model" arg
           modifiedArgs.model = modelKeyOverride;
+          // Remove quality arg so handler doesn't see conflicting tier info
+          delete modifiedArgs.quality;
         }
       } else if (modelKeyOverride) {
-        modifiedArgs[getModelArgKey(effectiveToolName)] = modelKeyOverride;
+        const argKey = getModelArgKey(effectiveToolName);
+        modifiedArgs[argKey] = modelKeyOverride;
+        // Strip model-specific numeric params so the new model's defaults apply.
+        // Without this, e.g. pony-v7's guidance=7.0 would leak to z-turbo (default 1.0).
+        delete modifiedArgs.guidance;
+        delete modifiedArgs.steps;
       }
 
       // Session safety: capture session ID for background detection (mirrors sendMessage)
@@ -1334,7 +1342,7 @@ export function useChat(): UseChatResult {
       };
 
       try {
-        const result = await toolRegistry.execute(effectiveToolName, modifiedArgs, executionContext, callbacks);
+        const result = await toolRegistry.execute(effectiveToolName, modifiedArgs, executionContext, callbacks, { skipValidation: !!modelKeyOverride });
         if (toolAbortController.signal.aborted || !isActiveSession()) return;
         // If the tool returned an error JSON and onToolComplete wasn't called, show error.
         // Guard on isStreaming: if onToolComplete already fired, the message is finalized.

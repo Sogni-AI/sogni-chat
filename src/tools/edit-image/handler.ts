@@ -133,7 +133,8 @@ export async function execute(
   callbacks: ToolCallbacks,
 ): Promise<string> {
   const prompt = args.prompt as string;
-  const modelKey = (args.model as string) || 'qwen-lightning';
+  const defaultModel = context.qualityTier === 'hq' ? 'qwen' : 'qwen-lightning';
+  const modelKey = (args.model as string) || defaultModel;
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
   const sourceImageIndex = args.sourceImageIndex as number | undefined;
   const aspectRatio = args.aspectRatio as string | undefined;

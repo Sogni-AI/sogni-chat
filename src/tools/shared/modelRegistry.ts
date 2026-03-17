@@ -15,14 +15,14 @@ export interface ModelOption {
  *  These tools natively support fast/hq via a "quality" arg, plus Flux.2 Dev
  *  via a "model" arg override in the handler. */
 const QUALITY_TIER_MODELS: ModelOption[] = [
-  { key: 'fast', displayName: 'Qwen Image Edit Lightning' },
+  { key: 'fast', displayName: 'Qwen Image Edit 2511 Lightning' },
   { key: 'hq', displayName: 'Qwen Image Edit 2511' },
   { key: 'flux2', displayName: 'Flux.2 Dev' },
 ];
 
 /** Quality-only models for tools where Flux.2 is not compatible (e.g. SV3D pipeline) */
 const QUALITY_ONLY_MODELS: ModelOption[] = [
-  { key: 'fast', displayName: 'Qwen Image Edit Lightning' },
+  { key: 'fast', displayName: 'Qwen Image Edit 2511 Lightning' },
   { key: 'hq', displayName: 'Qwen Image Edit 2511' },
 ];
 

@@ -40,7 +40,7 @@ Rules:
           type: 'string',
           enum: ['fast', 'hq'],
           description:
-            'Quality tier. "fast" uses Lightning model for quick results (~10s per image). "hq" uses the standard model at 25 steps for higher quality output (~30s per image). Default: "fast".',
+            'Quality tier override. ONLY include this parameter when the user explicitly requests a quality level (e.g., "high quality", "best quality", "quick", "fast"). Do NOT set this — the app uses the user\'s quality setting from the UI by default.',
         },
         scale: {
           type: 'number',
