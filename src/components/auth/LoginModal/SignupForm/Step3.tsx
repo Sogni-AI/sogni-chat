@@ -36,7 +36,7 @@ function Step3({ step1, step2, onReturn, onContinue }: Props) {
           email,
           password,
           subscribe,
-          referralCode: referralCode || 'CHAT',
+          referralCode: referralCode || undefined,
           turnstileToken: token
         },
         remember
