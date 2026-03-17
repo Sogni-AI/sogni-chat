@@ -53,6 +53,10 @@ export function useMediaUpload(): UseMediaUploadReturn {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Track concurrent addFile calls so isUploading stays true for the
+  // entire batch (e.g. when pasting multiple images at once).
+  const activeUploadsRef = useRef(0);
+
   // Cache blob URLs keyed by a stable identifier (filename + byte length)
   // so the same file doesn't generate multiple URLs across renders.
   const previewUrlCacheRef = useRef<Map<string, string>>(new Map());
@@ -103,6 +107,7 @@ export function useMediaUpload(): UseMediaUploadReturn {
       }
     }
 
+    activeUploadsRef.current += 1;
     setIsUploading(true);
     try {
       const uploaded = await processFile(file);
@@ -136,7 +141,10 @@ export function useMediaUpload(): UseMediaUploadReturn {
       console.error('[MEDIA UPLOAD] Processing failed:', err);
       setError(message);
     } finally {
-      setIsUploading(false);
+      activeUploadsRef.current -= 1;
+      if (activeUploadsRef.current === 0) {
+        setIsUploading(false);
+      }
     }
   }, []);
 
