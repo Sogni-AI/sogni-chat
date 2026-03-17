@@ -101,14 +101,18 @@ const GalleryImageCard: React.FC<GalleryImageCardProps> = ({
       onClick={handleClick}
       onMouseEnter={() => {
         setIsHovered(true);
-        if (supportsHover && image.mediaType === 'video' && videoRef.current) {
-          videoRef.current.muted = false;
-          setIsMuted(false);
+        if (image.mediaType === 'video' && videoRef.current) {
+          videoRef.current.play().catch(() => {});
+          if (supportsHover) {
+            videoRef.current.muted = false;
+            setIsMuted(false);
+          }
         }
       }}
       onMouseLeave={() => {
         setIsHovered(false);
         if (image.mediaType === 'video' && videoRef.current) {
+          videoRef.current.pause();
           videoRef.current.muted = true;
           setIsMuted(true);
         }
@@ -188,7 +192,7 @@ const GalleryImageCard: React.FC<GalleryImageCardProps> = ({
             muted
             loop
             playsInline
-            autoPlay
+            preload="metadata"
             style={{
               width: '100%',
               height: '100%',

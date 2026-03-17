@@ -5,7 +5,7 @@
  * height, with widths determined by each tile's aspect ratio.
  */
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import type { GalleryProject, GalleryImage } from '@/types/gallery';
 import GalleryProjectCard from './GalleryProjectCard';
 import GalleryImageCard from './GalleryImageCard';
@@ -100,6 +100,8 @@ const EmptyFavoritesState: React.FC = () => (
 // Component
 // ============================================================================
 
+const PAGE_SIZE = 20;
+
 const GalleryGrid: React.FC<GalleryGridProps> = ({
   projects,
   favorites,
@@ -110,6 +112,10 @@ const GalleryGrid: React.FC<GalleryGridProps> = ({
   onToggleFavorite,
 }) => {
   const [projectDims, setProjectDims] = useState<Map<string, { width: number; height: number }>>(new Map());
+  const [projPage, setProjPage] = useState(1);
+  const [favPage, setFavPage] = useState(1);
+  const projSentinelRef = useRef<HTMLDivElement>(null);
+  const favSentinelRef = useRef<HTMLDivElement>(null);
 
   const handleProjectDimensions = useCallback((projectId: string, width: number, height: number) => {
     setProjectDims(prev => {
@@ -121,29 +127,82 @@ const GalleryGrid: React.FC<GalleryGridProps> = ({
     });
   }, []);
 
-  // Justified layout - projects
+  // Paginated subsets
+  const visibleProjects = useMemo(
+    () => projects.slice(0, projPage * PAGE_SIZE),
+    [projects, projPage],
+  );
+  const visibleFavorites = useMemo(
+    () => favorites.slice(0, favPage * PAGE_SIZE),
+    [favorites, favPage],
+  );
+
+  // Justified layout - only for visible (paginated) items
   const projectItems = useMemo(
-    () => projects.map(p => projectDims.get(p.id) || { width: 4, height: 3 }),
-    [projects, projectDims],
+    () => visibleProjects.map(p => projectDims.get(p.id) || { width: 4, height: 3 }),
+    [visibleProjects, projectDims],
   );
   const { containerRef: projRef, layout: projLayout } = useJustifiedLayout(projectItems, {
     targetRowHeight: 240,
     gap: 8,
   });
 
-  // Justified layout - favorites
   const favItems = useMemo(
-    () => favorites.map(img => ({ width: img.width || 1, height: img.height || 1 })),
-    [favorites],
+    () => visibleFavorites.map(img => ({ width: img.width || 1, height: img.height || 1 })),
+    [visibleFavorites],
   );
   const { containerRef: favRef, layout: favLayout } = useJustifiedLayout(favItems, {
     targetRowHeight: 240,
     gap: 8,
   });
 
+  // Load more projects when sentinel enters viewport
+  useEffect(() => {
+    if (activeTab !== 'all') return;
+    if (projPage * PAGE_SIZE >= projects.length) return;
+
+    const sentinel = projSentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setProjPage(prev => prev + 1);
+        }
+      },
+      { rootMargin: '600px' },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [activeTab, projPage, projects.length]);
+
+  // Load more favorites when sentinel enters viewport
+  useEffect(() => {
+    if (activeTab !== 'favorites') return;
+    if (favPage * PAGE_SIZE >= favorites.length) return;
+
+    const sentinel = favSentinelRef.current;
+    if (!sentinel) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setFavPage(prev => prev + 1);
+        }
+      },
+      { rootMargin: '600px' },
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [activeTab, favPage, favorites.length]);
+
   // All Projects Tab
   if (activeTab === 'all') {
     if (projects.length === 0) return <EmptyAllState />;
+
+    const hasMoreProjects = projPage * PAGE_SIZE < projects.length;
 
     return (
       <div
@@ -154,7 +213,7 @@ const GalleryGrid: React.FC<GalleryGridProps> = ({
           height: projLayout.containerHeight > 0 ? projLayout.containerHeight : undefined,
         }}
       >
-        {projects.map((project, idx) => {
+        {visibleProjects.map((project, idx) => {
           const box = projLayout.boxes[idx];
           if (!box) return null;
           return (
@@ -180,12 +239,20 @@ const GalleryGrid: React.FC<GalleryGridProps> = ({
             </div>
           );
         })}
+        {hasMoreProjects && (
+          <div
+            ref={projSentinelRef}
+            style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '1px' }}
+          />
+        )}
       </div>
     );
   }
 
   // Favorites Tab
   if (favorites.length === 0) return <EmptyFavoritesState />;
+
+  const hasMoreFavorites = favPage * PAGE_SIZE < favorites.length;
 
   return (
     <div
@@ -196,7 +263,7 @@ const GalleryGrid: React.FC<GalleryGridProps> = ({
         height: favLayout.containerHeight > 0 ? favLayout.containerHeight : undefined,
       }}
     >
-      {favorites.map((image, idx) => {
+      {visibleFavorites.map((image, idx) => {
         const box = favLayout.boxes[idx];
         if (!box) return null;
         return (
@@ -218,6 +285,12 @@ const GalleryGrid: React.FC<GalleryGridProps> = ({
           </div>
         );
       })}
+      {hasMoreFavorites && (
+        <div
+          ref={favSentinelRef}
+          style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '1px' }}
+        />
+      )}
     </div>
   );
 };
