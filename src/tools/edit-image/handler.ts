@@ -19,6 +19,7 @@ import {
 import type { TokenType } from '@/types/wallet';
 import { parseAspectRatio } from '@/utils/imageDimensions';
 import { fetchImageCostEstimate } from '@/services/creditsService';
+import { projectSessionMap } from '@/services/projectSessionMap';
 
 // ---------------------------------------------------------------------------
 // Model configurations (from MODELS.imageEdit in workflow-helpers.mjs)
@@ -232,6 +233,7 @@ export async function execute(
           });
         },
         context.signal,
+        context.sessionId,
       ),
       context,
       estimatedCost,
@@ -290,6 +292,7 @@ async function runEditGeneration(
   params: EditGenParams,
   onProgress: (progress: EditProgress) => void,
   signal?: AbortSignal,
+  sessionId?: string,
 ): Promise<string[]> {
   const projectParams: Record<string, unknown> = {
     type: 'image',
@@ -319,6 +322,7 @@ async function runEditGeneration(
   } }).projects;
 
   const project = await projects.create(projectParams);
+  if (sessionId) void projectSessionMap.register(project.id, sessionId);
 
   return new Promise<string[]>((resolve, reject) => {
     const resultUrls: string[] = [];

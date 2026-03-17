@@ -98,6 +98,7 @@ export async function execute(
           }
         },
         context.signal,
+        context.sessionId,
       ),
       context,
       estimatedCost,

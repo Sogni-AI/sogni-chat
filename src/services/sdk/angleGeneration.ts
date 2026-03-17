@@ -6,6 +6,7 @@ import { SogniClient } from '@sogni-ai/sogni-client';
 import { TokenType } from '@/types/wallet';
 import { QUALITY_PRESETS, type QualityTier } from '@/config/qualityPresets';
 import { calculateOutputDimensions } from '@/utils/imageDimensions';
+import { projectSessionMap } from '@/services/projectSessionMap';
 
 /** LoRA ID for multiple angles (resolved to filename by worker via config API) */
 const LORA_ID = 'multiple_angles';
@@ -45,6 +46,7 @@ export async function generateAngle(
   params: AngleGenerationParams,
   onProgress?: (progress: AngleGenerationProgress) => void,
   signal?: AbortSignal,
+  sessionId?: string,
 ): Promise<string> {
   if (signal?.aborted) {
     throw new Error('CANCELLED');
@@ -110,6 +112,7 @@ export async function generateAngle(
 
   try {
     project = await sogniClient.projects.create(projectConfig);
+    if (sessionId) void projectSessionMap.register(project.id, sessionId);
     console.log(`[ANGLE SERVICE] Project created in ${Date.now() - startTime}ms: ${project.id}`);
   } catch (createError: any) {
     console.error('[ANGLE SERVICE] Failed to create project:', createError);

@@ -376,6 +376,7 @@ export async function execute(
       }
     },
     context.signal,
+    context.sessionId,
   );
 
   const billingId = estimatedCost > 0

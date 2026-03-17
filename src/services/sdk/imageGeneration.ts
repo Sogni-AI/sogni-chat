@@ -12,6 +12,7 @@ import { SogniClient } from '@sogni-ai/sogni-client';
 import { TokenType } from '@/types/wallet';
 import { getPresetsForCount, type RestorationPreset, type RestorationModeId } from '@/config/restorationPresets';
 import { QUALITY_PRESETS, DEFAULT_QUALITY, type QualityTier } from '@/config/qualityPresets';
+import { projectSessionMap } from '@/services/projectSessionMap';
 
 /** Override the quality-preset model with explicit model/steps/guidance */
 export interface ModelOverride {
@@ -109,7 +110,8 @@ async function restoreWithPresets(
   presets: RestorationPreset[],
   params: Omit<RestorationParams, 'customPrompt' | 'numberOfMedia'> & { outputFormat: string; qualityTier: QualityTier },
   onProgress?: (progress: RestorationProgress) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sessionId?: string,
 ): Promise<string[]> {
   const totalCount = presets.length;
   const resultUrls: (string | null)[] = new Array(totalCount).fill(null);
@@ -279,6 +281,7 @@ async function restoreWithPresets(
 
         try {
           const project = await sogniClient.projects.create(config);
+          if (sessionId) void projectSessionMap.register(project.id, sessionId);
           activeProjects.push(project);
           projectIdToSlot.set(project.id, slot);
           console.log(`[RESTORE SERVICE] Preset "${preset.label}" project created: ${project.id} (${Date.now() - startTime}ms)`);
@@ -380,7 +383,8 @@ async function restoreWithSinglePrompt(
   prompt: string,
   params: Omit<RestorationParams, 'customPrompt'> & { outputFormat: string; numberOfMedia: number; qualityTier: QualityTier },
   onProgress?: (progress: RestorationProgress) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sessionId?: string,
 ): Promise<string[]> {
   const { numberOfMedia } = params;
   const config = buildProjectConfig(prompt, {
@@ -404,6 +408,7 @@ async function restoreWithSinglePrompt(
   let project;
   try {
     project = await sogniClient.projects.create(config);
+    if (sessionId) void projectSessionMap.register(project.id, sessionId);
   } catch (createError: any) {
     normalizeInsufficientCreditsError(createError);
   }
@@ -653,7 +658,8 @@ export async function restorePhoto(
   sogniClient: SogniClient,
   params: RestorationParams,
   onProgress?: (progress: RestorationProgress) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sessionId?: string,
 ): Promise<string[]> {
   const {
     imageData,
@@ -675,7 +681,8 @@ export async function restorePhoto(
       customPrompt,
       { imageData, width, height, tokenType, outputFormat: effectiveFormat, numberOfMedia, qualityTier, modelOverride: params.modelOverride },
       onProgress,
-      signal
+      signal,
+      sessionId,
     );
   }
 
@@ -686,6 +693,7 @@ export async function restorePhoto(
     presets,
     { imageData, width, height, tokenType, outputFormat: effectiveFormat, qualityTier },
     onProgress,
-    signal
+    signal,
+    sessionId,
   );
 }

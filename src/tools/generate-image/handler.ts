@@ -18,6 +18,7 @@ import {
 import type { TokenType } from '@/types/wallet';
 import { parseAspectRatio } from '@/utils/imageDimensions';
 import { fetchImageCostEstimate } from '@/services/creditsService';
+import { projectSessionMap } from '@/services/projectSessionMap';
 
 // ---------------------------------------------------------------------------
 // Model configurations (from MODELS.image in workflow-helpers.mjs)
@@ -325,6 +326,7 @@ export async function execute(
           });
         },
         context.signal,
+        context.sessionId,
       ),
       context,
       estimatedCost,
@@ -392,6 +394,7 @@ async function runImageGeneration(
   params: ImageGenParams,
   onProgress: (progress: ImageProgress) => void,
   signal?: AbortSignal,
+  sessionId?: string,
 ): Promise<string[]> {
   const projectParams: Record<string, unknown> = {
     type: 'image',
@@ -421,6 +424,7 @@ async function runImageGeneration(
   }
 
   const project = await (sogniClient as unknown as { projects: { create: (p: Record<string, unknown>) => Promise<{ id: string }>; on: (e: string, h: (ev: Record<string, unknown>) => void) => void; off: (e: string, h: (ev: Record<string, unknown>) => void) => void } }).projects.create(projectParams);
+  if (sessionId) void projectSessionMap.register((project as { id: string }).id, sessionId);
 
   return new Promise<string[]>((resolve, reject) => {
     const resultUrls: string[] = [];

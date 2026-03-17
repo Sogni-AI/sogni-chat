@@ -6,6 +6,7 @@ import { SogniClient } from '@sogni-ai/sogni-client';
 import { TokenType } from '@/types/wallet';
 import { QUALITY_PRESETS, type QualityTier } from '@/config/qualityPresets';
 import type { ModelOverride } from './imageGeneration';
+import { projectSessionMap } from '@/services/projectSessionMap';
 
 interface StyleTransferParams {
   imageData: Uint8Array;
@@ -34,7 +35,8 @@ export async function applyStyle(
   sogniClient: SogniClient,
   params: StyleTransferParams,
   onProgress?: (progress: StyleTransferProgress) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sessionId?: string,
 ): Promise<string> {
   const {
     imageData,
@@ -96,6 +98,7 @@ export async function applyStyle(
 
   try {
     project = await sogniClient.projects.create(projectConfig);
+    if (sessionId) void projectSessionMap.register(project.id, sessionId);
     console.log(`[STYLE SERVICE] Project created in ${Date.now() - startTime}ms:`, {
       projectId: project.id,
       projectStatus: project?.status

@@ -17,6 +17,7 @@ import {
 import type { TokenType } from '@/types/wallet';
 import { parseAspectRatio } from '@/utils/imageDimensions';
 import { fetchVideoCostEstimate } from '@/services/creditsService';
+import { projectSessionMap } from '@/services/projectSessionMap';
 
 // ---------------------------------------------------------------------------
 // S2V model configurations (from MODELS.s2v in workflow-helpers.mjs)
@@ -338,6 +339,7 @@ export async function execute(
           });
         },
         context.signal,
+        context.sessionId,
       ),
       context,
       estimatedCost,
@@ -403,6 +405,7 @@ async function runS2VGeneration(
   params: S2VParams,
   onProgress: (progress: S2VProgress) => void,
   signal?: AbortSignal,
+  sessionId?: string,
 ): Promise<string[]> {
   const projectParams: Record<string, unknown> = {
     type: 'video',
@@ -439,6 +442,7 @@ async function runS2VGeneration(
   } }).projects;
 
   const project = await projects.create(projectParams);
+  if (sessionId) void projectSessionMap.register(project.id, sessionId);
 
   return new Promise<string[]>((resolve, reject) => {
     const resultUrls: string[] = [];

@@ -15,6 +15,7 @@ import {
 } from '../shared';
 import type { TokenType } from '@/types/wallet';
 import { fetchVideoCostEstimate } from '@/services/creditsService';
+import { projectSessionMap } from '@/services/projectSessionMap';
 
 // ---------------------------------------------------------------------------
 // V2V model configurations (from MODELS.v2v in workflow-helpers.mjs)
@@ -226,6 +227,7 @@ export async function execute(
           });
         },
         context.signal,
+        context.sessionId,
       ),
       context,
       estimatedCost,
@@ -292,6 +294,7 @@ async function runV2VGeneration(
   params: V2VParams,
   onProgress: (progress: V2VProgress) => void,
   signal?: AbortSignal,
+  sessionId?: string,
 ): Promise<string[]> {
   const projectParams: Record<string, unknown> = {
     type: 'video',
@@ -326,6 +329,7 @@ async function runV2VGeneration(
   } }).projects;
 
   const project = await projects.create(projectParams);
+  if (sessionId) void projectSessionMap.register(project.id, sessionId);
 
   return new Promise<string[]>((resolve, reject) => {
     const resultUrls: string[] = [];

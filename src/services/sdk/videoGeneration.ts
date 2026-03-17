@@ -12,6 +12,7 @@ import {
   calculateVideoFrames,
   type VideoModelId,
 } from '@/constants/videoSettings';
+import { projectSessionMap } from '@/services/projectSessionMap';
 
 /** Which frame slot the source image should occupy */
 export type FrameMode = 'first' | 'last';
@@ -63,6 +64,7 @@ export async function generateVideo(
   params: VideoGenerationParams,
   onProgress?: (progress: VideoGenerationProgress) => void,
   signal?: AbortSignal,
+  sessionId?: string,
 ): Promise<string[]> {
   if (signal?.aborted) {
     throw new Error('CANCELLED');
@@ -131,6 +133,7 @@ export async function generateVideo(
 
   try {
     project = await sogniClient.projects.create(projectConfig);
+    if (sessionId) void projectSessionMap.register(project.id, sessionId);
     console.log(`[VIDEO SERVICE] Project created in ${Date.now() - startTime}ms: ${project.id}`);
   } catch (createError: any) {
     console.error('[VIDEO SERVICE] Failed to create project:', createError);

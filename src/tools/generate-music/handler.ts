@@ -17,6 +17,7 @@ import type { TokenType } from '@/types/wallet';
 import { AUDIO_MODELS } from '@/constants/audioSettings';
 import { fetchAudioCostEstimate } from '@/services/creditsService';
 import { saveAudioToGallery } from '@/services/galleryService';
+import { projectSessionMap } from '@/services/projectSessionMap';
 
 // ---------------------------------------------------------------------------
 // Main handler
@@ -91,6 +92,7 @@ export async function execute(
           });
         },
         context.signal,
+        context.sessionId,
       ),
       context,
       estimatedCost,
@@ -170,6 +172,7 @@ async function runMusicGeneration(
   params: MusicParams,
   onProgress: (progress: MusicProgress) => void,
   signal?: AbortSignal,
+  sessionId?: string,
 ): Promise<string[]> {
   const projectParams: Record<string, unknown> = {
     type: 'audio',
@@ -200,6 +203,7 @@ async function runMusicGeneration(
   } }).projects;
 
   const project = await projects.create(projectParams);
+  if (sessionId) void projectSessionMap.register(project.id, sessionId);
 
   return new Promise<string[]>((resolve, reject) => {
     const resultUrls: string[] = [];
