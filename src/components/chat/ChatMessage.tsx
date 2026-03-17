@@ -303,6 +303,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
               onRetry={onRetry}
               mediaType="video"
               mediaUrls={message.videoResults}
+              galleryVideoIds={message.galleryVideoIds}
               downloadSlug={downloadSlug}
             />
             {message.modelName && (

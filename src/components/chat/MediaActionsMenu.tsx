@@ -28,6 +28,8 @@ interface MediaActionsMenuProps {
   mediaUrls?: string[];
   /** Gallery image IDs for favorite toggle and persistent blob downloads */
   galleryImageIds?: string[];
+  /** Gallery video IDs for persistent blob downloads */
+  galleryVideoIds?: string[];
   /** Descriptive slug for download filenames */
   downloadSlug?: string;
 }
@@ -39,6 +41,7 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
   mediaType,
   mediaUrls,
   galleryImageIds,
+  galleryVideoIds,
   downloadSlug,
 }: MediaActionsMenuProps) {
   const [open, setOpen] = useState(false);
@@ -55,10 +58,11 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
   const hasToolArgs = !!message.toolArgs && !!toolName;
 
   // --- Download / Favorite support ---
-  // Resolve gallery blob URLs for persistent image downloads
-  const galleryBlobUrls = useGalleryBlobUrls(
-    mediaType === 'image' ? galleryImageIds : undefined,
-  );
+  // Resolve gallery blob URLs for persistent downloads (images + videos)
+  const blobIds = mediaType === 'image' ? galleryImageIds
+    : mediaType === 'video' ? galleryVideoIds
+    : undefined;
+  const galleryBlobUrls = useGalleryBlobUrls(blobIds);
   const hasGalleryIds = !!galleryImageIds && galleryImageIds.length > 0;
 
   // Track favorite state for gallery images
@@ -97,7 +101,7 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
     if (!mediaUrls?.length) return;
     setOpen(false);
     mediaUrls.forEach((url, index) => {
-      const displayUrl = (mediaType === 'image' ? galleryBlobUrls.get(index) : undefined) || url;
+      const displayUrl = galleryBlobUrls.get(index) || url;
       const filenameType = mediaType === 'video' ? 'video' : mediaType === 'audio' ? 'audio' : 'restored';
       const filename = buildDownloadFilename(
         downloadSlug,
@@ -291,7 +295,7 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
           )}
 
           {/* Divider before Branch/Retry */}
-          {(mediaUrls?.length || hasGalleryIds) && (onBranchChat || hasToolArgs) && (
+          {(mediaUrls?.length || hasGalleryIds) && (onBranchChat || (hasToolArgs && onRetry)) && (
             <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
           )}
 
@@ -308,8 +312,8 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
           {/* Retry section — only if we have tool args */}
           {hasToolArgs && onRetry && (
             <>
-              {/* Divider before retry (only if branch or save items above) */}
-              {(onBranchChat || mediaUrls?.length || hasGalleryIds) && (
+              {/* Divider between Branch and Retry (only when Branch actually rendered) */}
+              {onBranchChat && (
                 <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '4px 0' }} />
               )}
 
