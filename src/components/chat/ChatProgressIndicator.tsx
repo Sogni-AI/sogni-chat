@@ -135,7 +135,7 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
 
   const totalCount = progress.totalCount || 1;
   const completedResults = progress.resultUrls || [];
-  const isVideoTool = progress.toolName === 'animate_photo';
+  const isVideoTool = ['animate_photo', 'generate_video', 'sound_to_video', 'video_to_video'].includes(progress.toolName);
   const isBatch = totalCount > 1;
   // Check if any slots are still pending (no result URL and not failed)
   const slotStates = Array.from({ length: totalCount }, (_, i) => {
@@ -165,8 +165,8 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
   // Use the source image being processed (if available), otherwise fall back to original
   const placeholderUrl = progress.sourceImageUrl || imageUrl;
 
-  // When we have an image URL, show the visual progress with blurred thumbnails
-  if (placeholderUrl) {
+  // Show the visual grid when we have a placeholder image, multiple results, or a video tool
+  if (placeholderUrl || isBatch || isVideoTool) {
     return (
       <div
         style={{
@@ -217,9 +217,9 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
                 {/* Completed video result — render inline player */}
                 {isCompletedVideo ? (
                   <ProgressVideo src={resultUrl!} aspectRatio={progress.videoAspectRatio} />
-                ) : (
+                ) : resultUrl || placeholderUrl ? (
                   <img
-                    src={resultUrl || placeholderUrl}
+                    src={resultUrl || placeholderUrl!}
                     alt={resultUrl ? `Result #${i + 1}` : 'Processing...'}
                     style={{
                       width: '100%',
@@ -231,6 +231,15 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
                       ...(isVideoTool && !resultUrl && progress.videoAspectRatio
                         ? { aspectRatio: progress.videoAspectRatio, height: 'auto', objectFit: 'cover' as const }
                         : { height: 'auto' }),
+                    }}
+                  />
+                ) : (
+                  /* No placeholder image — render a sized placeholder box */
+                  <div
+                    style={{
+                      width: '100%',
+                      aspectRatio: progress.videoAspectRatio || '16 / 9',
+                      background: 'rgba(var(--rgb-primary), 0.06)',
                     }}
                   />
                 )}
