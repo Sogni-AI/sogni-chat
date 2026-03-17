@@ -61,6 +61,8 @@ export interface RecoveredWorkerJob {
   jobType: string;
   tokenType: string;
   isTest: boolean;
+  speedVsBaseline?: number;
+  timings?: Record<string, unknown>;
   // Video-specific
   modelType?: 'video';
   videoFrames?: number;
@@ -106,6 +108,7 @@ export interface RecoveredProject {
   clientRequestData?: string; // base64-encoded JSON
   workerJobs?: RecoveredWorkerJob[];
   completedWorkerJobs?: RecoveredWorkerJob[];
+  premium?: Record<string, unknown>;
   // Video-specific
   modelType?: 'video';
   videoFrames?: number;
@@ -130,15 +133,37 @@ interface AuthenticatedData {
 
 **Current behavior:** Marks all tracked projects as `failed` with `'Server disconnected'` error.
 
-**New behavior:** Only clear available models. Leave tracked projects alive. They will either:
+**New behavior:** Clear available models and pause project timeouts. Leave tracked projects alive. They will either:
 - Resume when socket reconnects (handler listeners still attached)
-- Timeout naturally via existing 2-minute `_checkForTimeout` mechanism
+- Timeout naturally if reconnection never happens (timeouts restart on reconnect)
 
 ```typescript
 private handleServerDisconnected() {
   this._availableModels = [];
   this.emit('availableModels', this._availableModels);
-  // Do NOT fail tracked projects — they may recover on reconnect
+  // Do NOT fail tracked projects — they may recover on reconnect.
+  // Pause timeout intervals so they don't force-fail during disconnect.
+  this.projects.forEach((p) => p._pauseTimeout());
+}
+```
+
+This requires adding `_pauseTimeout()` and `_resumeTimeout()` methods to `Project`:
+
+```typescript
+/** Pause the timeout interval (e.g., during socket disconnect). @internal */
+_pauseTimeout() {
+  if (this._timeout) {
+    clearInterval(this._timeout);
+    this._timeout = null;
+  }
+}
+
+/** Resume the timeout interval (e.g., after socket reconnect). @internal */
+_resumeTimeout() {
+  if (!this._timeout && !this.finished) {
+    this.lastUpdated = new Date(); // Reset timer from reconnection point
+    this._timeout = setInterval(this._checkForTimeout.bind(this), PROJECT_TIMEOUT);
+  }
 }
 ```
 
@@ -177,9 +202,18 @@ New method:
 private async handleSocketAuthenticated(data: AuthenticatedData) {
   const { activeProjects, unclaimedCompletedProjects } = data;
 
+  // Deduplicate: a project could theoretically appear in both arrays
+  const seenIds = new Set<string>();
+
+  // Resume timeouts on all existing tracked projects
+  this.projects.forEach((p) => p._resumeTimeout());
+
   // --- Active projects ---
   const unmatchedActive: RecoveredProject[] = [];
   for (const recoveredProject of activeProjects) {
+    if (recoveredProject.jobType === 'llm') continue; // Skip LLM projects
+    seenIds.add(recoveredProject.id);
+
     const tracked = this.projects.find(p => p.id === recoveredProject.id);
     if (tracked) {
       // Already tracked — restore status if it was pending/failed due to disconnect
@@ -195,6 +229,9 @@ private async handleSocketAuthenticated(data: AuthenticatedData) {
       }
       // Otherwise leave it alone — handler listeners are still attached
     } else {
+      // Unmatched: re-add to tracked projects so normal event flow resumes
+      const rehydrated = this._rehydrateProject(recoveredProject);
+      this.projects.push(rehydrated);
       unmatchedActive.push(recoveredProject);
     }
   }
@@ -202,6 +239,9 @@ private async handleSocketAuthenticated(data: AuthenticatedData) {
   // --- Completed projects ---
   const unmatchedCompleted: CompletedRecoveredProject[] = [];
   for (const recoveredProject of unclaimedCompletedProjects) {
+    if (recoveredProject.jobType === 'llm') continue; // Skip LLM projects
+    if (seenIds.has(recoveredProject.id)) continue; // Dedup
+
     const tracked = this.projects.find(p => p.id === recoveredProject.id);
     if (tracked) {
       // Resolve download URLs for completed jobs and update tracked project
@@ -226,6 +266,58 @@ private async handleSocketAuthenticated(data: AuthenticatedData) {
 Helper methods:
 
 ```typescript
+/**
+ * Re-create a Project instance from recovered server data so the SDK can
+ * track it and normal event handlers (jobState, jobResult, etc.) work.
+ * The project is added to this.projects by the caller.
+ */
+private _rehydrateProject(recovered: RecoveredProject): Project {
+  const mediaType = recovered.model?.type === 'video' ? 'video'
+    : recovered.model?.type === 'music' ? 'audio'
+    : 'image';
+
+  // Create a Project with minimal params — enough for event routing and URL resolution
+  const project = new Project(
+    {
+      type: mediaType as any,
+      modelId: recovered.model.id,
+      positivePrompt: '',
+      numberOfMedia: recovered.imageCount,
+      steps: recovered.stepCount,
+    } as any,
+    { api: this, logger: this.client.logger }
+  );
+
+  // Override the auto-generated UUID with the server's actual project ID
+  (project as any).data.id = recovered.id;
+
+  // Hydrate existing worker jobs
+  const activeJobs = recovered.workerJobs || [];
+  for (const wj of activeJobs) {
+    project._addJob({
+      id: wj.imgID,
+      projectId: recovered.id,
+      status: wj.status === 'jobStarted' ? 'processing'
+        : wj.status === 'assigned' ? 'initiating'
+        : 'pending',
+      step: wj.performedSteps || 0,
+      stepCount: recovered.stepCount,
+      workerName: wj.worker?.username,
+    });
+  }
+
+  // Map server status to SDK status
+  const statusMap: Record<string, ProjectStatus> = {
+    queued: 'queued', active: 'queued',
+    assigned: 'processing', progress: 'processing',
+  };
+  project._update({
+    status: statusMap[recovered.status] || 'processing'
+  });
+
+  return project;
+}
+
 /**
  * For a tracked project that completed while offline, resolve download URLs
  * and update the project/jobs to trigger completion events.
@@ -495,26 +587,35 @@ for each project:
 
 **`handleActiveRecovery(projects: RecoveredProject[])`:**
 
+These projects have been re-hydrated into SDK `Project` instances by `_rehydrateProject()`, so normal `jobState`/`jobResult` socket events will flow to them. The chat app needs to:
+1. Attach result listeners (since the original tool handler is gone after page refresh / GC)
+2. Show a progress indicator in the appropriate session
+
 ```
 for each project:
   sessionId = projectSessionMap.getSessionId(project.id)
-  if (!sessionId) → skip
+  if (!sessionId) → skip (not our app's project)
 
-  // These are still processing. The SDK will emit normal job events
-  // for them going forward (since they're now tracked in the SDK's
-  // internal list after reconnection... actually they're NOT tracked
-  // because they're "unmatched" — they were GC'd).
-  //
-  // For unmatched active projects: we can't re-attach tool handlers.
-  // Log for awareness. They'll appear in completedProjectsRecovered
-  // on the next reconnect if they finish while disconnected again,
-  // or we could poll/sync via REST.
-  //
-  // Simplest: show informational message in the appropriate session.
+  mediaType = project.model.type
+
+  // Find the re-hydrated SDK Project instance to attach listeners
+  sdkProject = sogniClient.projects.trackedProjects.find(p => p.id === project.id)
+
   if (sessionId === currentSessionId):
     → Add system message: "Your [mediaType] is still being processed"
+    → Show progress indicator on that message
+    → Attach listener: sdkProject.on('completed', urls => {
+        Update the message with results (imageResults/videoResults/audioResults)
+        Clear progress indicator
+        projectSessionMap.remove(project.id)
+      })
+    → Attach listener: sdkProject.on('failed', error => {
+        Update the message with error
+        projectSessionMap.remove(project.id)
+      })
   else:
     → Show toast: "A generation is still in progress in another chat"
+    → Attach listener for completion → updateSessionMessages() + toast
 ```
 
 ### 2E. Recovery Message Format
@@ -543,10 +644,17 @@ Run `projectSessionMap.cleanup()` on app startup to prune stale entries (>24h ol
 | Page refresh during generation | Project GC'd → unmatched → `completedProjectsRecovered` event → IndexedDB mapping still exists → routes to correct session |
 | Tab killed by OS | Same as page refresh |
 | Short disconnect (<2s) | SDK reconnects, tracked projects still alive, handler listeners fire normally — no recovery events needed |
+| Extended disconnect (>6min) | Project timeouts paused during disconnect, resume on reconnect — no premature failure |
 | Project from photobooth.sogni.ai | No mapping in projectSessionMap → skipped |
-| Multiple tabs | Only the tab with active socket processes recovery. BroadcastChannel syncs session changes to other tabs. |
-| Project completed + page refreshed + 24h passed | Mapping pruned by cleanup → project treated as unknown → skipped. Acceptable — user likely doesn't care after 24h. |
-| LLM projects in activeProjects | `jobType === 'llm'` → skip. LLM chat completions are stateless and not recoverable. |
+| Multiple tabs | Only the tab with active socket processes recovery. BroadcastChannel syncs session changes to other tabs |
+| Project completed + page refreshed + 24h passed | Mapping pruned by cleanup → project treated as unknown → skipped. Acceptable — user likely doesn't care after 24h |
+| LLM projects in activeProjects | `jobType === 'llm'` → skip. LLM chat completions are stateless and not recoverable |
+| Same project in both arrays | Deduplicated by `seenIds` set in `handleSocketAuthenticated` |
+| Disconnect during URL resolution | Individual try/catch per job. Partially resolved projects emit with whatever URLs succeeded. Missing URLs are acceptable — the media still exists on the server for manual retrieval |
+| IndexedDB unavailable (private browsing) | In-memory Map still works for current session. Mappings won't survive page refresh in this mode — graceful degradation, not a crash |
+| Unmatched active projects | Re-hydrated as SDK `Project` instances and added to tracked list. Normal `jobState`/`jobResult` events flow to them. Recovery event emitted so chat app can show progress |
+| Different user logs in | Server filters by `artist.id` so only that user's projects are sent. No mapping → skipped |
+| Concurrent tool executions during disconnect | All projects handled individually in the recovery loop. Each routes to its own session |
 
 ## Files Changed
 
@@ -554,8 +662,9 @@ Run `projectSessionMap.cleanup()` on app startup to prune stale entries (>24h ol
 | File | Change |
 |------|--------|
 | `src/ApiClient/WebSocketClient/events.ts` | Add `RecoveredProject`, `RecoveredWorkerJob` types. Fix `AuthenticatedData` array types. |
-| `src/Projects/types/events.ts` | Add `activeProjectsRecovered` and `completedProjectsRecovered` to `ProjectApiEvents` |
-| `src/Projects/index.ts` | Remove project-failing from `handleServerDisconnected`. Add `handleSocketAuthenticated` + helper methods. |
+| `src/Projects/types/events.ts` | Add `CompletedRecoveredProject`, `activeProjectsRecovered` and `completedProjectsRecovered` to `ProjectApiEvents` |
+| `src/Projects/index.ts` | Remove project-failing from `handleServerDisconnected` (pause timeouts instead). Add `handleSocketAuthenticated`, `_rehydrateProject`, `_resolveAndCompleteTrackedProject`, `_resolveRecoveredProjectUrls`, `_downloadUrlForRecoveredJob`. |
+| `src/Projects/Project.ts` | Add `_pauseTimeout()` and `_resumeTimeout()` internal methods. |
 
 ### sogni-chat
 | File | Change |
