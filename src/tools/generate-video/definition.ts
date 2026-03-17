@@ -48,12 +48,12 @@ CONSTRAINTS:
         width: {
           type: 'number',
           description:
-            'Video width in pixels. LTX 2.3: 640-3840 (step 64), default 1920. WAN: 480-1536 (step 16), default 640.',
+            'Video width in pixels. LTX 2.3: 640-3840 (step 64), default 1920. WAN: 480-1536 (step 16), default 640. When the user requests a specific resolution (e.g. "480p", "720p", "1080p"), set width and height explicitly — common mappings: 480p=640x480, 720p=1280x720, 1080p=1920x1088, 4K=3840x2176.',
         },
         height: {
           type: 'number',
           description:
-            'Video height in pixels. LTX 2.3: 640-3840 (step 64), default 1088. WAN: 480-1536 (step 16), default 640.',
+            'Video height in pixels. LTX 2.3: 640-3840 (step 64), default 1088. WAN: 480-1536 (step 16), default 640. Always set both width and height when the user specifies a resolution like "480p" or "720p".',
         },
         numberOfVariations: {
           type: 'number',
