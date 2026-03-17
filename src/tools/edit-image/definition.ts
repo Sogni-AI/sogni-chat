@@ -29,7 +29,7 @@ Tips:
           type: 'string',
           enum: ['qwen-lightning', 'qwen', 'flux2'],
           description:
-            'AI model override. ONLY include this parameter when the user explicitly requests a specific model or quality level. Do NOT set this by default — the app selects the appropriate model based on the user\'s quality setting. Available: "qwen-lightning" (fast, 4 steps, up to 3 context images), "qwen" (high quality, 20 steps, up to 3 context images), "flux2" (highest quality, up to 6 context images).',
+            'DO NOT SET THIS PARAMETER unless the user names a specific model. The app auto-selects based on quality settings.',
         },
         sourceImageIndex: {
           type: 'number',

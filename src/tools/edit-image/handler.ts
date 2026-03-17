@@ -134,7 +134,13 @@ export async function execute(
 ): Promise<string> {
   const prompt = args.prompt as string;
   const defaultModel = context.qualityTier === 'hq' ? 'qwen' : 'qwen-lightning';
-  const modelKey = (args.model as string) || defaultModel;
+  const explicitModel = args.model as string | undefined;
+  // Only honor explicit model for non-tier models (e.g. flux2).
+  // Ignore qwen/qwen-lightning from args — those are handled by qualityTier.
+  const TIER_DEFAULTS = ['qwen-lightning', 'qwen'];
+  const modelKey = (explicitModel && !TIER_DEFAULTS.includes(explicitModel))
+    ? explicitModel
+    : defaultModel;
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
   const sourceImageIndex = args.sourceImageIndex as number | undefined;
   const aspectRatio = args.aspectRatio as string | undefined;

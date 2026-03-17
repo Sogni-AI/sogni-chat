@@ -40,7 +40,7 @@ Rules:
           type: 'string',
           enum: ['fast', 'hq'],
           description:
-            'Quality tier override. ONLY include this parameter when the user explicitly requests a quality level (e.g., "high quality", "best quality", "quick", "fast"). Do NOT set this — the app uses the user\'s quality setting from the UI by default.',
+            'DO NOT SET THIS PARAMETER unless the user explicitly asks for "high quality" or "fast". The app auto-selects based on quality settings.',
         },
         scale: {
           type: 'number',

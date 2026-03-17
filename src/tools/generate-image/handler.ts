@@ -178,7 +178,13 @@ export async function execute(
 ): Promise<string> {
   const prompt = args.prompt as string;
   const defaultModel = context.qualityTier === 'hq' ? 'z-image' : 'z-turbo';
-  const modelKey = (args.model as string) || defaultModel;
+  const explicitModel = args.model as string | undefined;
+  // Only honor explicit model for specialized (non-tier) models like chroma/flux/pony.
+  // Ignore z-turbo/z-image from args — those are handled by qualityTier.
+  const TIER_DEFAULTS = ['z-turbo', 'z-image'];
+  const modelKey = (explicitModel && !TIER_DEFAULTS.includes(explicitModel))
+    ? explicitModel
+    : defaultModel;
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
   const negativePrompt = args.negativePrompt as string | undefined;
   const aspectRatio = args.aspectRatio as string | undefined;

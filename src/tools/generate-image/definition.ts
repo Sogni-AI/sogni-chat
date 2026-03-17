@@ -31,7 +31,7 @@ Tips:
           type: 'string',
           enum: ['z-turbo', 'z-image', 'chroma-v46-flash', 'chroma-detail', 'flux1-krea', 'flux2', 'pony-v7'],
           description:
-            'AI model override. ONLY include this parameter when the user explicitly requests a specific model or style (e.g., "use flux", "chroma detail", "pony"). Do NOT set this by default — the app selects the appropriate model based on the user\'s quality setting. CRITICAL — NSFW/nudity/adult model rules: "flux2" and "flux1-krea" CANNOT generate nudity or NSFW content — they will produce garbage results. You MUST use one of these for ANY NSFW/nude/adult/explicit request: "pony-v7" (best NSFW quality, 20 steps), "chroma-detail" (high quality NSFW), "chroma-v46-flash" (fast NSFW), "z-image" (standard NSFW), or "z-turbo" (fastest NSFW). Available models: "z-turbo" (ultra-fast, 8 steps), "chroma-v46-flash" (fast, 10 steps), "z-image" (standard, 30 steps), "flux1-krea" (creative, 25 steps), "chroma-detail" (high detail, 30 steps), "flux2" (complex scenes, 20 steps), "pony-v7" (anime/NSFW, 20 steps). All support img2img except flux2.',
+            'DO NOT SET THIS PARAMETER unless the user names a specific model. The app auto-selects based on quality settings. NSFW rule: "flux2"/"flux1-krea" CANNOT do nudity — use "pony-v7", "chroma-detail", "chroma-v46-flash", or "z-turbo" instead.',
         },
         width: {
           type: 'number',
