@@ -101,7 +101,7 @@ export function ReferralSharePopup({ isOpen, onClose }: ReferralSharePopupProps)
               letterSpacing: '-0.02em',
             }}
           >
-            Earn Free Credits
+            Share & Earn
           </h2>
         </div>
 
