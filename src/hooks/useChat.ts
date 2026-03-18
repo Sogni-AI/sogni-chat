@@ -152,7 +152,10 @@ function makeWelcomeMessage(hasImage: boolean): UIChatMessage {
   };
 }
 
-/** Strip transient fields before persisting */
+/** Strip transient fields before persisting.
+ *  NOTE: uploadedImageUrl / uploadedImageUrls are intentionally kept — their
+ *  stale blob URLs act as markers so the ChatPanel refresh logic can replace
+ *  them with fresh blob URLs generated from the persisted uploadedFiles data. */
 function cleanForStorage(messages: UIChatMessage[]): UIChatMessage[] {
   return messages.map((msg) => ({
     ...msg,
@@ -160,8 +163,6 @@ function cleanForStorage(messages: UIChatMessage[]): UIChatMessage[] {
     isStreaming: undefined,
     streamingStatus: undefined,
     chatModelLabel: undefined,
-    uploadedImageUrl: undefined,
-    uploadedImageUrls: undefined,
     isFromHistory: undefined,
   }));
 }
