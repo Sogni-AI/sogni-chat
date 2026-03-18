@@ -394,10 +394,19 @@ export function ChatPanel({
     return msgs;
   }, [messages, uploadedFiles, getPreviewUrl, imageUrl]);
 
-  // Paginated messages — show the most recent `visibleCount` messages
+  // Paginated messages — show the most recent `visibleCount` messages,
+  // but always pin the upload entry so the original photo stays at the top.
   const paginatedMessages = useMemo(() => {
     if (processedMessages.length <= visibleCount) return processedMessages;
-    return processedMessages.slice(-visibleCount);
+    const sliced = processedMessages.slice(-visibleCount);
+    // Find the upload entry near the start of the conversation
+    const uploadEntry = processedMessages.find(
+      (m) => m.id === 'user-upload' || m.uploadedImageUrl || (m.uploadedImageUrls && m.uploadedImageUrls.length > 0),
+    );
+    if (uploadEntry && !sliced.includes(uploadEntry)) {
+      return [uploadEntry, ...sliced];
+    }
+    return sliced;
   }, [processedMessages, visibleCount]);
 
   const hasMoreMessages = processedMessages.length > visibleCount;
@@ -468,6 +477,18 @@ export function ChatPanel({
 
   const hasImage = !!(uploadedFiles && uploadedFiles.some(f => f.type === 'image'));
   const canSend = isAuthenticated && !!sogniClient;
+
+  // Hide file previews in ChatInput once images have been embedded in a sent message
+  // (the images are visible in the message stream, showing them in the input is redundant).
+  // Data stays in uploadedFiles for subsequent tool calls — only the preview is suppressed.
+  const chatInputFiles = useMemo(() => {
+    if (!uploadedFiles?.length) return undefined;
+    const hasImageInMessages = messages.some(
+      (m) => m.role === 'user' &&
+        ((m.uploadedImageUrls && m.uploadedImageUrls.length > 0) || m.uploadedImageUrl),
+    );
+    return hasImageInMessages ? undefined : uploadedFiles;
+  }, [uploadedFiles, messages]);
 
   // True when the welcome empty state UI is showing (has its own category chips)
   const showWelcomeScreen = !hasImage && messages.length <= 1 && messages[0]?.id === 'welcome' && !isLoading;
@@ -828,7 +849,7 @@ export function ChatPanel({
             ? (hasImage ? 'What should I do with your photo?' : 'What do you want to create?')
             : (hasImage ? 'Describe what you want to do with your photo...' : 'Describe what you want to create...'))
         }
-        uploadedFiles={uploadedFiles}
+        uploadedFiles={chatInputFiles}
         isMediaUploading={isMediaUploading}
         onAddMediaFile={onAddMediaFile}
         onRemoveMediaFile={onRemoveMediaFile}
