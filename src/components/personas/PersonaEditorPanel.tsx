@@ -224,7 +224,7 @@ function computeFaceCrop(
   return { cx, cy, cw: Math.min(cw, imgW - cx), ch: Math.min(ch, imgH - cy) };
 }
 
-/** Crop to face for avatar display — square, face ≈55%, 256px output */
+/** Crop to face for avatar display — square, face ≈55%, 512px output (retina-ready) */
 async function cropToFace(
   photoData: Uint8Array,
   mimeType: string,
@@ -235,13 +235,13 @@ async function cropToFace(
     if (!crop) throw new Error('Face box too small');
 
     const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 256;
+    canvas.width = 512;
+    canvas.height = 512;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Canvas not supported');
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, crop.cx, crop.cy, crop.cw, crop.ch, 0, 0, 256, 256);
+    ctx.drawImage(img, crop.cx, crop.cy, crop.cw, crop.ch, 0, 0, 512, 512);
 
     return new Promise<Blob>((resolve, reject) => {
       canvas.toBlob(
@@ -252,7 +252,7 @@ async function cropToFace(
   });
 }
 
-/** Crop a reference photo for image generation — 3:4 portrait, face ≈25%, max 768px tall */
+/** Crop a reference photo for image generation — 3:4 portrait, face ≈25%, fits within 1024×1024 */
 async function cropReferencePhoto(
   photoData: Uint8Array,
   mimeType: string,
@@ -263,8 +263,9 @@ async function cropReferencePhoto(
     const crop = computeFaceCrop(img.width, img.height, faceBox, 0.25, 0.75);
     if (!crop) throw new Error('Face box too small');
 
-    const maxH = 768;
-    const scale = crop.ch > maxH ? maxH / crop.ch : 1;
+    // Fit within 1024×1024 while preserving aspect ratio
+    const maxDim = 1024;
+    const scale = Math.min(maxDim / crop.cw, maxDim / crop.ch, 1);
     const outW = Math.round(crop.cw * scale);
     const outH = Math.round(crop.ch * scale);
 

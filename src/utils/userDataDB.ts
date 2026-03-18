@@ -238,8 +238,8 @@ export async function getPersonaThumbnail(personaId: string): Promise<PersonaThu
   });
 }
 
-/** Generate a small JPEG thumbnail from a Blob using canvas */
-export function generatePersonaThumbnail(blob: Blob, maxWidth = 80): Promise<Blob> {
+/** Generate a JPEG thumbnail from a Blob using canvas (160px for retina displays) */
+export function generatePersonaThumbnail(blob: Blob, maxWidth = 160): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(blob);
