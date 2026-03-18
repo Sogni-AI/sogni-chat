@@ -69,7 +69,7 @@ export interface ToolExecutionContext {
 // Tool names
 // ---------------------------------------------------------------------------
 
-/** Tool name union — expanded from original 5 to 14 tools */
+/** Tool name union — expanded from original 5 to 16 tools */
 export type ToolName =
   | 'restore_photo'
   | 'apply_style'
@@ -84,7 +84,9 @@ export type ToolName =
   | 'generate_music'
   | 'analyze_image'
   | 'set_content_filter'
-  | 'extract_metadata';
+  | 'extract_metadata'
+  | 'resolve_personas'
+  | 'manage_memory';
 
 // ---------------------------------------------------------------------------
 // Progress & callbacks
@@ -113,6 +115,8 @@ export interface ToolExecutionProgress {
   videoAspectRatio?: string;
   /** Display name of the AI model used (e.g. "Z-Image Turbo", "LTX-2") */
   modelName?: string;
+  /** Persona names referenced during this tool execution (for UI indicator) */
+  referencedPersonas?: string[];
   /** Accumulated per-job progress for multi-job operations (keyed by jobIndex) */
   perJobProgress?: Record<number, {
     progress?: number;

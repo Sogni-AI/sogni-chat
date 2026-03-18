@@ -8,6 +8,7 @@ import type { ToolExecutionProgress } from '@/tools/types';
 import { formatCredits } from '@/services/creditsService';
 import { useTokenPrice } from '@/hooks/useTokenPrice';
 import { activeVideos, pauseOtherVideos } from './videoCoordination';
+import { PersonaReferenceIndicator } from '@/components/personas/PersonaReferenceIndicator';
 
 /** Inline video player for progress grid — hidden until first frame is ready.
  *  Participates in the global video coordination so that playing one video
@@ -404,6 +405,11 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
           </div>
         )}
 
+        {/* Persona reference indicator */}
+        {progress.referencedPersonas && progress.referencedPersonas.length > 0 && (
+          <PersonaReferenceIndicator personaNames={progress.referencedPersonas} />
+        )}
+
         {/* Batch summary bar — project-level cost + cancel for multi-item jobs */}
         {isBatch && hasAnyPending && (costLabel || onCancel) && (
           <div
@@ -616,6 +622,11 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
         <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', marginTop: '0.375rem', opacity: 0.6 }}>
           {progress.modelName}
         </div>
+      )}
+
+      {/* Persona reference indicator */}
+      {progress.referencedPersonas && progress.referencedPersonas.length > 0 && (
+        <PersonaReferenceIndicator personaNames={progress.referencedPersonas} />
       )}
     </div>
   );

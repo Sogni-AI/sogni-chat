@@ -14,6 +14,8 @@ import { formatTokenAmount, getTokenLabel } from '@/services/walletService';
 import type { TokenType } from '@/types/wallet';
 import { PackPurchaseModal } from '@/components/billing/PackPurchaseModal';
 import BillingHistoryModal from '@/components/billing/BillingHistoryModal';
+import { MemoryViewer } from '@/components/personas/MemoryViewer';
+import { useMemories } from '@/hooks/useMemories';
 
 export function AuthStatus() {
   const { isAuthenticated, isLoading, user, authMode, logout } = useSogniAuth();
@@ -24,6 +26,8 @@ export function AuthStatus() {
   const [open, setOpen] = useState(false);
   const [showPackModal, setShowPackModal] = useState(false);
   const [showBillingModal, setShowBillingModal] = useState(false);
+  const [showMemoryViewer, setShowMemoryViewer] = useState(false);
+  const { memories, deleteMemory, upsertByKey } = useMemories();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -306,6 +310,42 @@ export function AuthStatus() {
               </>
             )}
 
+            {/* Memories */}
+            <button
+              onClick={() => { setShowMemoryViewer(true); setOpen(false); }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                width: '100%',
+                padding: '10px 14px',
+                background: 'none',
+                border: 'none',
+                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                cursor: 'pointer',
+                fontSize: '0.8125rem',
+                fontWeight: 500,
+                color: '#d4d4d4',
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#b4b4b4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z" />
+                <line x1="9" y1="21" x2="15" y2="21" />
+              </svg>
+              <span>Memories</span>
+              {memories.length > 0 && (
+                <span style={{
+                  fontSize: '0.625rem', fontWeight: 600, background: 'rgba(255,255,255,0.08)',
+                  color: '#8e8e8e', borderRadius: '100px', padding: '1px 6px', marginLeft: 'auto',
+                }}>
+                  {memories.length}
+                </span>
+              )}
+            </button>
+
             {/* Safe Content Filter toggle */}
             <button
               onClick={() => setSafeContentFilter(!safeContentFilter)}
@@ -391,6 +431,15 @@ export function AuthStatus() {
         isOpen={showBillingModal}
         onClose={() => setShowBillingModal(false)}
       />
+
+      {showMemoryViewer && (
+        <MemoryViewer
+          memories={memories}
+          onDelete={deleteMemory}
+          onAdd={(key, value) => upsertByKey(key, value, 'preference', 'user')}
+          onClose={() => setShowMemoryViewer(false)}
+        />
+      )}
     </>
   );
 }

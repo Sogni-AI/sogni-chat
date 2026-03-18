@@ -7,7 +7,9 @@
 
 import { useState, useCallback, useMemo, type CSSProperties, type DragEvent } from 'react';
 import type { ChatSessionSummary } from '@/types/chat';
+import type { PersonaSummary } from '@/types/userData';
 import { ChatHistoryItem } from './ChatHistoryItem';
+import { PersonaSection } from '@/components/personas/PersonaSection';
 
 interface ChatHistorySidebarProps {
   sessions: ChatSessionSummary[];
@@ -33,6 +35,11 @@ interface ChatHistorySidebarProps {
   collapsed?: boolean;
   /** Toggle sidebar collapse state */
   onToggleCollapse?: () => void;
+  /** Persona data for "My People" section */
+  personas?: PersonaSummary[];
+  onAddPersona?: () => void;
+  onEditPersona?: (id: string) => void;
+  getPersonaThumbnailUrl?: (personaId: string) => Promise<string | null>;
 }
 
 export function ChatHistorySidebar({
@@ -51,6 +58,10 @@ export function ChatHistorySidebar({
   activeJobSessionIds,
   collapsed = false,
   onToggleCollapse,
+  personas,
+  onAddPersona,
+  onEditPersona,
+  getPersonaThumbnailUrl,
 }: ChatHistorySidebarProps) {
   const [dragOver, setDragOver] = useState(false);
 
@@ -204,13 +215,44 @@ export function ChatHistorySidebar({
 
       {/* Collapsed mode: icon-only nav */}
       {collapsed && !onClose && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', padding: '0.25rem 0' }}>
-          {/* Sidebar toggle */}
-          {onToggleCollapse && (
+        <>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', padding: '0.25rem 0' }}>
+            {/* Sidebar toggle */}
+            {onToggleCollapse && (
+              <button
+                onClick={onToggleCollapse}
+                aria-label="Expand sidebar"
+                title="Expand sidebar"
+                style={{
+                  width: '2.25rem',
+                  height: '2.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'transparent',
+                  border: 'none',
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: 'pointer',
+                  color: '#8e8e8e',
+                  transition: 'color 0.15s, background 0.15s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = '#ececec'; e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = '#8e8e8e'; e.currentTarget.style.background = 'transparent'; }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <line x1="9" y1="3" x2="9" y2="21" />
+                </svg>
+              </button>
+            )}
+            {/* New chat icon */}
             <button
-              onClick={onToggleCollapse}
-              aria-label="Expand sidebar"
-              title="Expand sidebar"
+              onClick={onNewProject}
+              onDragOver={handleDragOver as any}
+              onDragLeave={handleDragLeave as any}
+              onDrop={handleDrop as any}
+              aria-label="New chat"
+              title="New chat"
               style={{
                 width: '2.25rem',
                 height: '2.25rem',
@@ -221,49 +263,31 @@ export function ChatHistorySidebar({
                 border: 'none',
                 borderRadius: 'var(--radius-sm)',
                 cursor: 'pointer',
-                color: '#8e8e8e',
+                color: '#b4b4b4',
                 transition: 'color 0.15s, background 0.15s',
+                opacity: dragOver ? 0.8 : undefined,
               }}
               onMouseEnter={(e) => { e.currentTarget.style.color = '#ececec'; e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = '#8e8e8e'; e.currentTarget.style.background = 'transparent'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = '#b4b4b4'; e.currentTarget.style.background = 'transparent'; }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <line x1="9" y1="3" x2="9" y2="21" />
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
               </svg>
             </button>
+          </div>
+
+          {/* Collapsed: personas */}
+          {personas && onAddPersona && onEditPersona && getPersonaThumbnailUrl && (
+            <PersonaSection
+              personas={personas}
+              collapsed
+              onAddPersona={onAddPersona}
+              onEditPersona={onEditPersona}
+              getThumbnailUrl={getPersonaThumbnailUrl}
+            />
           )}
-          {/* New chat icon */}
-          <button
-            onClick={onNewProject}
-            onDragOver={handleDragOver as any}
-            onDragLeave={handleDragLeave as any}
-            onDrop={handleDrop as any}
-            aria-label="New chat"
-            title="New chat"
-            style={{
-              width: '2.25rem',
-              height: '2.25rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'transparent',
-              border: 'none',
-              borderRadius: 'var(--radius-sm)',
-              cursor: 'pointer',
-              color: '#b4b4b4',
-              transition: 'color 0.15s, background 0.15s',
-              opacity: dragOver ? 0.8 : undefined,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = '#ececec'; e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = '#b4b4b4'; e.currentTarget.style.background = 'transparent'; }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 20h9" />
-              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-            </svg>
-          </button>
-        </div>
+        </>
       )}
 
       {/* Expanded mode: New Chat button + session list */}
@@ -339,6 +363,17 @@ export function ChatHistorySidebar({
               ))
             )}
           </div>
+
+          {/* Personas section at bottom of expanded sidebar */}
+          {personas && onAddPersona && onEditPersona && getPersonaThumbnailUrl && (
+            <PersonaSection
+              personas={personas}
+              collapsed={false}
+              onAddPersona={onAddPersona}
+              onEditPersona={onEditPersona}
+              getThumbnailUrl={getPersonaThumbnailUrl}
+            />
+          )}
         </>
       )}
     </div>

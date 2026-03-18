@@ -382,6 +382,35 @@ a:focus-visible,
   }
 }
 
+/* Slide-in animations for persona/memory panels */
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Backdrop fade — opacity only, no translateY */
+@keyframes backdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* Sidebar collapse transition */
 .sidebar-transition {
   transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);

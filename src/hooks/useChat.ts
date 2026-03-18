@@ -83,6 +83,8 @@ export interface UseChatResult {
   declineModelSwitch: () => void;
   /** Whether a model refusal confirmation is pending */
   pendingRefusal: boolean;
+  /** Update the welcome message with personalized context (user name, personas) */
+  updateWelcome: (ctx: { userName?: string | null; hasPersonas?: boolean; hasImage?: boolean }) => void;
   /** Retry a tool execution directly with optional model override */
   retryToolExecution: (
     message: UIChatMessage,
@@ -143,11 +145,44 @@ const WELCOME_MESSAGE_WITH_IMAGE =
 const WELCOME_MESSAGE_NO_IMAGE =
   "What would you like to create? I can generate images, create videos, and compose music.";
 
-function makeWelcomeMessage(hasImage: boolean): UIChatMessage {
+interface WelcomeContext {
+  hasImage: boolean;
+  userName?: string | null;
+  hasPersonas?: boolean;
+}
+
+function getTimeOfDayGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Morning';
+  if (hour < 17) return 'Afternoon';
+  return 'Evening';
+}
+
+function makeWelcomeMessage(ctx: WelcomeContext | boolean): UIChatMessage {
+  // Backward compat: accept plain boolean
+  const { hasImage, userName, hasPersonas } = typeof ctx === 'boolean'
+    ? { hasImage: ctx, userName: undefined, hasPersonas: undefined }
+    : ctx;
+
+  let content: string;
+  if (hasImage) {
+    content = userName
+      ? `${getTimeOfDayGreeting()}, ${userName}! I can see your photo — I can restore it, apply artistic styles, animate it into a video, change the camera angle, edit details, and more.`
+      : WELCOME_MESSAGE_WITH_IMAGE;
+  } else if (userName) {
+    if (hasPersonas === false) {
+      content = `${getTimeOfDayGreeting()}, ${userName}! I can create images, videos, music, and more. Want to personalize your experience? Add yourself in "My People" so I can include you in creations.`;
+    } else {
+      content = `${getTimeOfDayGreeting()}, ${userName}! What would you like to create? I can generate images, create videos, and compose music.`;
+    }
+  } else {
+    content = WELCOME_MESSAGE_NO_IMAGE;
+  }
+
   return {
     id: 'welcome',
     role: 'assistant',
-    content: hasImage ? WELCOME_MESSAGE_WITH_IMAGE : WELCOME_MESSAGE_NO_IMAGE,
+    content,
     timestamp: Date.now(),
   };
 }
@@ -218,6 +253,9 @@ export function useChat(): UseChatResult {
   const [error, setError] = useState<string | null>(null);
   const [allResultUrls, setAllResultUrls] = useState<string[]>([]);
   const [analysisSuggestions, setAnalysisSuggestions] = useState<Suggestion[]>([]);
+
+  // Persisted welcome context for personalized greetings
+  const welcomeContextRef = useRef<WelcomeContext>({ hasImage: false });
 
   // LLM conversation history (raw ChatMessages for API)
   const conversationRef = useRef<ChatMessage[]>([]);
@@ -373,7 +411,7 @@ export function useChat(): UseChatResult {
               setIsAnalyzing(false);
               setError(errorMsg);
               // Restore welcome message on failure (image was present since we were analyzing)
-              setUIMessages([makeWelcomeMessage(true)]);
+              setUIMessages([makeWelcomeMessage({ ...welcomeContextRef.current, hasImage: true })]);
             },
           },
           context.visionSystemPrompt || context.visionUserText
@@ -389,7 +427,7 @@ export function useChat(): UseChatResult {
           console.error('[CHAT HOOK] Analyze image error:', err);
           setIsAnalyzing(false);
           setError(err.message || 'Failed to analyze image');
-          setUIMessages([makeWelcomeMessage(true)]);
+          setUIMessages([makeWelcomeMessage({ ...welcomeContextRef.current, hasImage: true })]);
         }
       } finally {
         if (!thisRequest.aborted && isActiveSession()) {
@@ -566,6 +604,7 @@ export function useChat(): UseChatResult {
                             type: 'started',
                             toolName,
                             totalCount: 0,
+                            referencedPersonas: msg.toolProgress?.referencedPersonas,
                           },
                         }
                       : msg,
@@ -643,7 +682,7 @@ export function useChat(): UseChatResult {
                     // (e.g. progress from jobStep, etaSeconds from jobETA) don't overwrite each other
                     const prev = msg.toolProgress;
                     const merged: ToolExecutionProgress = progress.type === 'started'
-                      ? { ...progress, perJobProgress }
+                      ? { ...progress, perJobProgress, referencedPersonas: progress.referencedPersonas ?? prev?.referencedPersonas }
                       : {
                           ...prev,
                           ...progress,
@@ -654,6 +693,7 @@ export function useChat(): UseChatResult {
                           sourceImageUrl: progress.sourceImageUrl ?? prev?.sourceImageUrl,
                           videoAspectRatio: progress.videoAspectRatio ?? prev?.videoAspectRatio,
                           modelName: progress.modelName ?? prev?.modelName,
+                          referencedPersonas: progress.referencedPersonas ?? prev?.referencedPersonas,
                           perJobProgress,
                         };
                     return { ...msg, toolProgress: merged, videoResults, galleryVideoIds };
@@ -1006,7 +1046,8 @@ export function useChat(): UseChatResult {
     }
     queuedRequestsRef.current = [];
     activeRequestCountRef.current = 0;
-    setUIMessages([makeWelcomeMessage(false)]);
+    welcomeContextRef.current = { ...welcomeContextRef.current, hasImage: false };
+    setUIMessages([makeWelcomeMessage(welcomeContextRef.current)]);
     setIsLoading(false);
     setIsSending(false);
     setIsAnalyzing(false);
@@ -1021,6 +1062,22 @@ export function useChat(): UseChatResult {
     setPendingRefusalMsgId(null);
     lastUserMessageRef.current = '';
     lastSendContextRef.current = null;
+  }, []);
+
+  /** Update the welcome message with personalized context */
+  const updateWelcome = useCallback((ctx: { userName?: string | null; hasPersonas?: boolean; hasImage?: boolean }) => {
+    welcomeContextRef.current = {
+      hasImage: ctx.hasImage ?? welcomeContextRef.current.hasImage,
+      userName: ctx.userName ?? welcomeContextRef.current.userName,
+      hasPersonas: ctx.hasPersonas ?? welcomeContextRef.current.hasPersonas,
+    };
+    setUIMessages((prev) => {
+      // Only update if the first message is the welcome message and no real conversation has started
+      if (prev.length > 0 && prev[0].id === 'welcome' && prev.length <= 1) {
+        return [makeWelcomeMessage(welcomeContextRef.current)];
+      }
+      return prev;
+    });
   }, []);
 
   /** Get a serializable snapshot of current session state */
@@ -1376,7 +1433,7 @@ export function useChat(): UseChatResult {
         timestamp: Date.now(),
         isStreaming: true,
         toolArgs: modifiedArgs,
-        toolProgress: { type: 'started', toolName: effectiveToolName, totalCount: 0 },
+        toolProgress: { type: 'started', toolName: effectiveToolName, totalCount: 0, referencedPersonas: targetMessage.toolProgress?.referencedPersonas },
       };
 
       setUIMessages(prev => [...prev, userMsg, assistantMsg]);
@@ -1456,7 +1513,7 @@ export function useChat(): UseChatResult {
               };
             }
             const merged: ToolExecutionProgress = progress.type === 'started'
-              ? { ...progress, perJobProgress }
+              ? { ...progress, perJobProgress, referencedPersonas: progress.referencedPersonas ?? prevProgress?.referencedPersonas }
               : {
                   ...prevProgress,
                   ...progress,
@@ -1466,6 +1523,7 @@ export function useChat(): UseChatResult {
                   sourceImageUrl: progress.sourceImageUrl ?? prevProgress?.sourceImageUrl,
                   videoAspectRatio: progress.videoAspectRatio ?? prevProgress?.videoAspectRatio,
                   modelName: progress.modelName ?? prevProgress?.modelName,
+                  referencedPersonas: progress.referencedPersonas ?? prevProgress?.referencedPersonas,
                   perJobProgress,
                 };
             const videoResults = retryVideoUrls.length > 0 ? [...retryVideoUrls] : msg.videoResults;
@@ -1609,6 +1667,7 @@ export function useChat(): UseChatResult {
     acceptModelSwitch,
     declineModelSwitch,
     pendingRefusal: pendingRefusalMsgId !== null,
+    updateWelcome,
     setGalleryIds,
     setSessionId,
     getSessionId,

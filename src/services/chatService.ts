@@ -23,6 +23,7 @@ import { isInsufficientCreditsError, getAlternateToken, hasBalance } from '@/too
 import { trimConversation, getInputBudget } from '@/services/contextWindow';
 import { resizeImageForVision } from '@/utils/imageProcessing';
 import type { TokenType } from '@/types/wallet';
+import { getAllPersonas, getAllMemories } from '@/utils/userDataDB';
 
 // ---------------------------------------------------------------------------
 // Callbacks
@@ -52,6 +53,63 @@ const MAX_TOOL_ROUNDS = 5;
 
 /** Token overhead for a vision image (matches IMAGE_TOKENS_HIGH in tokenEstimation.ts) */
 const VISION_IMAGE_TOKENS = 1_300;
+
+// ---------------------------------------------------------------------------
+// Persona & Memory context helpers
+// ---------------------------------------------------------------------------
+
+/** Build compact persona context for system message injection (capped at 8 names) */
+async function buildPersonaContext(): Promise<string> {
+  try {
+    const personas = await getAllPersonas();
+    if (personas.length === 0) return '';
+    const MAX_PERSONAS = 8;
+    const shown = personas.slice(0, MAX_PERSONAS);
+    let result = shown.map(p => {
+      const nicknames = p.tags?.length ? ` aka ${p.tags.join('/')}` : '';
+      return `${p.name}${nicknames} (${p.relationship})`;
+    }).join(', ');
+    if (personas.length > MAX_PERSONAS) {
+      result += ` and ${personas.length - MAX_PERSONAS} more`;
+    }
+    return result;
+  } catch (err) {
+    console.warn('[CHAT SERVICE] Failed to build persona context:', err);
+    return '';
+  }
+}
+
+/** Build compact memory context for system message injection (capped at ~200 chars) */
+async function buildMemoryContext(): Promise<string> {
+  try {
+    const memories = await getAllMemories();
+    if (memories.length === 0) return '';
+    const MAX_CHARS = 200;
+    const MAX_VALUE_LEN = 60;
+    const parts: string[] = [];
+    let totalLen = 0;
+    let included = 0;
+    for (const m of memories) {
+      const value = m.value.length > MAX_VALUE_LEN ? m.value.slice(0, MAX_VALUE_LEN) + '...' : m.value;
+      const entry = `${m.key}: ${value}`;
+      // Account for separator ", " between entries
+      const addedLen = parts.length > 0 ? entry.length + 2 : entry.length;
+      if (totalLen + addedLen > MAX_CHARS) break;
+      parts.push(entry);
+      totalLen += addedLen;
+      included++;
+    }
+    const omitted = memories.length - included;
+    let result = parts.join(', ');
+    if (omitted > 0) {
+      result += ` (+${omitted} more)`;
+    }
+    return result;
+  } catch (err) {
+    console.warn('[CHAT SERVICE] Failed to build memory context:', err);
+    return '';
+  }
+}
 
 /**
  * Prepare vision-ready data URIs from uploaded images.
@@ -127,6 +185,15 @@ export async function sendChatMessage(
   let toolRound = 0;
   let streamNullRetries = 0;
 
+  // Build persona/memory context once (not per tool round)
+  const personaContext = await buildPersonaContext();
+  const memoryContext = await buildMemoryContext();
+  const dynamicSystemPrompt = CHAT_SYSTEM_PROMPT
+    + (personaContext
+      ? `\nUser's people: ${personaContext}. Call resolve_personas for image creation with these people. Suggest adding unknown names to My People.`
+      : `\nTo include people in creations, suggest they add them in My People.`)
+    + (memoryContext ? `\nUser prefs: ${memoryContext}` : '');
+
   // Verify the chat API is available on this client instance
   if (!sogniClient.chat?.completions) {
     console.error('[CHAT SERVICE] sogniClient.chat is not available. Client keys:', Object.keys(sogniClient));
@@ -159,7 +226,7 @@ export async function sendChatMessage(
     try {
       // Sliding window: trim conversation if approaching context limit.
       // Reserve token budget for the vision image that will be attached.
-      const systemMessage: ChatMessage = { role: 'system', content: CHAT_SYSTEM_PROMPT };
+      const systemMessage: ChatMessage = { role: 'system', content: dynamicSystemPrompt };
       const rawBudget = getInputBudget(context.sogniClient);
       const budget = visionDataUris.length > 0 ? rawBudget - VISION_IMAGE_TOKENS * visionDataUris.length : rawBudget;
       const trimResult = trimConversation(updatedMessages, systemMessage, budget);

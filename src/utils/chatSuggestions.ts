@@ -5,7 +5,7 @@
 import type { UIChatMessage } from '@/types/chat';
 import { RESTORATION_PRESETS, type RestorationModeId } from '@/config/restorationPresets';
 
-/** Tool names used in chat — must match ToolName union from tools/types.ts */
+/** Tool names used in chat — subset of ToolName union (excludes set_content_filter which has no suggestions) */
 type ChatToolName =
   | 'restore_photo'
   | 'apply_style'
@@ -19,7 +19,9 @@ type ChatToolName =
   | 'video_to_video'
   | 'generate_music'
   | 'analyze_image'
-  | 'extract_metadata';
+  | 'extract_metadata'
+  | 'resolve_personas'
+  | 'manage_memory';
 
 /** A suggestion chip with display label and prompt text sent on click */
 export interface Suggestion {
@@ -49,6 +51,13 @@ const NO_IMAGE_SUGGESTIONS: Suggestion[] = [
   { label: 'Create a video', prompt: 'Create a video' },
   { label: 'Compose a song', prompt: 'Compose a song' },
   { label: 'Make a music video', prompt: 'Make a music video' },
+];
+
+/** Suggestions shown when no personas exist — includes personalization CTA */
+const NO_PERSONAS_SUGGESTIONS: Suggestion[] = [
+  { label: 'Generate an image', prompt: 'Generate an image' },
+  { label: 'Create a video', prompt: 'Create a video' },
+  { label: 'Compose a song', prompt: 'Compose a song' },
 ];
 
 const SUGGESTIONS_BY_TOOL: Record<ChatToolName, Suggestion[]> = {
@@ -119,6 +128,15 @@ const SUGGESTIONS_BY_TOOL: Record<ChatToolName, Suggestion[]> = {
     { label: 'Generate a new version', prompt: 'Generate a new version of this image using the extracted settings' },
     { label: 'Different prompt, same settings', prompt: 'Use these generation settings but with a different prompt' },
     { label: 'What model was used?', prompt: 'What model was used to generate this?' },
+  ],
+  resolve_personas: [
+    { label: 'Generate an image with them', prompt: 'Generate an image featuring them' },
+    { label: 'Create a portrait', prompt: 'Create a portrait of them' },
+    { label: 'Animate into a video', prompt: 'Animate them into a video' },
+  ],
+  manage_memory: [
+    { label: 'Show my preferences', prompt: 'What preferences do you remember about me?' },
+    { label: 'Generate an image', prompt: 'Generate an image using my preferences' },
   ],
 };
 
@@ -276,6 +294,7 @@ export function generateSuggestions(
   messages: UIChatMessage[],
   analysisSuggestions?: Suggestion[],
   hasImage?: boolean,
+  hasPersonas?: boolean,
 ): Suggestion[] {
   // Walk backwards to find the last assistant message with a completed tool
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -309,8 +328,13 @@ export function generateSuggestions(
 
   // Fallback: show image-upload suggestions or text-only creation suggestions
   if (messages.length > 0 && messages[0].role === 'assistant') {
-    return hasImage ? WELCOME_SUGGESTIONS : NO_IMAGE_SUGGESTIONS;
+    if (hasImage) return WELCOME_SUGGESTIONS;
+    if (hasPersonas === false) return NO_PERSONAS_SUGGESTIONS;
+    return NO_IMAGE_SUGGESTIONS;
   }
 
-  return hasImage === false ? NO_IMAGE_SUGGESTIONS : [];
+  if (hasImage === false) {
+    return hasPersonas === false ? NO_PERSONAS_SUGGESTIONS : NO_IMAGE_SUGGESTIONS;
+  }
+  return [];
 }

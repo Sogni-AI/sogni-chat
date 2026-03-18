@@ -18,6 +18,10 @@ import { SEOHead } from '@/components/seo/SEOHead';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { ChatHistorySidebar } from '@/components/chat/ChatHistorySidebar';
 import { MobileChatDrawer } from '@/components/chat/MobileChatDrawer';
+import { usePersonas } from '@/hooks/usePersonas';
+import { PersonaEditorPanel } from '@/components/personas/PersonaEditorPanel';
+import { getPersona } from '@/utils/userDataDB';
+import type { Persona } from '@/types/userData';
 // Footer removed for clean ChatGPT-inspired layout
 import { saveRestorationToGallery } from '@/services/galleryService';
 import { generateSessionTitle } from '@/services/chatService';
@@ -88,7 +92,7 @@ function legacySessionToUploadedFiles(session: ChatSession): UploadedFile[] {
 
 
 export default function ChatPage() {
-  const { isAuthenticated, getSogniClient } = useSogniAuth();
+  const { isAuthenticated, getSogniClient, user } = useSogniAuth();
   const { tokenType, balances, switchPaymentMethod } = useWallet();
   const {
     uploadedFiles,
@@ -138,6 +142,10 @@ export default function ChatPage() {
   } = useChatSessions();
   const isDesktop = useMediaQuery('(min-width: 900px)');
   const { showOutOfCreditsPopup, showSignupModal, sidebarCollapsed, toggleSidebar, selectedModelVariant, setSelectedModelVariant, safeContentFilter, setSafeContentFilter, isLoginModalOpen } = useLayout();
+  const { personas, addPersona, updatePersona, deletePersona, getPersonaThumbnailUrl } = usePersonas();
+  const [personaEditorOpen, setPersonaEditorOpen] = useState(false);
+  const [editingPersonaId, setEditingPersonaId] = useState<string | null>(null);
+  const [editingPersona, setEditingPersona] = useState<Persona | null>(null);
   const { showToast } = useToastContext();
 
   const [resultUrls, setResultUrls] = useState<string[]>([]);
@@ -171,6 +179,21 @@ export default function ChatPage() {
   chatRef.current = chat;
   const uploadedFilesRef = useRef(uploadedFiles);
   uploadedFilesRef.current = uploadedFiles;
+
+  // Personalize welcome message when user/personas load
+  const selfPersonaName = useMemo(() => {
+    const self = personas.find(p => p.relationship === 'self');
+    return self?.name || null;
+  }, [personas]);
+
+  useEffect(() => {
+    const userName = selfPersonaName || user?.username || null;
+    chat.updateWelcome({
+      userName,
+      hasPersonas: personas.length > 0,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selfPersonaName, user?.username, personas.length, chat.updateWelcome]);
 
   // Track counts for immediate save when new content is generated
   const prevResultCountRef = useRef(0);
@@ -934,6 +957,31 @@ export default function ChatPage() {
 
   const sogniClient = getSogniClient();
 
+  const handleAddPersona = useCallback(() => {
+    setEditingPersonaId(null);
+    setEditingPersona(null);
+    setPersonaEditorOpen(true);
+  }, []);
+
+  const handleEditPersona = useCallback(async (id: string) => {
+    try {
+      const persona = await getPersona(id);
+      setEditingPersonaId(id);
+      setEditingPersona(persona);
+      setPersonaEditorOpen(true);
+    } catch (err) {
+      console.error('[CHAT PAGE] Failed to load persona for editing:', err);
+    }
+  }, []);
+
+  const handleSavePersona = useCallback(async (persona: Persona, faceCropBlob?: Blob | null) => {
+    if (editingPersonaId) {
+      await updatePersona(persona, faceCropBlob);
+    } else {
+      await addPersona(persona, faceCropBlob);
+    }
+  }, [editingPersonaId, updatePersona, addPersona]);
+
   if (!isAuthenticated) {
     return (
       <>
@@ -991,6 +1039,10 @@ export default function ChatPage() {
           activeJobSessionIds={activeJobSessionIds}
           collapsed={sidebarCollapsed}
           onToggleCollapse={toggleSidebar}
+          personas={personas}
+          onAddPersona={handleAddPersona}
+          onEditPersona={handleEditPersona}
+          getPersonaThumbnailUrl={getPersonaThumbnailUrl}
         />,
         document.getElementById('sidebar-root')!,
       )}
@@ -1042,6 +1094,7 @@ export default function ChatPage() {
               onAddMediaFile={addMediaFile}
               onRemoveMediaFile={removeMediaFile}
               onFileDrop={handleFileDrop}
+              hasPersonas={personas.length > 0}
               getPreviewUrl={getPreviewUrl}
               onBranchChat={handleBranchChat}
               onRetry={handleRetry}
@@ -1063,9 +1116,26 @@ export default function ChatPage() {
             onClose={() => setDrawerOpen(false)}
             unreadSessionIds={unreadSessionIds}
             activeJobSessionIds={activeJobSessionIds}
+            personas={personas}
+            onAddPersona={handleAddPersona}
+            onEditPersona={handleEditPersona}
+            getPersonaThumbnailUrl={getPersonaThumbnailUrl}
           />
         )}
       </div>
+
+      {/* Persona editor panel */}
+      {personaEditorOpen && (
+        <PersonaEditorPanel
+          persona={editingPersona}
+          onSave={handleSavePersona}
+          onDelete={editingPersonaId ? deletePersona : undefined}
+          onClose={() => setPersonaEditorOpen(false)}
+          getThumbnailUrl={getPersonaThumbnailUrl}
+          sogniClient={sogniClient}
+          tokenType={tokenType}
+        />
+      )}
     </>
   );
 }

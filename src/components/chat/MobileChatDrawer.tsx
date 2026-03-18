@@ -6,6 +6,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { ChatSessionSummary } from '@/types/chat';
+import type { PersonaSummary } from '@/types/userData';
 import { ChatHistorySidebar } from './ChatHistorySidebar';
 
 interface MobileChatDrawerProps {
@@ -20,6 +21,10 @@ interface MobileChatDrawerProps {
   onClose: () => void;
   unreadSessionIds?: Set<string>;
   activeJobSessionIds?: Set<string>;
+  personas?: PersonaSummary[];
+  onAddPersona?: () => void;
+  onEditPersona?: (id: string) => void;
+  getPersonaThumbnailUrl?: (personaId: string) => Promise<string | null>;
 }
 
 export function MobileChatDrawer({
@@ -34,6 +39,10 @@ export function MobileChatDrawer({
   onClose,
   unreadSessionIds,
   activeJobSessionIds,
+  personas,
+  onAddPersona,
+  onEditPersona,
+  getPersonaThumbnailUrl,
 }: MobileChatDrawerProps) {
   const [closing, setClosing] = useState(false);
   const pendingActionRef = useRef<(() => void) | null>(null);
@@ -111,6 +120,10 @@ export function MobileChatDrawer({
           isMobile
           unreadSessionIds={unreadSessionIds}
           activeJobSessionIds={activeJobSessionIds}
+          personas={personas}
+          onAddPersona={onAddPersona}
+          onEditPersona={onEditPersona}
+          getPersonaThumbnailUrl={getPersonaThumbnailUrl}
           style={{
             width: '100%',
             borderRadius: 0,

@@ -71,6 +71,8 @@ interface ChatPanelProps {
   onBranchChat?: (message: UIChatMessage) => void;
   /** Called when user clicks "Try again" or switches model in media actions menu */
   onRetry?: (message: UIChatMessage, modelKey?: string) => void;
+  /** Whether the user has any saved personas (for suggestion chip selection) */
+  hasPersonas?: boolean;
 }
 
 /** Minimal dropdown for quality tier selection */
@@ -204,6 +206,7 @@ export function ChatPanel({
   getPreviewUrl,
   onBranchChat,
   onRetry,
+  hasPersonas,
 }: ChatPanelProps) {
   const { selectedModelVariant, setSelectedModelVariant } = useLayout();
   const isMobile = useMediaQuery('(max-width: 743px)');
@@ -245,9 +248,9 @@ export function ChatPanel({
       if (uploadIntent === 'video' && imageData && analysisSuggestions && analysisSuggestions.length > 0) {
         return analysisSuggestions;
       }
-      return generateSuggestions(messages, analysisSuggestions, !!imageData);
+      return generateSuggestions(messages, analysisSuggestions, !!imageData, hasPersonas);
     },
-    [messages, isLoading, analysisSuggestions, imageData, uploadIntent],
+    [messages, isLoading, analysisSuggestions, imageData, uploadIntent, hasPersonas],
   );
 
   // Smart auto-scroll

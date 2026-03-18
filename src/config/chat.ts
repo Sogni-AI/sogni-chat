@@ -112,7 +112,7 @@ export const CONTEXT_WINDOW_CONFIG = {
   DEFAULT_CONTEXT_LENGTH: 65_536,  // Fallback; actual value read from socket's maxContextLength at runtime
   MAX_OUTPUT_TOKENS: 4_096,
   SAFETY_MARGIN: 2_048,
-  TOOL_SCHEMA_TOKENS: 5_000, // Budget for tool definitions sent to LLM. 13 tools with detailed param descriptions. Conservative estimate — previously 2,500 which was too low.
+  TOOL_SCHEMA_TOKENS: 5_500, // Budget for tool definitions sent to LLM. 16 tools with detailed param descriptions. Conservative estimate — previously 2,500 which was too low.
   MIN_PROTECTED_GROUPS: 2,
 } as const;
 

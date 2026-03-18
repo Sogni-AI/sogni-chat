@@ -30,6 +30,10 @@ import './set-content-filter';
 // Metadata extraction
 import './extract-metadata';
 
+// Persona & memory tools
+import './resolve-personas';
+import './manage-memory';
+
 export { toolRegistry } from './registry';
 export type {
   ToolHandler,
