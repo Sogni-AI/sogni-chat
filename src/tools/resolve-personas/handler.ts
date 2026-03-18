@@ -76,22 +76,56 @@ export async function execute(
     });
 
     callbacks.onToolComplete('resolve_personas', []);
-    const descriptions = personas.map(p => {
-      const desc = p.visionDescription || p.description || '';
-      const attire = p.defaultAttire ? ` Usual attire: ${p.defaultAttire}.` : '';
-      const voice = p.voice ? ` Voice: ${p.voice}.` : '';
-      return `${p.name} (${p.relationship}): ${desc}${attire}${voice}`;
-    }).join('\n');
+
+    // Build per-persona descriptions with picture number references
+    const personaDetails: string[] = [];
+    const pictureMapping: string[] = [];
+    let pictureNum = 1;
+    for (const persona of personas) {
+      const desc = persona.visionDescription || persona.description || '';
+      const attire = persona.defaultAttire ? ` Default attire: ${persona.defaultAttire}.` : '';
+      const voice = persona.voice ? ` Voice: ${persona.voice}.` : '';
+      const hasPhoto = !!(persona.referencePhotoData || persona.photoData);
+      if (hasPhoto) {
+        pictureMapping.push(`Picture ${pictureNum} = ${persona.name}`);
+        personaDetails.push(`${persona.name} (${persona.relationship}, picture ${pictureNum}): ${desc}${attire}${voice}`);
+        pictureNum++;
+      } else {
+        personaDetails.push(`${persona.name} (${persona.relationship}, no photo): ${desc}${attire}${voice}`);
+      }
+    }
+
+    const descriptions = personaDetails.join('\n');
+    const mappingStr = pictureMapping.join(', ');
+
+    // Build prompt guidance following Qwen Image Edit multi-image reference patterns
+    let promptGuidance: string;
+    if (injectedCount > 0) {
+      promptGuidance = `Reference photos loaded as context images: ${mappingStr}.
+
+IMPORTANT — How to use these for identity-preserving generation with edit_image:
+1. Reference each person by their picture number in your prompt: "the person in picture 1", "the subject of picture 2"
+2. Be EXPLICIT about preserving identity: "maintaining the person's face, ethnicity, age, hairstyle, and features from picture N"
+3. Describe the new scene/pose/setting separately from the identity reference
+4. Include appearance descriptors from below to reinforce the likeness
+
+Example prompt structure for two people:
+"Generate a scene of [description]. The man is the person from picture 1 — preserve his face, ethnicity, hairstyle, and features exactly. The woman is the person from picture 2 — preserve her face, ethnicity, hairstyle, and features exactly. [scene details]"
+
+Persona details:
+${descriptions}`;
+    } else {
+      promptGuidance = `Found personas ${loadedNames.join(', ')} but they have no photos uploaded. Use their appearance descriptions directly in your image prompt:\n${descriptions}`;
+    }
 
     return JSON.stringify({
       success: true,
       loadedPersonas: loadedNames,
       photosInjected: injectedCount,
       contextImageMapping: personaMap,
+      pictureMapping: mappingStr,
       descriptions,
-      promptGuidance: injectedCount > 0
-        ? `Reference photos and appearance descriptions for ${loadedNames.join(', ')} are loaded. CRITICAL: The text descriptions below are your primary tool for capturing their likeness — incorporate these descriptors directly into your image prompt (e.g. "${personas[0]?.name || 'person'}, ${personas[0]?.visionDescription?.split(',').slice(0, 3).join(',') || 'their appearance'}"). The reference photos provide visual guidance for composition and style but will not perfectly reproduce exact facial features. Use edit_image with the context images and a detailed prompt that includes the appearance descriptors.\n\nAppearance descriptions:\n${descriptions}`
-        : `Found personas ${loadedNames.join(', ')} but they have no photos uploaded. Use their appearance descriptions directly in your image prompt:\n${descriptions}`,
+      promptGuidance,
     });
   } catch (err: unknown) {
     console.error('[RESOLVE PERSONAS] Failed:', err);
