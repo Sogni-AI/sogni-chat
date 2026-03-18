@@ -10,7 +10,7 @@ export const definition: ToolDefinition = {
   function: {
     name: 'resolve_personas',
     description:
-      'Load persona photos for image generation or editing. Call this BEFORE generate_image or edit_image when the user references a person by name (e.g. "make a picture of me", "draw Sarah and the kids"). Returns photo data injected as context images plus descriptions. After calling this, use edit_image with the loaded context images. Do NOT call this for non-person subjects.',
+      'Load persona reference photos and appearance descriptions for image generation. Call this BEFORE generate_image or edit_image when the user references a person by name (e.g. "make a picture of me", "draw Sarah and the kids"). Returns appearance descriptions and reference photos. IMPORTANT: The appearance description text is the primary tool for capturing likeness — weave it directly into your image prompt. Reference photos provide visual guidance for composition but will not perfectly reproduce exact facial features. Do NOT call this for non-person subjects.',
     parameters: {
       type: 'object',
       properties: {

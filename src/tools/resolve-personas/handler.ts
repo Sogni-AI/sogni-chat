@@ -90,8 +90,8 @@ export async function execute(
       contextImageMapping: personaMap,
       descriptions,
       promptGuidance: injectedCount > 0
-        ? `Reference photos for ${loadedNames.join(', ')} are now loaded as context images. Use edit_image with these reference images to create the requested image. Incorporate the person's appearance from the reference photo.`
-        : `Found personas ${loadedNames.join(', ')} but they have no photos uploaded. Use their descriptions instead: ${descriptions}`,
+        ? `Reference photos and appearance descriptions for ${loadedNames.join(', ')} are loaded. CRITICAL: The text descriptions below are your primary tool for capturing their likeness — incorporate these descriptors directly into your image prompt (e.g. "${personas[0]?.name || 'person'}, ${personas[0]?.visionDescription?.split(',').slice(0, 3).join(',') || 'their appearance'}"). The reference photos provide visual guidance for composition and style but will not perfectly reproduce exact facial features. Use edit_image with the context images and a detailed prompt that includes the appearance descriptors.\n\nAppearance descriptions:\n${descriptions}`
+        : `Found personas ${loadedNames.join(', ')} but they have no photos uploaded. Use their appearance descriptions directly in your image prompt:\n${descriptions}`,
     });
   } catch (err: unknown) {
     console.error('[RESOLVE PERSONAS] Failed:', err);
