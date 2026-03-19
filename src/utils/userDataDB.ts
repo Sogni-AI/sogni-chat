@@ -181,6 +181,9 @@ export async function getPersonasByNames(names: string[]): Promise<Persona[]> {
         }
         cursor.continue();
       } else {
+        // Sort by relationship order: self first, partner second, then others
+        const ORDER: Record<string, number> = { self: 0, partner: 1 };
+        results.sort((a, b) => (ORDER[a.relationship] ?? 2) - (ORDER[b.relationship] ?? 2));
         resolve(results);
       }
     };

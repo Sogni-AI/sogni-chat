@@ -331,6 +331,7 @@ async function runEditGeneration(
     sampler: params.sampler,
     scheduler: params.scheduler,
     disableNSFWFilter: !!params.disableNSFWFilter,
+    outputFormat: 'jpg',
   };
 
   if (params.guidance !== undefined) {
