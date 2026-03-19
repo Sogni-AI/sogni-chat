@@ -1126,7 +1126,7 @@ export default function ChatPage() {
             onDeleteSession={handleDeleteSession}
             onRenameSession={handleRenameSession}
             onTogglePinSession={handleTogglePinSession}
-            onNewProject={handleUploadClick}
+            onNewProject={handleNewPhoto}
             onFileDrop={handleFileDrop}
             onClose={() => setDrawerOpen(false)}
             unreadSessionIds={unreadSessionIds}
