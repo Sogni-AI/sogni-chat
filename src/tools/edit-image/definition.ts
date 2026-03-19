@@ -26,7 +26,7 @@ Tips:
 - Use POSITIVE phrasing ("sharp details", not "no blur").
 - Be specific about what to take from each reference image.
 
-BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. For personas: vary scene, activity, or environment — never vary identity. Example: "[persona] at the beach {building a sandcastle|surfing a wave|reading under a palm tree}". For direct edits: vary the approach, e.g., "make the sky {a vibrant sunset|stormy and dramatic|clear blue}".`,
+BATCH VARIATIONS: When numberOfVariations > 1, the prompt must describe ONE image — never mention counts or "different versions" in the prompt text. Use Dynamic Prompt syntax. For personas: vary scene, activity, or environment — never vary identity. Example: numberOfVariations=4, prompt="[persona] at the beach {building a sandcastle|surfing a wave|reading under a palm tree|flying a kite}". Each variation becomes its own separate full image. For direct edits: vary the approach, e.g., numberOfVariations=3, prompt="make the sky {a vibrant sunset|stormy and dramatic|clear blue}".`,
         },
         model: {
           type: 'string',

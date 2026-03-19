@@ -21,7 +21,7 @@ export const definition: ToolDefinition = {
 
 Include: lighting ("soft golden hour light"), composition ("close-up portrait", "wide shot"), and style ("oil painting", "shot on Canon EOS R5, 85mm f/1.4"). POSITIVE phrasing only.
 
-BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary unspecified dimensions. Example: "4 images of a black cat" → "a black cat {lounging in a sunlit window|prowling through autumn leaves|sitting on a vintage bookshelf|curled up by a fireplace}". Vary setting, style, lighting, or composition — never override what the user specified.`,
+BATCH VARIATIONS: When numberOfVariations > 1, the prompt must describe ONE image — never mention counts or "different versions" in the prompt text. Use Dynamic Prompt syntax to vary unspecified dimensions. Example: numberOfVariations=4, prompt="a black cat {lounging in a sunlit window|prowling through autumn leaves|sitting on a vintage bookshelf|curled up by a fireplace}". Each variation becomes its own separate full image. Vary setting, style, lighting, or composition — never override what the user specified.`,
         },
         model: {
           type: 'string',
