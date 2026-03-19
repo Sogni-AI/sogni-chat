@@ -826,23 +826,31 @@ export function useChat(): UseChatResult {
                 currentToolResultUrls = [];
                 currentToolVideoUrls = [];
 
-                setUIMessages((prev) => [
-                  ...prev.map((msg) =>
-                    msg.id === currentMsgId
-                      ? { ...msg, isStreaming: false }
-                      : msg,
-                  ),
-                  {
-                    id: postToolMsgId,
-                    role: 'assistant' as const,
-                    content: '',
-                    timestamp: Date.now(),
-                    isStreaming: true,
-                    lastCompletedTool: toolName,
-                    streamingStatus: 'Thinking...',
-                    chatModelLabel,
-                  },
-                ]);
+                setUIMessages((prev) => {
+                  // Carry referencedPersonas forward from the completing message
+                  // so retries on later messages can still re-inject persona photos.
+                  const completingMsg = prev.find(m => m.id === currentMsgId);
+                  const carryPersonas = completingMsg?.referencedPersonas
+                    || completingMsg?.toolProgress?.referencedPersonas;
+                  return [
+                    ...prev.map((msg) =>
+                      msg.id === currentMsgId
+                        ? { ...msg, isStreaming: false }
+                        : msg,
+                    ),
+                    {
+                      id: postToolMsgId,
+                      role: 'assistant' as const,
+                      content: '',
+                      timestamp: Date.now(),
+                      isStreaming: true,
+                      lastCompletedTool: toolName,
+                      streamingStatus: 'Thinking...',
+                      chatModelLabel,
+                      ...(carryPersonas ? { referencedPersonas: carryPersonas } : {}),
+                    },
+                  ];
+                });
               },
 
               onComplete: (_fullContent: string) => {

@@ -223,6 +223,9 @@ export async function execute(
     }
   }
 
+  console.log(`[EDIT IMAGE] Context: ${cappedContextImages.length} images (${hasPersonaPhotos ? personaFiles.length + ' persona' : 'no persona'}), model: ${modelConfig.id}, steps: ${modelConfig.defaultSteps}, guidance: ${modelConfig.defaultGuidance}`);
+  console.log(`[EDIT IMAGE] Prompt: ${effectivePrompt.slice(0, 300)}...`);
+
   try {
     const resultUrls = await tryWithTokenFallback(
       (tokenType: TokenType) => runEditGeneration(
@@ -264,13 +267,17 @@ export async function execute(
     if (billingId) void recordCompletion(billingId);
     callbacks.onToolComplete('edit_image', resultUrls);
 
+    const personaNote = hasPersonaPhotos
+      ? ' IMPORTANT: Compare the generated result against the persona reference photos. Be HONEST — if the faces, hair, or features do not match the reference photos, say so clearly and offer to retry. Do NOT claim the result looks like the person if it does not. The user can see the image too.'
+      : '';
+
     return JSON.stringify({
       success: true,
       resultCount: resultUrls.length,
       model: modelConfig.name,
       contextImageCount: cappedContextImages.length,
       creditsCost: formatCredits(estimatedCost),
-      message: `Successfully generated ${resultUrls.length} image${resultUrls.length !== 1 ? 's' : ''} using ${modelConfig.name} with ${cappedContextImages.length} reference image${cappedContextImages.length !== 1 ? 's' : ''}. Cost: ~${formatCredits(estimatedCost)} credits. The user can now see the results.`,
+      message: `Successfully generated ${resultUrls.length} image${resultUrls.length !== 1 ? 's' : ''} using ${modelConfig.name} with ${cappedContextImages.length} reference image${cappedContextImages.length !== 1 ? 's' : ''}. Cost: ~${formatCredits(estimatedCost)} credits. The user can now see the results.${personaNote}`,
     });
   } catch (err: unknown) {
     if (billingId) discardPending(billingId);

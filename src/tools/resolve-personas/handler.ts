@@ -118,16 +118,17 @@ export async function execute(
       promptGuidance = `Reference photos loaded as context images: ${mappingStr}.${preExistingNote}
 
 IMPORTANT — Identity-preserving generation with edit_image:
-1. Reference each person by their EXACT picture number: "the person in picture ${preExistingImageCount + 1}", NOT "picture 1" unless that IS the correct number
-2. Be EXPLICIT about preserving identity: "preserve the person's face, ethnicity, age, skin tone, hairstyle, and features exactly as shown in picture N"
-3. Include the appearance descriptors from below in the prompt to reinforce the likeness
-4. Describe the new scene/pose/setting separately from the identity directives
-5. Qwen Image Edit supports max 3 context images total (including any user uploads)
+1. Reference each person by picture number AND name: "${personas[0]?.name || 'Name'} is the person in picture ${preExistingImageCount + 1}"
+2. Be EXPLICIT about preserving identity: "preserve ${personas[0]?.name || 'Name'}'s face, ethnicity, age, skin tone, hairstyle, and features exactly as shown in picture N"
+3. NEVER use "you", "your", "I", or "me" in the prompt — always use the person's NAME. The image model doesn't know who "you" is.
+4. DO NOT copy appearance descriptions into the prompt — the model can already see the reference photos. The picture number + "preserve face/features exactly" is enough.
+5. Focus the prompt on the SCENE: what they're doing, wearing, where they are. Keep it natural and concise.
+6. Qwen Image Edit supports max 3 context images total (including any user uploads)
 
 Example prompt for the current context:
-"${personas.filter(p => p.referencePhotoData || p.photoData).map((p, i) => `The ${p.relationship === 'self' ? 'person' : p.relationship} is the subject from picture ${preExistingImageCount + 1 + i} — preserve their face, ethnicity, age, skin tone, hairstyle, and expression exactly`).join('. ')}. [scene/setting description]. ${personas.map(p => p.visionDescription || p.description || '').filter(Boolean).join('. ')}."
+"${personas.filter(p => p.referencePhotoData || p.photoData).map((p, i) => `${p.name} is the person in picture ${preExistingImageCount + 1 + i} — preserve ${p.name}'s face and features exactly`).join('. ')}. [describe the scene, clothing, action, mood — not their physical appearance]."
 
-Persona details:
+Persona details (for your reference, NOT for pasting into prompts):
 ${descriptions}`;
     } else {
       promptGuidance = `Found personas ${loadedNames.join(', ')} but they have no photos uploaded. Use their appearance descriptions directly in your image prompt:\n${descriptions}`;

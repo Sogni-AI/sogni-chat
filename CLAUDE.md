@@ -131,10 +131,11 @@ toolRegistry.register({ definition, execute, suggestions: [...] });
 - **Tool calling loop**: Up to 5 rounds (tool call -> execution -> feed result back -> next response)
 - **Context window management**: Sliding-window trimming in `src/services/contextWindow.ts`
 
-**System Prompt Design** (critical for Qwen3):
-- Keep the system prompt SHORT (~400 chars) — long prompts cause the model to narrate tool calls as text
-- Put prompt engineering rules in tool parameter descriptions (in `definition.ts`), not the system prompt
-- NEVER instruct the model to "describe" or "mention" what it's about to do
+**System Prompt Design**:
+- System prompt is structured into 4 sections: Role, Priorities, Output Rules, Hard Constraints
+- The model should acknowledge user requests with a brief friendly message alongside tool calls (not narrate the tool call itself)
+- Additional prompt engineering rules live in tool parameter descriptions (in `definition.ts`)
+- If tool calling reliability degrades, test whether prompt length is the cause before compressing
 
 ### Dual-Client Authentication
 
@@ -207,7 +208,7 @@ No global state library. Uses React Context + Custom Hooks:
 - **Dual servers**: Both frontend AND backend must run during development
 - **max_tokens**: Use 4096, not 1024 — tool call JSON generation needs headroom
 - **Chat tool calling + thinking**: Qwen3 produces `<think>` blocks before tool calls. The vLLM worker needs `reasoningParser: "qwen3"` in the API model config, otherwise tool calls appear as plain text. `stripThinkBlocks()` in chatService.ts is a safety net.
-- **System prompt length**: Keep under ~400 chars for Qwen3 — long prompts with detailed rules cause text narration instead of structured tool calls
+- **System prompt structure**: Organized into Role, Priorities, Output Rules, and Hard Constraints sections with markdown headers. If tool calling degrades, compress the prompt — but test before assuming length is the issue
 
 ## Environment Variables
 

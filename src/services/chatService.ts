@@ -157,7 +157,7 @@ export async function sendChatMessage(
   const personaContext = await buildPersonaContext();
   const dynamicSystemPrompt = CHAT_SYSTEM_PROMPT
     + (personaContext
-      ? `\nUser's people: ${personaContext}. When creating images of these people: call resolve_personas first, then use edit_image (never generate_image). When creating videos of these people: ALWAYS generate an image first (resolve_personas → edit_image), then use animate_photo on that image — never use generate_video directly for personas. Pronouns like "us", "we", "our" refer to these people — always call resolve_personas again for each new image generation, even in follow-up messages. If user mentions someone not listed, suggest adding them to My Personas.`
+      ? `\nUser's people: ${personaContext}. When creating images of these people: call resolve_personas first, then use edit_image (never generate_image). When creating videos of these people: ALWAYS generate an image first (resolve_personas → edit_image), then STOP — show the image result and ask if it looks good before proceeding to animate_photo. Never chain image → video without user approval. Pronouns like "us", "we", "our" refer to these people — always call resolve_personas again for each new image generation, even in follow-up messages. If user mentions someone not listed, suggest adding them to My Personas.`
       : '');
 
   // Verify the chat API is available on this client instance
