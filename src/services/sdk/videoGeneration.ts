@@ -12,6 +12,7 @@ import {
   calculateVideoFrames,
   type VideoModelId,
 } from '@/constants/videoSettings';
+import { resizeImageToFit } from '@/utils/imageProcessing';
 import { projectSessionMap } from '@/services/projectSessionMap';
 
 /** Which frame slot the source image should occupy */
@@ -92,8 +93,11 @@ export async function generateVideo(
     frameMode,
   });
 
-  // Convert Uint8Array to Blob for SDK referenceImage param
-  const referenceImageBlob = new Blob([new Uint8Array(imageData)], { type: params.imageMimeType || 'image/jpeg' });
+  // Resize source image to match target video dimensions (contain mode: scale to fit, center, black fill)
+  const resized = await resizeImageToFit(imageData, srcWidth, srcHeight, width, height, params.imageMimeType || 'image/jpeg');
+
+  // Convert to Blob for SDK referenceImage param
+  const referenceImageBlob = new Blob([new Uint8Array(resized.data)], { type: resized.mimeType });
 
   // Build project config — model-specific params applied dynamically
   const projectConfig: any = {

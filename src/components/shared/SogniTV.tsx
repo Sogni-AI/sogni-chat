@@ -929,6 +929,7 @@ export function SogniTV() {
   const [startVideoUrl, setStartVideoUrl] = useState<string | null>(null);
   const [playerKey, setPlayerKey] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
+  const [previewVisible, setPreviewVisible] = useState(false);
 
   // Listen for external open/close from the controller (chat offer integration)
   useEffect(() => {
@@ -939,6 +940,7 @@ export function SogniTV() {
         setPlayerKey((k) => k + 1);
       }
       setPlayerOpen(state.isOpen);
+      setPreviewVisible(state.previewVisible);
     });
   }, [playerOpen]);
 
@@ -952,7 +954,7 @@ export function SogniTV() {
     return <SogniTVPlayer key={playerKey} onClose={handleClose} startVideoUrl={startVideoUrl} />;
   }
 
-  if (dismissed) return null;
+  if (dismissed || previewVisible) return null;
 
   return createPortal(
     <>
@@ -971,7 +973,7 @@ export function SogniTV() {
         style={{
           position: 'fixed',
           bottom: 24,
-          left: 24,
+          right: 24,
           zIndex: 99998,
           animation: 'sogniTvBubbleIn 0.4s ease-out',
           display: 'flex',

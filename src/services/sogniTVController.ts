@@ -23,6 +23,7 @@ let isOpen = false;
 let autoCloseOnComplete = false;
 let currentProgress: TVProgress | null = null;
 let startVideoUrl: string | null = null;
+let previewVisible = false;
 const listeners = new Set<Listener>();
 
 function notify() {
@@ -75,8 +76,13 @@ export const sogniTVController = {
     return url;
   },
 
+  setPreviewVisible(visible: boolean) {
+    previewVisible = visible;
+    notify();
+  },
+
   getState() {
-    return { isOpen, autoCloseOnComplete, progress: currentProgress, startVideoUrl };
+    return { isOpen, autoCloseOnComplete, progress: currentProgress, startVideoUrl, previewVisible };
   },
 
   subscribe(fn: Listener) {

@@ -37,6 +37,12 @@ export function SogniTVPreview() {
     setDismissed(true);
   }, []);
 
+  // Report visibility to controller so the floating SogniTV button can hide
+  useEffect(() => {
+    sogniTVController.setPreviewVisible(!dismissed);
+    return () => { sogniTVController.setPreviewVisible(false); };
+  }, [dismissed]);
+
   if (dismissed) return null;
 
   return (

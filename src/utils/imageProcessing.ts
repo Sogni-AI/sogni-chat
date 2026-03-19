@@ -184,6 +184,58 @@ export async function downsampleIfOversized(
   return { file: resized, width: targetW, height: targetH };
 }
 
+/**
+ * Resize a Uint8Array image to exactly match target dimensions using "cover" mode.
+ * The image is scaled to fill the target (maintaining aspect ratio), then center-cropped
+ * on the overflowing axis. No black bars, no distortion.
+ */
+export async function resizeImageToFit(
+  data: Uint8Array,
+  srcWidth: number,
+  srcHeight: number,
+  targetWidth: number,
+  targetHeight: number,
+  mimeType = 'image/jpeg',
+): Promise<{ data: Uint8Array; mimeType: string }> {
+  // Skip if dimensions already match
+  if (srcWidth === targetWidth && srcHeight === targetHeight) {
+    return { data, mimeType };
+  }
+
+  const blob = new Blob([data.buffer as ArrayBuffer], { type: mimeType });
+  const bitmap = await createImageBitmap(blob);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const ctx = canvas.getContext('2d')!;
+
+  // Scale to cover (fill target, crop overflow)
+  const scale = Math.max(targetWidth / srcWidth, targetHeight / srcHeight);
+  const drawW = Math.round(srcWidth * scale);
+  const drawH = Math.round(srcHeight * scale);
+
+  // Center-crop the overflowing axis
+  const offsetX = Math.round((targetWidth - drawW) / 2);
+  const offsetY = Math.round((targetHeight - drawH) / 2);
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bitmap, offsetX, offsetY, drawW, drawH);
+  bitmap.close();
+
+  // Output as JPEG (video models prefer it, and it avoids alpha channel issues)
+  const outMime = 'image/jpeg';
+  const outBlob: Blob = await new Promise((resolve) =>
+    canvas.toBlob((b) => resolve(b!), outMime, 0.95),
+  );
+  const arrayBuffer = await outBlob.arrayBuffer();
+
+  console.log(`[IMAGE] Resized for video (cover): ${srcWidth}x${srcHeight} -> ${targetWidth}x${targetHeight} (scaled ${drawW}x${drawH}, center-cropped)`);
+
+  return { data: new Uint8Array(arrayBuffer), mimeType: outMime };
+}
+
 export async function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
     const img = new Image();
