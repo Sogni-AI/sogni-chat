@@ -67,8 +67,7 @@ async function buildPersonaContext(): Promise<string> {
     const shown = personas.slice(0, MAX_PERSONAS);
     let result = shown.map(p => {
       const nicknames = p.tags?.length ? ` aka ${p.tags.join('/')}` : '';
-      const voice = p.voice ? `, voice: ${p.voice}` : '';
-      return `${p.name}${nicknames} (${p.relationship}${voice})`;
+      return `${p.name}${nicknames} (${p.relationship})`;
     }).join(', ');
     if (personas.length > MAX_PERSONAS) {
       result += ` and ${personas.length - MAX_PERSONAS} more`;
