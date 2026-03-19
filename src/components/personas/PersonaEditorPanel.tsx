@@ -193,6 +193,8 @@ function computeFaceCrop(
   const faceH = Math.round(imgH * faceBox.h / 100);
   if (faceW < 10 || faceH < 10) return null;
 
+  const faceCenterX = faceX + faceW / 2;
+  const faceCenterY = faceY + faceH / 2;
   const faceDim = Math.max(faceW, faceH);
   const targetSize = Math.round(faceDim / faceRatio);
 
@@ -202,15 +204,21 @@ function computeFaceCrop(
     ch = Math.min(targetSize, imgH);
     cw = Math.min(Math.round(ch * aspectRatio), imgW);
     ch = Math.min(Math.round(cw / aspectRatio), imgH); // re-clamp
+    cw = Math.max(cw, faceW);
+    ch = Math.max(ch, faceH);
   } else {
-    // Square
-    cw = ch = Math.min(targetSize, imgW, imgH);
+    // Square: prioritize keeping face centered to avoid off-center faces in circular avatars.
+    // Compute the largest centered square that fits within image bounds around the face center.
+    const maxCenteredW = 2 * Math.min(faceCenterX, imgW - faceCenterX);
+    const maxCenteredH = 2 * Math.min(faceCenterY, imgH - faceCenterY);
+    const maxCentered = Math.min(maxCenteredW, maxCenteredH);
+    // Use ideal size if it fits centered, otherwise shrink to keep face centered (face ratio increases)
+    let size = Math.min(targetSize, maxCentered, imgW, imgH);
+    // Ensure the face fits within the crop
+    size = Math.max(size, faceDim);
+    cw = ch = size;
   }
-  cw = Math.max(cw, faceW);
-  ch = Math.max(ch, faceH);
 
-  const faceCenterX = faceX + faceW / 2;
-  const faceCenterY = faceY + faceH / 2;
   let cx = Math.round(faceCenterX - cw / 2);
   let cy = Math.round(faceCenterY - ch / 2);
 
@@ -374,6 +382,7 @@ export function PersonaEditorPanel({
   const [multiFaceWarning, setMultiFaceWarning] = useState(false);
   const [faceCropData, setFaceCropData] = useState<Blob | null>(null);
   const [referencePhotoData, setReferencePhotoData] = useState<Uint8Array | null>(persona?.referencePhotoData || null);
+  const [isNewPhoto, setIsNewPhoto] = useState(false); // Track whether user uploaded a new photo this session
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoPreviewRef = useRef<string | null>(null);
   // Track which photoData the current visionDescription belongs to, to prevent re-analysis
@@ -529,6 +538,7 @@ export function PersonaEditorPanel({
           setMultiFaceWarning(false);
           setFaceCropData(null);
           setReferencePhotoData(null);
+          setIsNewPhoto(true);
           // Create preview
           const previewUrl = URL.createObjectURL(blob);
           setPhotoPreview(prev => {
@@ -728,12 +738,19 @@ export function PersonaEditorPanel({
               onClick={() => fileInputRef.current?.click()}
               style={{ cursor: 'pointer', marginBottom: '8px' }}
             >
-              {(faceCropPreviewUrl || photoPreview) ? (
+              {faceCropPreviewUrl ? (
                 <div style={{
                   width: '80px', height: '80px', borderRadius: '50%', overflow: 'hidden',
                   border: '2px solid rgba(255,255,255,0.15)',
                 }}>
-                  <img src={faceCropPreviewUrl || photoPreview!} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={faceCropPreviewUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+              ) : isNewPhoto && photoPreview ? (
+                <div style={{
+                  width: '80px', height: '80px', borderRadius: '50%', overflow: 'hidden',
+                  border: '2px solid rgba(255,255,255,0.15)',
+                }}>
+                  <img src={photoPreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
               ) : (
                 <PersonaAvatar
