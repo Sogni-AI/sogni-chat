@@ -207,14 +207,10 @@ function computeFaceCrop(
     cw = Math.max(cw, faceW);
     ch = Math.max(ch, faceH);
   } else {
-    // Square: prioritize keeping face centered to avoid off-center faces in circular avatars.
-    // Compute the largest centered square that fits within image bounds around the face center.
-    const maxCenteredW = 2 * Math.min(faceCenterX, imgW - faceCenterX);
-    const maxCenteredH = 2 * Math.min(faceCenterY, imgH - faceCenterY);
-    const maxCentered = Math.min(maxCenteredW, maxCenteredH);
-    // Use ideal size if it fits centered, otherwise shrink to keep face centered (face ratio increases)
-    let size = Math.min(targetSize, maxCentered, imgW, imgH);
-    // Ensure the face fits within the crop
+    // Square: size the crop so the face fills `faceRatio` of the output circle.
+    // Allow slight off-centering (face may shift from dead-center after clamping)
+    // rather than shrinking the crop, which would make the face appear too small.
+    let size = Math.min(targetSize, imgW, imgH);
     size = Math.max(size, faceDim);
     cw = ch = size;
   }
@@ -233,14 +229,14 @@ function computeFaceCrop(
   return { cx, cy, cw: Math.min(cw, imgW - cx), ch: Math.min(ch, imgH - cy) };
 }
 
-/** Crop to face for avatar display — square, face ≈55%, 512px output (retina-ready) */
+/** Crop to face for avatar display — square, face ≈65%, 512px output (retina-ready) */
 async function cropToFace(
   photoData: Uint8Array,
   mimeType: string,
   faceBox: { x: number; y: number; w: number; h: number },
 ): Promise<Blob> {
   return withLoadedImage(photoData, mimeType, (img) => {
-    const crop = computeFaceCrop(img.width, img.height, faceBox, 0.55);
+    const crop = computeFaceCrop(img.width, img.height, faceBox, 0.65);
     if (!crop) throw new Error('Face box too small');
 
     const canvas = document.createElement('canvas');
@@ -743,14 +739,14 @@ export function PersonaEditorPanel({
                   width: '80px', height: '80px', borderRadius: '50%', overflow: 'hidden',
                   border: '2px solid rgba(255,255,255,0.15)',
                 }}>
-                  <img src={faceCropPreviewUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={faceCropPreviewUrl} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scale(1.08)' }} />
                 </div>
               ) : isNewPhoto && photoPreview ? (
                 <div style={{
                   width: '80px', height: '80px', borderRadius: '50%', overflow: 'hidden',
                   border: '2px solid rgba(255,255,255,0.15)',
                 }}>
-                  <img src={photoPreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={photoPreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scale(1.08)' }} />
                 </div>
               ) : (
                 <PersonaAvatar

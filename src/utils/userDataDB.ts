@@ -244,7 +244,7 @@ export async function getPersonaThumbnail(personaId: string): Promise<PersonaThu
   });
 }
 
-/** Generate a JPEG thumbnail from a Blob using canvas (160px for retina displays) */
+/** Generate a square JPEG thumbnail from a Blob using canvas (160px for retina displays) */
 export function generatePersonaThumbnail(blob: Blob, maxWidth = 160): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -256,19 +256,23 @@ export function generatePersonaThumbnail(blob: Blob, maxWidth = 160): Promise<Bl
         reject(new Error('Invalid image dimensions'));
         return;
       }
-      const scale = Math.min(maxWidth / img.width, maxWidth / img.height, 1);
-      const w = Math.round(img.width * scale);
-      const h = Math.round(img.height * scale);
+      // Center-crop to square, then scale to maxWidth (ensures good circular avatar display)
+      const cropSize = Math.min(img.width, img.height);
+      const sx = Math.round((img.width - cropSize) / 2);
+      const sy = Math.round((img.height - cropSize) / 2);
+      const outSize = Math.min(maxWidth, cropSize);
 
       const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
+      canvas.width = outSize;
+      canvas.height = outSize;
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         reject(new Error('Canvas not supported'));
         return;
       }
-      ctx.drawImage(img, 0, 0, w, h);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, sx, sy, cropSize, cropSize, 0, 0, outSize, outSize);
       canvas.toBlob(
         (result) => {
           if (result) resolve(result);
