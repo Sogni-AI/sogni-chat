@@ -19,6 +19,7 @@ interface PersonaAvatarProps {
   name: string;
   size?: AvatarSize;
   getThumbnailUrl: (personaId: string) => Promise<string | null>;
+  updatedAt?: number;
   onClick?: () => void;
   style?: CSSProperties;
 }
@@ -28,6 +29,7 @@ export function PersonaAvatar({
   name,
   size = 'md',
   getThumbnailUrl,
+  updatedAt,
   onClick,
   style,
 }: PersonaAvatarProps) {
@@ -35,12 +37,13 @@ export function PersonaAvatar({
   const px = SIZE_MAP[size];
 
   useEffect(() => {
+    setThumbUrl(null);
     let cancelled = false;
     getThumbnailUrl(personaId).then(url => {
       if (!cancelled) setThumbUrl(url);
     });
     return () => { cancelled = true; };
-  }, [personaId, getThumbnailUrl]);
+  }, [personaId, getThumbnailUrl, updatedAt]);
 
   const initials = (name || '?').split(' ').filter(w => w.length > 0).map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?';
 

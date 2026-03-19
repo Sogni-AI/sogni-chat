@@ -62,6 +62,7 @@ export function PersonaSection({
             name={p.name}
             size="sm"
             getThumbnailUrl={getThumbnailUrl}
+            updatedAt={p.updatedAt}
             onClick={() => handleAvatarClick(p.id)}
           />
         ))}
@@ -151,6 +152,7 @@ export function PersonaSection({
                 name={p.name}
                 size="md"
                 getThumbnailUrl={getThumbnailUrl}
+                updatedAt={p.updatedAt}
                 onClick={() => handleAvatarClick(p.id)}
               />
               <span style={{ fontSize: '0.625rem', color: '#8e8e8e', maxWidth: '44px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>

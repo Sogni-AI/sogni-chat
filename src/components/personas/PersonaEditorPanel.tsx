@@ -25,34 +25,34 @@ const RELATIONSHIP_HINTS: Record<string, {
 }> = {
   self: {
     namePlaceholder: 'e.g. Mark, Sarah',
-    nameHelp: 'Your first name — used in chat like &quot;make a picture of me&quot; or &quot;make a picture of Mark&quot;',
+    nameHelp: 'Your first name — used in chat like "make a picture of me" or "make a picture of Mark"',
     descPlaceholder: 'e.g. Brown eyes, curly dark hair, tall and athletic',
     descHelp: 'Physical features the AI should capture. With a photo uploaded, this is auto-generated.',
     nickPlaceholder: 'e.g. bro, dude',
-    nickHelp: 'Extra nicknames beyond the basics. &quot;Me&quot; and &quot;myself&quot; are already built-in for the Self relationship.',
+    nickHelp: 'Extra nicknames beyond the basics. "Me" and "myself" are already built-in for the Self relationship.',
     photoTip: 'Adding a photo gives much better results than text descriptions alone.',
   },
   partner: {
     namePlaceholder: 'e.g. Sarah, James',
-    nameHelp: 'Their name — used in chat like &quot;make a picture of me and Sarah&quot;',
+    nameHelp: 'Their name — used in chat like "make a picture of me and Sarah"',
     descPlaceholder: 'e.g. Green eyes, long blonde hair, petite build',
     descHelp: 'Physical features that make them recognizable. A photo is best, but this helps supplement it.',
     nickPlaceholder: 'e.g. babe, honey',
-    nickHelp: 'Extra nicknames. &quot;My wife&quot;, &quot;my husband&quot;, and &quot;my partner&quot; are already built-in for this relationship.',
+    nickHelp: 'Extra nicknames. "My wife", "my husband", and "my partner" are already built-in for this relationship.',
     photoTip: 'A clear photo helps the AI accurately depict your partner.',
   },
   child: {
     namePlaceholder: 'e.g. Mei, Oliver',
-    nameHelp: 'Their name — used in chat like &quot;make a picture of Mei at the park&quot;',
+    nameHelp: 'Their name — used in chat like "make a picture of Mei at the park"',
     descPlaceholder: 'e.g. 3 years old, big brown eyes, dark pigtails, chubby cheeks',
     descHelp: 'Include approximate age — it helps the AI get proportions right. Kids change fast, so update the photo periodically.',
     nickPlaceholder: 'e.g. kiddo, little one, bug',
-    nickHelp: 'Extra nicknames. &quot;My son&quot;, &quot;my daughter&quot;, and &quot;my kid&quot; are already built-in for this relationship.',
+    nickHelp: 'Extra nicknames. "My son", "my daughter", and "my kid" are already built-in for this relationship.',
     photoTip: 'A recent photo works best since kids change quickly.',
   },
   friend: {
     namePlaceholder: 'e.g. Alex, Jordan',
-    nameHelp: 'Their name — used in chat like &quot;put Alex and me at a concert&quot;',
+    nameHelp: 'Their name — used in chat like "put Alex and me at a concert"',
     descPlaceholder: 'e.g. Red hair, freckles, glasses, medium build',
     descHelp: 'Physical features the AI should capture when generating images with this person.',
     nickPlaceholder: 'e.g. bestie, roommate',
@@ -61,11 +61,11 @@ const RELATIONSHIP_HINTS: Record<string, {
   },
   pet: {
     namePlaceholder: 'e.g. Luna, Max, Whiskers',
-    nameHelp: 'Your pet\'s name — used in chat like &quot;make a picture of Luna on the beach&quot;',
+    nameHelp: 'Your pet\'s name — used in chat like "make a picture of Luna on the beach"',
     descPlaceholder: 'e.g. Golden retriever, fluffy coat, brown eyes, medium size',
     descHelp: 'Include breed, color, size, and any distinguishing markings.',
     nickPlaceholder: 'e.g. good boy, fluffball, the pup',
-    nickHelp: 'Extra nicknames. &quot;My dog&quot;, &quot;my cat&quot;, and &quot;my pet&quot; are already built-in for this relationship.',
+    nickHelp: 'Extra nicknames. "My dog", "my cat", and "my pet" are already built-in for this relationship.',
     photoTip: 'A clear photo of your pet helps the AI get breed and markings right.',
   },
   other: {
@@ -110,8 +110,9 @@ function HelpTip({ text }: { text: string }) {
           width: '220px', zIndex: 10, boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
           animation: 'backdropFadeIn 0.1s ease', pointerEvents: 'none',
         }}
-          dangerouslySetInnerHTML={{ __html: text }}
-        />
+        >
+          {text}
+        </span>
       )}
     </span>
   );
@@ -314,7 +315,7 @@ export function PersonaEditorPanel({
 }: PersonaEditorPanelProps) {
   const isEditMode = !!persona;
   const [name, setName] = useState(persona?.name || '');
-  const [relationship, setRelationship] = useState(persona?.relationship || 'self');
+  const [relationship, setRelationship] = useState(persona?.relationship || 'friend');
   const [description, setDescription] = useState(persona?.description || '');
   const [tags, setTags] = useState<string[]>(persona?.tags || []);
   const [tagInput, setTagInput] = useState('');
@@ -699,6 +700,7 @@ export function PersonaEditorPanel({
                   name={name || '?'}
                   size="lg"
                   getThumbnailUrl={getThumbnailUrl}
+                  updatedAt={persona?.updatedAt}
                 />
               )}
             </div>
@@ -789,7 +791,7 @@ export function PersonaEditorPanel({
               <label style={{ fontSize: '0.75rem', fontWeight: 600, color: '#8e8e8e', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Relationship
               </label>
-              <HelpTip text="Helps the AI understand context when you say things like &quot;me and my wife&quot; or &quot;a photo with my dog&quot;" />
+              <HelpTip text={'Helps the AI understand context when you say things like "me and my wife" or "a photo with my dog"'} />
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {RELATIONSHIPS.map(r => (
@@ -974,7 +976,7 @@ export function PersonaEditorPanel({
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
               <path d="M7 11V7a5 5 0 0110 0v4" />
             </svg>
-            Photos stay on your device
+            Photos are stored on your device. Analysis uses the Sogni AI service.
           </div>
         </div>
 

@@ -40,8 +40,9 @@ export async function execute(
     }
 
     // Count pre-existing images so picture numbering accounts for user uploads
-    const preExistingImageCount = context.uploadedFiles.filter(f => f.type === 'image').length
-      + (context.imageData ? 1 : 0); // legacy imageData also becomes a context image
+    // Note: context.imageData is always the .data of the first image in uploadedFiles
+    // (same Uint8Array reference), so we must NOT count it separately.
+    const preExistingImageCount = context.uploadedFiles.filter(f => f.type === 'image').length;
 
     // Inject persona photos into context.uploadedFiles
     const personaMap: Record<number, { name: string; description: string; relationship: string }> = {};

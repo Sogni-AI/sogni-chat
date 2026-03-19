@@ -80,7 +80,7 @@ async function buildPersonaContext(): Promise<string> {
 }
 
 /** Build compact memory context for system message injection (capped at ~200 chars) */
-async function buildMemoryContext(): Promise<string> {
+export async function buildMemoryContext(): Promise<string> {
   try {
     const memories = await getAllMemories();
     if (memories.length === 0) return '';
@@ -185,14 +185,12 @@ export async function sendChatMessage(
   let toolRound = 0;
   let streamNullRetries = 0;
 
-  // Build persona/memory context once (not per tool round)
+  // Build persona context once (not per tool round)
   const personaContext = await buildPersonaContext();
-  const memoryContext = await buildMemoryContext();
   const dynamicSystemPrompt = CHAT_SYSTEM_PROMPT
     + (personaContext
-      ? `\nUser's people: ${personaContext}. Call resolve_personas for image creation with these people. Suggest adding unknown names to My People.`
-      : `\nTo include people in creations, suggest they add them in My People.`)
-    + (memoryContext ? `\nUser prefs: ${memoryContext}` : '');
+      ? `\nUser's people: ${personaContext}. Call resolve_personas for image creation with these people. If user mentions a specific person by name who is not listed, suggest they add them to My People.`
+      : '');
 
   // Verify the chat API is available on this client instance
   if (!sogniClient.chat?.completions) {
