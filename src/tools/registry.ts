@@ -156,10 +156,14 @@ class ToolRegistry {
       },
     };
 
-    const timeoutContext = { ...context, signal: timeoutController.signal };
+    // Override the signal directly on the context object (instead of shallow-
+    // copying) so that mutations made by the tool handler (e.g. resolve_personas
+    // injecting persona photos into context.uploadedFiles) propagate to
+    // subsequent tool calls that share the same context object.
+    context.signal = timeoutController.signal;
 
     try {
-      const result = await handler.execute(effectiveArgs, timeoutContext, activityCallbacks);
+      const result = await handler.execute(effectiveArgs, context, activityCallbacks);
       clearTimeout(timeoutId);
       return result;
     } catch (err) {
@@ -175,6 +179,8 @@ class ToolRegistry {
 
       console.error(`[TOOL REGISTRY] Error executing "${name}":`, message);
       return JSON.stringify({ error: `Unexpected error executing ${name}: ${message}` });
+    } finally {
+      context.signal = originalSignal;
     }
   }
 

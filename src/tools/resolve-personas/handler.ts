@@ -51,7 +51,7 @@ export async function execute(
     for (const persona of personas) {
       const photoToUse = persona.referencePhotoData || persona.photoData;
       if (photoToUse) {
-        const contextImageIndex = userFiles.length + injectedCount;
+        const contextImageIndex = userFiles.length; // index before push
         userFiles.push({
           type: 'image',
           data: photoToUse,
