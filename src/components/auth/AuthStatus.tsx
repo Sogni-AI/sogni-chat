@@ -46,6 +46,13 @@ export function AuthStatus() {
     };
   }, [open]);
 
+  // Open memory viewer when a memory chip is clicked in chat
+  useEffect(() => {
+    const handler = () => setShowMemoryViewer(true);
+    window.addEventListener('sogni-open-memory-viewer', handler);
+    return () => window.removeEventListener('sogni-open-memory-viewer', handler);
+  }, []);
+
   const currentBalance = balances?.[tokenType]?.net ?? '0';
   const tokenLabel = getTokenLabel(tokenType);
   const balanceNum = parseFloat(currentBalance);

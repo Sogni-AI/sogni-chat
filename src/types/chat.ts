@@ -43,6 +43,8 @@ export interface UIChatMessage {
   isRecoveryMessage?: boolean;
   /** Persona names used for this generation (persisted for retry re-injection) */
   referencedPersonas?: string[];
+  /** Memory chip: present when the LLM saved a user memory via manage_memory tool */
+  memorySaved?: { key: string; value: string };
 }
 
 /** Full chat session stored in IndexedDB */

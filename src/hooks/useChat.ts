@@ -2,7 +2,7 @@
  * React hook for managing chat-based restoration assistant state.
  * Session persistence is handled externally by useChatSessions (IndexedDB).
  */
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type { ChatMessage } from '@sogni-ai/sogni-client';
 import type { SogniClient } from '@sogni-ai/sogni-client';
 import { sendChatMessage, sendVisionAnalysis } from '@/services/chatService';
@@ -1712,6 +1712,23 @@ export function useChat(): UseChatResult {
     },
     [], // No dependencies needed - all mutable state accessed via refs/stable setters
   );
+
+  // Inject a memory-saved chip into the chat when the manage_memory tool writes
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { key, value } = (e as CustomEvent<{ key: string; value: string }>).detail;
+      const chipMsg: UIChatMessage = {
+        id: `memory-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        role: 'system',
+        content: '',
+        timestamp: Date.now(),
+        memorySaved: { key, value },
+      };
+      setUIMessages((prev) => [...prev, chipMsg]);
+    };
+    window.addEventListener('sogni-memory-saved', handler);
+    return () => window.removeEventListener('sogni-memory-saved', handler);
+  }, []);
 
   return {
     messages: uiMessages,

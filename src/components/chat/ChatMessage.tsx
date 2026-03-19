@@ -143,6 +143,51 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
     );
   }
 
+  // Memory-saved chip
+  if (message.memorySaved) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '0.375rem 0' }}>
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent('sogni-open-memory-viewer'))}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.375rem',
+            padding: '0.3125rem 0.75rem',
+            borderRadius: '999px',
+            border: '1px solid rgba(168, 130, 255, 0.2)',
+            background: 'rgba(168, 130, 255, 0.08)',
+            color: '#c4a8ff',
+            fontSize: '0.75rem',
+            fontWeight: 500,
+            cursor: 'pointer',
+            transition: 'background 0.15s, border-color 0.15s',
+            maxWidth: '90%',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(168, 130, 255, 0.15)';
+            e.currentTarget.style.borderColor = 'rgba(168, 130, 255, 0.35)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(168, 130, 255, 0.08)';
+            e.currentTarget.style.borderColor = 'rgba(168, 130, 255, 0.2)';
+          }}
+        >
+          <span style={{ fontSize: '0.8125rem', lineHeight: 1 }}>🧠</span>
+          <span>Memory saved</span>
+          <span style={{
+            color: 'rgba(196, 168, 255, 0.7)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>
+            {message.memorySaved.value}
+          </span>
+        </button>
+      </div>
+    );
+  }
+
   // System notification
   if (isSystem && hasVisibleContent) {
     return (

@@ -79,6 +79,9 @@ export async function execute(
         const { created } = await upsertMemoryByKey(key, value, safeCategory, 'llm');
         notifyMemoryUpdate();
 
+        // Notify chat UI to render a memory-saved chip
+        window.dispatchEvent(new CustomEvent('sogni-memory-saved', { detail: { key, value } }));
+
         callbacks.onToolProgress({ type: 'completed', toolName: 'manage_memory', progress: 1 });
         callbacks.onToolComplete('manage_memory', []);
 
