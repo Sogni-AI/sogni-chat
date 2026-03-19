@@ -139,11 +139,6 @@ export interface UseChatResult {
 
 const MAX_CONCURRENT_REQUESTS = 2;
 
-const WELCOME_MESSAGE_WITH_IMAGE =
-  "I can see your photo! I can restore it, apply artistic styles, animate it into a video, change the camera angle, edit details, and more — just describe what you want in your own words.";
-
-const WELCOME_MESSAGE_NO_IMAGE =
-  "What would you like to create? I can generate images, create videos, and compose music.";
 
 interface WelcomeContext {
   hasImage: boolean;
@@ -158,25 +153,45 @@ function getTimeOfDayGreeting(): string {
   return 'Evening';
 }
 
+/** Pick a random greeting template. Templates use {time} and {name} placeholders. */
+function getRandomGreeting(name: string): string {
+  const time = getTimeOfDayGreeting();
+  const templates = [
+    `${time}, ${name}!`,
+    `Good ${time.toLowerCase()}, ${name}!`,
+    `Hey ${name}!`,
+    `Welcome back, ${name}!`,
+    `Happy creating, ${name}!`,
+    `Ready to create, ${name}?`,
+  ];
+  return templates[Math.floor(Math.random() * templates.length)];
+}
+
+/** Build a greeting for the welcome heading (exported for ChatPanel). */
+export function getWelcomeGreeting(userName?: string | null): string {
+  const name = userName || 'Creator';
+  return getRandomGreeting(name);
+}
+
 function makeWelcomeMessage(ctx: WelcomeContext | boolean): UIChatMessage {
   // Backward compat: accept plain boolean
   const { hasImage, userName, hasPersonas } = typeof ctx === 'boolean'
     ? { hasImage: ctx, userName: undefined, hasPersonas: undefined }
     : ctx;
 
+  const greeting = getRandomGreeting(userName || 'Creator');
+
   let content: string;
   if (hasImage) {
-    content = userName
-      ? `${getTimeOfDayGreeting()}, ${userName}! I can see your photo — I can restore it, apply artistic styles, animate it into a video, change the camera angle, edit details, and more.`
-      : WELCOME_MESSAGE_WITH_IMAGE;
+    content = `${greeting} I can see your photo — I can restore it, apply artistic styles, animate it into a video, change the camera angle, edit details, and more.`;
   } else if (userName) {
     if (hasPersonas === false) {
-      content = `${getTimeOfDayGreeting()}, ${userName}! I can create images, videos, music, and more. Want to personalize your experience? Add yourself in "My People" so I can include you in creations.`;
+      content = `${greeting} I can create images, videos, music, and more. Want to personalize your experience? Add yourself in "My People" so I can include you in creations.`;
     } else {
-      content = `${getTimeOfDayGreeting()}, ${userName}! What would you like to create? I can generate images, create videos, and compose music.`;
+      content = `${greeting} What would you like to create?`;
     }
   } else {
-    content = WELCOME_MESSAGE_NO_IMAGE;
+    content = `${greeting} What would you like to create?`;
   }
 
   return {
@@ -1466,6 +1481,36 @@ export function useChat(): UseChatResult {
         think: effectiveThink,
         sessionId: capturedSessionId || '',
       };
+
+      // If the original generation used personas, re-inject their reference photos
+      // from the DB (they don't persist in uploadedFiles across sessions/retries).
+      const referencedPersonas = targetMessage.toolProgress?.referencedPersonas;
+      if (referencedPersonas && referencedPersonas.length > 0) {
+        try {
+          const { getPersonasByNames } = await import('@/utils/userDataDB');
+          const personas = await getPersonasByNames(referencedPersonas);
+          // Remove any stale persona files, then inject fresh ones
+          executionContext.uploadedFiles = executionContext.uploadedFiles.filter(
+            f => !f.filename?.startsWith('persona-'),
+          );
+          for (const persona of personas) {
+            const photoToUse = persona.referencePhotoData || persona.photoData;
+            if (photoToUse) {
+              executionContext.uploadedFiles.push({
+                type: 'image' as const,
+                data: photoToUse,
+                width: persona.referencePhotoData ? undefined : (persona.photoWidth || undefined),
+                height: persona.referencePhotoData ? undefined : (persona.photoHeight || undefined),
+                mimeType: persona.photoMimeType || 'image/jpeg',
+                filename: `persona-${persona.name.toLowerCase().replace(/\s+/g, '-')}.jpg`,
+              });
+            }
+          }
+          console.log(`[CHAT HOOK] Re-injected ${personas.length} persona photos for retry`);
+        } catch (err) {
+          console.warn('[CHAT HOOK] Failed to re-inject persona photos for retry:', err);
+        }
+      }
 
       let retryResultUrls: string[] = [];
       let retryVideoUrls: string[] = [];
