@@ -572,8 +572,59 @@ export function useChat(): UseChatResult {
         };
 
         let accumulatedContent = '';
+        let displayedContent = '';
         let currentToolResultUrls: string[] = [];
         let currentToolVideoUrls: string[] = [];
+
+        // Token buffer — releases characters at a steady pace for a
+        // natural typing feel instead of dumping whole chunks at once.
+        const TOKEN_REVEAL_INTERVAL_MS = 12;
+        const CHARS_PER_TICK = 3;
+        let tokenBufferTimer: ReturnType<typeof setInterval> | null = null;
+
+        const flushTokenBuffer = () => {
+          // Instantly reveal all remaining buffered content
+          if (tokenBufferTimer) {
+            clearInterval(tokenBufferTimer);
+            tokenBufferTimer = null;
+          }
+          if (displayedContent !== accumulatedContent) {
+            displayedContent = accumulatedContent;
+            const currentContent = displayedContent;
+            const targetId = localStreamingId.current;
+            setUIMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === targetId
+                  ? { ...msg, content: currentContent, streamingStatus: undefined, toolProgress: null }
+                  : msg,
+              ),
+            );
+          }
+        };
+
+        const startTokenBuffer = () => {
+          if (tokenBufferTimer) return;
+          tokenBufferTimer = setInterval(() => {
+            if (displayedContent.length >= accumulatedContent.length) {
+              // Caught up — pause the timer until more tokens arrive
+              if (tokenBufferTimer) {
+                clearInterval(tokenBufferTimer);
+                tokenBufferTimer = null;
+              }
+              return;
+            }
+            displayedContent = accumulatedContent.slice(0, displayedContent.length + CHARS_PER_TICK);
+            const currentContent = displayedContent;
+            const targetId = localStreamingId.current;
+            setUIMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === targetId
+                  ? { ...msg, content: currentContent, streamingStatus: undefined, toolProgress: null }
+                  : msg,
+              ),
+            );
+          }, TOKEN_REVEAL_INTERVAL_MS);
+        };
 
         try {
           const updatedConversation = await sendChatMessage(
@@ -584,31 +635,13 @@ export function useChat(): UseChatResult {
                 if (thisRequest.aborted) return;
                 if (!isActiveSession()) return;
                 accumulatedContent += token;
-                const currentContent = accumulatedContent;
-                const targetId = localStreamingId.current;
-                setUIMessages((prev) =>
-                  prev.map((msg) =>
-                    msg.id === targetId
-                      ? {
-                          ...msg,
-                          content: currentContent,
-                          streamingStatus: undefined,
-                          // Clear stale toolProgress when LLM starts streaming.
-                          // After a tool error (no onToolComplete), the previous
-                          // 'started'/'progress' state persists. Tokens arriving
-                          // means the LLM is responding, so any previous tool
-                          // progress is stale. (onToken only fires during the
-                          // streaming phase, never during tool execution.)
-                          toolProgress: null,
-                        }
-                      : msg,
-                  ),
-                );
+                startTokenBuffer();
               },
 
               onToolCall: (toolName: ToolName, toolCallArgs: Record<string, unknown>) => {
                 if (thisRequest.aborted) return;
                 if (!isActiveSession()) return;
+                flushTokenBuffer();
                 console.log('[CHAT HOOK] Tool called:', toolName);
                 const targetId = localStreamingId.current;
                 setUIMessages((prev) =>
@@ -857,6 +890,7 @@ export function useChat(): UseChatResult {
               onComplete: (_fullContent: string) => {
                 if (thisRequest.aborted) return;
                 if (!isActiveSession()) return;
+                flushTokenBuffer();
                 // Mark the current streaming message as done.
                 // Also clear any leftover toolProgress — if a tool returned an error
                 // without calling onToolComplete, the spinner would persist forever.
@@ -884,6 +918,7 @@ export function useChat(): UseChatResult {
               onError: (errorMsg: string) => {
                 if (thisRequest.aborted) return;
                 if (!isActiveSession()) return;
+                flushTokenBuffer();
                 setError(errorMsg);
                 const currentMsgId = localStreamingId.current;
                 setUIMessages((prev) =>
@@ -957,6 +992,11 @@ export function useChat(): UseChatResult {
             }
           }
         } finally {
+          // Clean up token buffer timer
+          if (tokenBufferTimer) {
+            clearInterval(tokenBufferTimer);
+            tokenBufferTimer = null;
+          }
           controllersSet.delete(toolAbortController);
 
           if (isActiveSession()) {

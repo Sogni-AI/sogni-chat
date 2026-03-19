@@ -3,7 +3,7 @@
  * Supports expanded (full row) and collapsed (icon stack) modes.
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState, useRef, useEffect } from 'react';
 import type { PersonaSummary } from '@/types/userData';
 
 /** Sort order: self first, partner second, then everyone else by updatedAt */
@@ -26,6 +26,83 @@ interface PersonaSectionProps {
   onAddPersona: () => void;
   onEditPersona: (id: string) => void;
   getThumbnailUrl: (personaId: string) => Promise<string | null>;
+}
+
+/** Info tooltip explaining the Personas feature */
+function PersonaInfoTooltip() {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-flex' }}>
+      <button
+        onClick={() => setOpen(!open)}
+        aria-label="What are Personas?"
+        style={{
+          width: '14px', height: '14px', borderRadius: '50%', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', background: 'none',
+          border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer',
+          color: '#8e8e8e', padding: 0, fontSize: '0.5625rem', fontWeight: 700,
+          lineHeight: 1, transition: 'color 0.15s, border-color 0.15s',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = '#ececec'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)'; }}
+        onMouseLeave={(e) => { if (!open) { e.currentTarget.style.color = '#8e8e8e'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'; } }}
+      >
+        i
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute',
+          bottom: 'calc(100% + 8px)',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '240px',
+          padding: '10px 12px',
+          background: '#2a2a2a',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: '10px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+          zIndex: 100,
+          animation: 'menuFadeIn 0.15s ease-out',
+        }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#d4d4d4', marginBottom: '4px' }}>
+            What are Personas?
+          </div>
+          <div style={{ fontSize: '0.6875rem', color: '#999', lineHeight: 1.5 }}>
+            Personas teach your Creative Agent who you are and what you look like — and anyone else you want it to generate images, videos, and content with. All persona data is stored locally on your device.
+          </div>
+          {/* Arrow */}
+          <div style={{
+            position: 'absolute',
+            bottom: '-5px',
+            left: '50%',
+            transform: 'translateX(-50%) rotate(45deg)',
+            width: '8px',
+            height: '8px',
+            background: '#2a2a2a',
+            borderRight: '1px solid rgba(255,255,255,0.12)',
+            borderBottom: '1px solid rgba(255,255,255,0.12)',
+          }} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function PersonaSection({
@@ -110,15 +187,31 @@ export function PersonaSection({
         justifyContent: 'space-between',
         padding: '8px 0 6px',
       }}>
-        <span style={{
-          fontSize: '0.6875rem',
-          fontWeight: 600,
-          letterSpacing: '0.06em',
-          textTransform: 'uppercase',
-          color: '#8e8e8e',
-        }}>
-          My Personas
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{
+            fontSize: '0.6875rem',
+            fontWeight: 600,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            color: '#8e8e8e',
+          }}>
+            My Personas
+          </span>
+          <span style={{
+            fontSize: '0.5625rem',
+            fontWeight: 700,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            color: '#00e5ff',
+            background: 'rgba(0, 229, 255, 0.12)',
+            padding: '1px 5px',
+            borderRadius: '4px',
+            lineHeight: '1.4',
+          }}>
+            New
+          </span>
+          <PersonaInfoTooltip />
+        </div>
         <button
           onClick={onAddPersona}
           style={{

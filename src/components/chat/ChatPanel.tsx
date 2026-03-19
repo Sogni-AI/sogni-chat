@@ -75,6 +75,8 @@ interface ChatPanelProps {
   hasPersonas?: boolean;
   /** Personalized welcome heading (e.g. "Evening, Mark!") */
   welcomeGreeting?: string;
+  /** Opens the persona editor to add a new persona */
+  onAddPersona?: () => void;
 }
 
 /** Minimal dropdown for quality tier selection */
@@ -191,7 +193,7 @@ export function ChatPanel({
   onContentFilterChange,
   onResultsChange,
   onLoadingChange,
-  onUploadClick,
+  onUploadClick: _onUploadClick,
   uploadIntent,
   onTokenSwitch,
   onInsufficientCredits,
@@ -210,6 +212,7 @@ export function ChatPanel({
   onRetry,
   hasPersonas,
   welcomeGreeting,
+  onAddPersona,
 }: ChatPanelProps) {
   const { selectedModelVariant, setSelectedModelVariant } = useLayout();
   const isMobile = useMediaQuery('(max-width: 743px)');
@@ -648,118 +651,74 @@ export function ChatPanel({
                 {welcomeGreeting || 'What would you like to create?'}
               </h1>
 
-              {/* Category chips */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', justifyContent: 'center', marginBottom: '2rem' }}>
-                {[
-                  { label: 'Generate an image', prompt: 'Generate an image', icon: 'image' },
-                  { label: 'Create a video', prompt: 'Create a video', icon: 'video' },
-                  { label: 'Compose music', prompt: 'Compose music', icon: 'music' },
-                ].map((chip) => (
-                  <button
-                    key={chip.label}
-                    onClick={() => handleSend(chip.prompt)}
-                    disabled={!canSend}
-                    className="radiant-orb-hover"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.625rem 1.25rem',
-                      background: 'rgba(255, 255, 255, 0.08)',
-                      border: '1px solid rgba(255, 255, 255, 0.12)',
-                      borderRadius: 'var(--radius-pill)',
-                      cursor: canSend ? 'pointer' : 'default',
-                      color: '#ececec',
-                      fontSize: '0.875rem',
-                      fontWeight: 500,
-                      transition: 'all 0.2s',
-                      opacity: canSend ? 1 : 0.5,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!canSend) return;
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.14)';
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
-                    }}
-                  >
-                    {chip.icon === 'image' && (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                        <circle cx="8.5" cy="8.5" r="1.5" />
-                        <polyline points="21 15 16 10 5 21" />
-                      </svg>
-                    )}
-                    {chip.icon === 'video' && (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <polygon points="23 7 16 12 23 17 23 7" />
-                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-                      </svg>
-                    )}
-                    {chip.icon === 'music' && (
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M9 18V5l12-2v13" />
-                        <circle cx="6" cy="18" r="3" />
-                        <circle cx="18" cy="16" r="3" />
-                      </svg>
-                    )}
-                    {chip.label}
-                  </button>
-                ))}
-              </div>
+              {/* What can I do? chip */}
+              <button
+                onClick={() => handleSend('What can I do? Give me a comprehensive overview of all your creative capabilities with concrete examples for each.')}
+                disabled={!canSend}
+                className="radiant-orb-hover"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '0.375rem 0.875rem',
+                  background: 'transparent',
+                  border: '1px solid rgba(255, 255, 255, 0.10)',
+                  borderRadius: 'var(--radius-pill)',
+                  cursor: canSend ? 'pointer' : 'default',
+                  color: '#8e8e8e',
+                  fontSize: '0.8125rem',
+                  fontWeight: 400,
+                  transition: 'all 0.2s',
+                  opacity: canSend ? 1 : 0.5,
+                }}
+                onMouseEnter={(e) => {
+                  if (!canSend) return;
+                  e.currentTarget.style.color = '#ececec';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.22)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = '#8e8e8e';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.10)';
+                }}
+              >
+                What can I do?
+              </button>
 
-              {/* Upload row */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'center' }}>
-                {[
-                  { label: 'Upload a photo to animate', intent: 'video' as const },
-                  { label: 'Upload a photo to edit', intent: 'edit' as const },
-                  { label: 'Upload a photo to restore', intent: 'restore' as const },
-                ].map((item) => (
-                  <button
-                    key={item.intent}
-                    onClick={() => onUploadClick?.(item.intent)}
-                    disabled={!canSend}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.5rem 1rem',
-                      background: 'transparent',
-                      border: '1px solid rgba(255, 255, 255, 0.08)',
-                      borderRadius: 'var(--radius-pill)',
-                      cursor: canSend ? 'pointer' : 'default',
-                      color: '#8e8e8e',
-                      fontSize: '0.8125rem',
-                      fontWeight: 500,
-                      transition: 'all 0.2s',
-                      opacity: canSend ? 1 : 0.5,
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!canSend) return;
-                      e.currentTarget.style.color = '#ececec';
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.color = '#8e8e8e';
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-                    }}
-                    aria-label={item.label}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <polyline points="17 8 12 3 7 8" />
-                      <line x1="12" y1="3" x2="12" y2="15" />
-                    </svg>
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-
-              <p className="drag-drop-hint" style={{ color: '#555555', fontSize: '0.75rem', marginTop: '0.5rem' }}>
-                or drag &amp; drop a file anywhere
-              </p>
+              {/* Add Persona CTA — only for logged-in users without personas */}
+              {isAuthenticated && !hasPersonas && onAddPersona && (
+                <button
+                  onClick={onAddPersona}
+                  className="radiant-orb-hover"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.375rem',
+                    padding: '0.375rem 0.875rem',
+                    background: 'transparent',
+                    border: '1px solid rgba(255, 255, 255, 0.10)',
+                    borderRadius: 'var(--radius-pill)',
+                    cursor: 'pointer',
+                    color: '#8e8e8e',
+                    fontSize: '0.8125rem',
+                    fontWeight: 400,
+                    transition: 'all 0.2s',
+                    marginTop: '0.5rem',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#ececec';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.22)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = '#8e8e8e';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.10)';
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                  Add your Persona
+                </button>
+              )}
 
             </div>
           )}

@@ -17,6 +17,8 @@ import './chat.css';
 
 /** Shared ReactMarkdown component overrides — hoisted to avoid re-creation per render */
 const markdownComponents: Components = {
+  h2: ({ children }) => <h2 style={{ fontSize: '1.1em', fontWeight: 600, margin: '1.25em 0 0.5em' }}>{children}</h2>,
+  h3: ({ children }) => <h3 style={{ fontSize: '1.05em', fontWeight: 600, margin: '1em 0 0.375em' }}>{children}</h3>,
   p: ({ children }) => <span className="chat-md-p" style={{ display: 'block' }}>{children}</span>,
   strong: ({ children }) => <strong style={{ fontWeight: 600 }}>{children}</strong>,
   ol: ({ children }) => <ol style={{ margin: '0.5em 0', paddingLeft: '1.5em' }}>{children}</ol>,
@@ -25,6 +27,7 @@ const markdownComponents: Components = {
   a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent)', textDecoration: 'underline' }}>{children}</a>,
   pre: ({ children }) => <pre style={{ background: 'rgba(255,255,255,0.06)', padding: '0.75em 1em', borderRadius: '6px', overflowX: 'auto', margin: '0.5em 0', fontSize: '0.875em' }}>{children}</pre>,
   code: ({ children }) => <code style={{ background: 'rgba(255,255,255,0.08)', padding: '0.125em 0.375em', borderRadius: '4px', fontSize: '0.875em' }}>{children}</code>,
+  hr: () => <hr style={{ margin: '1.25em 0', border: 'none', borderTop: '1px solid rgba(255,255,255,0.12)' }} />,
 };
 
 interface ChatMessageProps {

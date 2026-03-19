@@ -1110,6 +1110,7 @@ export default function ChatPage() {
               onFileDrop={handleFileDrop}
               hasPersonas={personas.length > 0}
               welcomeGreeting={welcomeGreeting}
+              onAddPersona={handleAddPersona}
               getPreviewUrl={getPreviewUrl}
               onBranchChat={handleBranchChat}
               onRetry={handleRetry}
