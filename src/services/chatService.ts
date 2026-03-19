@@ -58,6 +58,23 @@ const VISION_IMAGE_TOKENS = 1_300;
 // Persona & Memory context helpers
 // ---------------------------------------------------------------------------
 
+/** Get all persona names (plus tags/nicknames) for guardrail matching */
+async function getPersonaNames(): Promise<string[]> {
+  try {
+    const personas = await getAllPersonas();
+    const names: string[] = [];
+    for (const p of personas) {
+      names.push(p.name.toLowerCase());
+      if (p.tags?.length) {
+        for (const tag of p.tags) names.push(tag.toLowerCase());
+      }
+    }
+    return names;
+  } catch {
+    return [];
+  }
+}
+
 /** Build compact persona context for system message injection (capped at 8 names) */
 async function buildPersonaContext(): Promise<string> {
   try {
@@ -155,6 +172,7 @@ export async function sendChatMessage(
 
   // Build persona context once (not per tool round)
   const personaContext = await buildPersonaContext();
+  const personaNames = await getPersonaNames();
   const dynamicSystemPrompt = CHAT_SYSTEM_PROMPT
     + (personaContext
       ? `\nUser's people: ${personaContext}. When creating images of these people: call resolve_personas first, then use edit_image (never generate_image). When creating videos of these people: ALWAYS generate an image first (resolve_personas → edit_image), then STOP — show the image result and ask if it looks good before proceeding to animate_photo. Never chain image → video without user approval. Pronouns like "us", "we", "our" refer to these people — always call resolve_personas again for each new image generation, even in follow-up messages. If user mentions someone not listed, suggest adding them to My Personas.`
@@ -329,14 +347,53 @@ export async function sendChatMessage(
           }
         }
 
-        // Guardrail: if the LLM chose generate_image but persona reference
+        // Guardrail 1: if the LLM skipped resolve_personas and is calling
+        // generate_image while the user has personas whose names appear in the
+        // prompt, force a resolve_personas call first.  This catches the case
+        // where the LLM ignores the system prompt instruction to call
+        // resolve_personas before generating images of known people.
+        const hasPersonaPhotos = context.uploadedFiles?.some(f => f.filename?.startsWith('persona-'));
+        if (personaNames.length > 0 && !hasPersonaPhotos) {
+          for (const toolCall of result.tool_calls) {
+            if (toolCall.function.name === 'generate_image' || toolCall.function.name === 'edit_image') {
+              try {
+                const parsed = JSON.parse(toolCall.function.arguments);
+                const prompt = (parsed.prompt || '').toLowerCase();
+                const mentionsPersona = personaNames.some(name => prompt.includes(name));
+                if (mentionsPersona) {
+                  console.log('[CHAT SERVICE] Intercepting image generation — personas referenced but resolve_personas not called. Forcing resolve_personas first.');
+                  // Replace this tool call with resolve_personas using ALL persona names
+                  const uniqueNames = [...new Set(personaNames.filter(n =>
+                    prompt.includes(n)
+                  ))];
+                  // Get proper-cased names from the original personas
+                  const allPersonas = await getAllPersonas();
+                  const matchedNames = allPersonas
+                    .filter(p => {
+                      const lower = p.name.toLowerCase();
+                      const tagMatch = p.tags?.some(t => uniqueNames.includes(t.toLowerCase()));
+                      return uniqueNames.includes(lower) || tagMatch;
+                    })
+                    .map(p => p.name);
+                  toolCall.function.name = 'resolve_personas';
+                  toolCall.function.arguments = JSON.stringify({ names: matchedNames });
+                }
+              } catch {
+                // args will be parsed again downstream; skip check
+              }
+            }
+          }
+        }
+
+        // Guardrail 2: if the LLM chose generate_image but persona reference
         // photos are loaded in context, redirect to edit_image before recording
         // the tool call in conversation history.  generate_image cannot use
         // reference photos for identity preservation.
         const EDIT_IMAGE_MODELS = new Set(['qwen-lightning', 'qwen', 'flux2']);
-        const hasPersonaPhotos = context.uploadedFiles?.some(f => f.filename?.startsWith('persona-'));
+        // Re-check after guardrail 1 may have resolved personas in a previous round
+        const hasPersonaPhotosNow = context.uploadedFiles?.some(f => f.filename?.startsWith('persona-'));
         for (const toolCall of result.tool_calls) {
-          if (toolCall.function.name === 'generate_image' && hasPersonaPhotos) {
+          if (toolCall.function.name === 'generate_image' && hasPersonaPhotosNow) {
             console.log('[CHAT SERVICE] Redirecting generate_image → edit_image (persona photos in context)');
             toolCall.function.name = 'edit_image';
             // Sanitize args: drop generate_image-only params and validate model
