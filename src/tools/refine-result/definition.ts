@@ -33,7 +33,7 @@ Rules:
         numberOfVariations: {
           type: 'number',
           description:
-            'Number of variations to generate (1-16). ALWAYS use 1 unless the user explicitly asks for multiple options or a specific count. Default: 1.',
+            'Number of variations (1-16). Use 1 unless user requests multiple. Default: 1.',
           minimum: 1,
           maximum: 16,
         },

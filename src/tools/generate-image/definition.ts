@@ -17,15 +17,9 @@ export const definition: ToolDefinition = {
       properties: {
         prompt: {
           type: 'string',
-          description: `Detailed text description of the image to generate. Be specific about subject, composition, lighting, style, and mood. Use concrete visual details rather than vague adjectives. 50-200 words recommended for best results.
+          description: `Text description of the image (50-200 words). Subject first, then environment, then style/mood.
 
-Tips:
-- Describe the subject first, then environment, then style/mood.
-- Include lighting ("soft golden hour light", "dramatic studio lighting").
-- Mention composition ("close-up portrait", "wide establishing shot", "bird's eye view").
-- For photorealistic: specify camera details ("shot on Canon EOS R5, 85mm f/1.4, shallow depth of field").
-- For artistic: specify style ("oil painting", "watercolor", "digital art", "anime style").
-- Use POSITIVE phrasing only ("sharp and detailed", not "no blur").`,
+Include: lighting ("soft golden hour light"), composition ("close-up portrait", "wide shot"), and style ("oil painting", "shot on Canon EOS R5, 85mm f/1.4"). POSITIVE phrasing only.`,
         },
         model: {
           type: 'string',
@@ -52,7 +46,7 @@ Tips:
         numberOfVariations: {
           type: 'number',
           description:
-            'Number of image variations to generate (1-16). ALWAYS use 1 unless the user explicitly requests a specific quantity (e.g., "give me 4 options", "generate 3 versions"). Default: 1.',
+            'Number of variations (1-16). Use 1 unless user requests multiple. Default: 1.',
           minimum: 1,
           maximum: 16,
         },

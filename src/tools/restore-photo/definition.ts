@@ -17,22 +17,19 @@ export const definition: ToolDefinition = {
       properties: {
         prompt: {
           type: 'string',
-          description: `Image editing prompt for Qwen Image Edit 2511 (50-200 words, natural language sentences).
+          description: `Editing prompt (50-200 words, natural language). POSITIVE phrasing only — model ignores negatives.
 
-Rules:
-- Use POSITIVE phrasing only ("sharp and detailed", not "no blur"). The model ignores negatives.
-- Format: [Primary action] + [specific details] + [what to preserve].
-- For restoration: scratches/tears/stains → "remove scratches, tears, stains, dust spots, and noise"; faded → "enhance faded colors, restore vibrancy and contrast".
-- For object/person removal: describe the scene WITHOUT the object. E.g., "A clean background where the person was standing, matching surrounding textures and lighting seamlessly."
-- For content changes: describe the desired final state positively. E.g., "Change the sky to a vibrant sunset with warm orange and purple tones."
-- For colorization: "Restore and colorize the photo" or "Apply natural [decade] color palette with era-appropriate tones".
-- CRITICAL for photos with people (unless removing them): ALWAYS append "Preserve all facial features, expressions, and identity. Maintain exact positioning, poses, and composition."
-- Avoid keyword spam like "8k, masterpiece, best quality" — use plain descriptions.`,
+Format: [action] + [details] + [what to preserve]. Describe desired final state, not what to remove.
+- Restoration: "remove scratches, tears, stains, dust spots, and noise"
+- Object removal: describe scene WITHOUT the object, matching surrounding textures
+- Colorization: "Restore and colorize the photo" or "Apply natural [decade] color palette"
+- For photos with people (unless removing them): ALWAYS append "Preserve all facial features, expressions, identity, positioning, and composition."
+- No keyword spam ("8k, masterpiece") — use plain descriptions.`,
         },
         numberOfVariations: {
           type: 'number',
           description:
-            'Number of variations to generate (1-16). ALWAYS use 1 unless the user explicitly requests a specific quantity (e.g., "give me 3 options", "show me 4 versions", "make 2 more"). Default: 1.',
+            'Number of variations (1-16). Use 1 unless user requests multiple. Default: 1.',
           minimum: 1,
           maximum: 16,
         },

@@ -16,22 +16,17 @@ export const definition: ToolDefinition = {
       properties: {
         prompt: {
           type: 'string',
-          description: `Text description of the desired visual transformation. 2-4 sentences.
+          description: `Describe the TARGET appearance (not the transformation process). 2-4 present-tense sentences.
 
-Describe the TARGET appearance, not the transformation process:
-- For style transfer: "A vibrant anime scene with bold outlines and cel-shaded coloring, energetic composition."
-- For subject replacement: "A robot with metallic chrome body performing the same movements, industrial sci-fi environment."
-- For enhancement: "Crisp ultra-high-definition footage with enhanced details, vivid colors, and smooth motion."
+Examples by mode:
+- canny (preserves edges, restyle keeping shapes): "A watercolor painting with soft edges and flowing colors."
+- pose (tracks skeleton, replace person): "A cartoon character with exaggerated proportions performing the dance moves."
+- depth (preserves spatial depth, restyle scene): "An underwater coral reef scene with bioluminescent lighting."
+- detailer (enhance quality): "Ultra-detailed 4K footage with enhanced textures and sharp focus."
+- animate-move (camera animation from reference image): "Smooth cinematic camera movement following the subject."
+- animate-replace (swap subject from reference image): "The character from the reference image performing the video's movements."
 
-Control mode tips:
-- "canny": Preserves edge structure. Good for restyling while keeping shapes. "A watercolor painting with soft edges and flowing colors."
-- "pose": Tracks body skeleton. Good for replacing the person. "A cartoon character with exaggerated proportions performing the dance moves."
-- "depth": Preserves spatial depth. Good for complete scene restyling. "An underwater coral reef scene with bioluminescent lighting."
-- "detailer": Enhances quality. "Ultra-detailed 4K footage with enhanced textures and sharp focus."
-- "animate-move": Camera animation from reference. Requires a reference image. "Smooth cinematic camera movement following the subject."
-- "animate-replace": Subject replacement from reference image. "The character from the reference image performing the video's movements."
-
-CONSTRAINTS: Present tense. Positive phrasing. Concrete visual details.`,
+Present tense. Positive phrasing. Concrete visual details.`,
         },
         videoSourceIndex: {
           type: 'number',

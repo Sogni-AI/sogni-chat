@@ -11,26 +11,21 @@ export const definition: ToolDefinition = {
   function: {
     name: 'generate_video',
     description:
-      'Generate a video from a text description — no source image needed. LTX 2.3 generates audio natively (dialogue, ambient sounds, music, foley) — no separate audio generation step is needed. Describe audio in the prompt. Use this when the user wants to create a video from scratch without uploading a photo. For animating an existing photo, use animate_photo instead. Do NOT use this tool when the user references people from My Personas — personas require a reference image for identity preservation. Instead: call resolve_personas, then edit_image to generate an image of the persona, then animate_photo to bring it to life. CRITICAL: If the user\'s request is vague or lacks specific creative direction (e.g. just "create a video", "make a video"), do NOT call this tool yet. Instead, ask about their vision: subject matter, mood, camera style, and any specific actions or dialogue. If an image is available, analyze what is actually in it and suggest 2-3 creative directions tailored to the image content — never give generic ideas. Only call this tool once you have clear creative intent.',
+      'Generate a video from text — no source image. LTX 2.3 generates audio natively (dialogue, sounds, music) — describe audio in the prompt. For animating an existing photo, use animate_photo. Do NOT use for My Personas — instead: resolve_personas → edit_image → animate_photo. If the request is vague, ask about vision/mood/style first. If an image exists, analyze it and suggest 2-3 tailored directions. Only call once you have clear creative intent.',
     parameters: {
       type: 'object',
       properties: {
         prompt: {
           type: 'string',
-          description: `Text description of the video to generate. Capture the user's creative intent as faithfully and completely as possible.
+          description: `Text description of the video. 2-4 present-tense sentences capturing scene, action, atmosphere, sound, and camera.
 
-For SIMPLE scenes (landscape, abstract, single action): Write 2-4 present-tense sentences with scene, action, atmosphere, and camera movement.
+For complex/creative scenes (characters, dialogue, skits): capture the full creative intent — who, what they say, what happens, tone and style. The system auto-expands into a detailed prompt.
 
-For COMPLEX/CREATIVE scenes (characters talking, arguments, fights, skits, stories, scenes from movies/shows): Capture the FULL creative intent — who the characters are, what they say, what happens, the tone and style. Include specific details the user mentioned. The system will automatically expand this into a detailed video prompt, so focus on accurately representing what the user wants rather than summarizing.
+DIALOGUE: Write ACTUAL spoken words in double quotes. Never summarize as "they argue about X" — write what they say. Create appropriate dialogue if user implies conversation without exact words.
 
-CRITICAL FOR DIALOGUE: If the user's request involves people talking, arguing, or any spoken words, you MUST write out the actual dialogue in double quotes. NEVER summarize dialogue as "they argue about X" — instead write what they actually say. If the user didn't specify exact words, create appropriate dialogue that matches their intent.
+For specific characters (movies, TV): describe visual appearance (clothing, hair, build) — don't rely on names alone.
 
-CRITICAL FOR CHARACTERS: If the user references specific characters (from movies, TV, etc.), describe their visual appearance (clothing, hair, build, features) so they can be recognized. Do not rely on names alone.
-
-CONSTRAINTS:
-- Present tense only. Positive phrasing.
-- No vague words ("beautiful", "nice") — use concrete sensory details.
-- Keep movements natural and physically plausible.`,
+Capture the user's creative intent faithfully. Present tense. Positive phrasing. No vague words ("beautiful", "nice") — concrete sensory details. Natural, plausible movements.`,
         },
         duration: {
           type: 'number',
@@ -48,17 +43,17 @@ CONSTRAINTS:
         width: {
           type: 'number',
           description:
-            'Video width in pixels. LTX 2.3: 640-3840 (step 64), default 1920. WAN: 480-1536 (step 16), default 640. When the user requests a specific resolution (e.g. "480p", "720p", "1080p"), set width and height explicitly — common mappings: 480p=640x480, 720p=1280x720, 1080p=1920x1088, 4K=3840x2176.',
+            'Video width in pixels. LTX 2.3: 640-3840 (step 64), default 1920. WAN: 480-1536 (step 16), default 640. Resolution mappings: 480p=640x480, 720p=1280x720, 1080p=1920x1088, 4K=3840x2176.',
         },
         height: {
           type: 'number',
           description:
-            'Video height in pixels. LTX 2.3: 640-3840 (step 64), default 1088. WAN: 480-1536 (step 16), default 640. Always set both width and height when the user specifies a resolution like "480p" or "720p".',
+            'Video height in pixels. LTX 2.3: 640-3840 (step 64), default 1088. WAN: 480-1536 (step 16), default 640. Set both width and height for resolution requests.',
         },
         numberOfVariations: {
           type: 'number',
           description:
-            'Number of video variations to generate (1-16). ALWAYS use 1 unless the user explicitly requests multiple videos. Default: 1.',
+            'Number of variations (1-16). Use 1 unless user requests multiple. Default: 1.',
           minimum: 1,
           maximum: 16,
         },
