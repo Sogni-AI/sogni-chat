@@ -211,7 +211,7 @@ export async function execute(
     // Build picture references for each persona photo
     const personaRefs = personaFiles.map((f, i) => {
       const personaName = f.filename?.replace('persona-', '').replace('.jpg', '').replace(/-/g, ' ') || `person ${i + 1}`;
-      const pictureIdx = contextImages.findIndex(ci => ci.data === f.data) + 1;
+      const pictureIdx = cappedContextImages.findIndex(ci => ci.data === f.data) + 1;
       if (pictureIdx > 0) {
         return `Preserve the face, ethnicity, age, skin tone, hairstyle, and features of the person in picture ${pictureIdx} (${personaName}) exactly`;
       }

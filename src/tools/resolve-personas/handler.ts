@@ -39,29 +39,20 @@ export async function execute(
       });
     }
 
-    // Remove any previously injected persona photos to prevent accumulation
-    // across multiple resolve_personas calls or retries
-    for (let i = context.uploadedFiles.length - 1; i >= 0; i--) {
-      if (context.uploadedFiles[i].filename?.startsWith('persona-')) {
-        context.uploadedFiles.splice(i, 1);
-      }
-    }
+    // Build a clean uploadedFiles array: keep user files, remove old persona
+    // photos, then append fresh persona photos. We replace the array on
+    // context rather than mutating in-place to avoid corrupting React state.
+    const userFiles = context.uploadedFiles.filter(f => !f.filename?.startsWith('persona-'));
+    const preExistingImageCount = userFiles.filter(f => f.type === 'image').length;
 
-    // Count pre-existing images so picture numbering accounts for user uploads
-    // Note: context.imageData is always the .data of the first image in uploadedFiles
-    // (same Uint8Array reference), so we must NOT count it separately.
-    const preExistingImageCount = context.uploadedFiles.filter(f => f.type === 'image').length;
-
-    // Inject persona photos into context.uploadedFiles
     const personaMap: Record<number, { name: string; description: string; relationship: string }> = {};
     let injectedCount = 0;
 
     for (const persona of personas) {
-      // Prefer the cropped reference photo (head-to-waist) over the full original
       const photoToUse = persona.referencePhotoData || persona.photoData;
       if (photoToUse) {
-        const contextImageIndex = context.uploadedFiles.length;
-        context.uploadedFiles.push({
+        const contextImageIndex = userFiles.length + injectedCount;
+        userFiles.push({
           type: 'image',
           data: photoToUse,
           width: persona.referencePhotoData ? undefined : (persona.photoWidth || undefined),
@@ -77,6 +68,9 @@ export async function execute(
         injectedCount++;
       }
     }
+
+    // Replace the context array (new array, not mutating the original React state)
+    context.uploadedFiles = userFiles;
 
     // Build guidance for the LLM
     const loadedNames = personas.map(p => p.name);

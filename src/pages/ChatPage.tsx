@@ -76,9 +76,12 @@ function deriveSessionTitle(filename?: string, sessionNumber?: number): string {
   return cleaned || placeholder;
 }
 
-/** Construct UploadedFile array from legacy session fields for backward compat */
+/** Construct UploadedFile array from legacy session fields for backward compat.
+ *  Filters out persona reference photos that may have leaked into saved sessions. */
 function legacySessionToUploadedFiles(session: ChatSession): UploadedFile[] {
-  if (session.uploadedFiles?.length) return session.uploadedFiles;
+  if (session.uploadedFiles?.length) {
+    return session.uploadedFiles.filter(f => !f.filename?.startsWith('persona-'));
+  }
   if (!session.imageData || !session.width || !session.height) return [];
   return [{
     type: 'image',

@@ -253,22 +253,59 @@ async function cropToFace(
   });
 }
 
-/** Crop a reference photo for image generation — 3:4 portrait, face ≈25%, fits within 1024×1024 */
+/** Crop a reference photo for image generation — 3:4 portrait, face ≈26%, shortest side = 1024 */
 async function cropReferencePhoto(
   photoData: Uint8Array,
   mimeType: string,
   faceBox: { x: number; y: number; w: number; h: number },
 ): Promise<Uint8Array> {
   return withLoadedImage(photoData, mimeType, (img) => {
-    // Face should be ~25% of crop height for a head-to-waist framing
-    const crop = computeFaceCrop(img.width, img.height, faceBox, 0.25, 0.75);
+    // Face occupies ~32% of crop height for tighter head-to-waist framing
+    const crop = computeFaceCrop(img.width, img.height, faceBox, 0.32, 0.75);
     if (!crop) throw new Error('Face box too small');
 
-    // Fit within 1024×1024 while preserving aspect ratio
-    const maxDim = 1024;
-    const scale = Math.min(maxDim / crop.cw, maxDim / crop.ch, 1);
-    const outW = Math.round(crop.cw * scale);
-    const outH = Math.round(crop.ch * scale);
+    const TARGET_DIM = 1024;
+    let { cx, cy, cw, ch } = crop;
+
+    // Scale so shortest output side = 1024
+    const shortSide = Math.min(cw, ch);
+    const scale = TARGET_DIM / shortSide;
+    let outW = Math.round(cw * scale);
+    let outH = Math.round(ch * scale);
+
+    // Face coordinates in source image pixels (for face-aware centering)
+    const facePixelX = Math.round(img.width * faceBox.x / 100);
+    const facePixelY = Math.round(img.height * faceBox.y / 100);
+    const facePixelW = Math.round(img.width * faceBox.w / 100);
+    const facePixelH = Math.round(img.height * faceBox.h / 100);
+
+    // If the longer side exceeds 1024, shrink the source crop on that axis (face-aware centering)
+    if (outW > TARGET_DIM) {
+      const newCW = Math.round(TARGET_DIM / scale);
+      const faceCenterX = facePixelX + facePixelW / 2;
+      let newCX = Math.round(faceCenterX - newCW / 2);
+      // Ensure face stays fully within the crop
+      newCX = Math.min(newCX, facePixelX);
+      if (newCX + newCW < facePixelX + facePixelW) newCX = facePixelX + facePixelW - newCW;
+      // Clamp within original crop bounds
+      newCX = Math.max(cx, Math.min(newCX, cx + cw - newCW));
+      cx = newCX;
+      cw = newCW;
+      outW = TARGET_DIM;
+    }
+    if (outH > TARGET_DIM) {
+      const newCH = Math.round(TARGET_DIM / scale);
+      const faceCenterY = facePixelY + facePixelH / 2;
+      let newCY = Math.round(faceCenterY - newCH / 2);
+      // Ensure face stays fully within the crop
+      newCY = Math.min(newCY, facePixelY);
+      if (newCY + newCH < facePixelY + facePixelH) newCY = facePixelY + facePixelH - newCH;
+      // Clamp within original crop bounds
+      newCY = Math.max(cy, Math.min(newCY, cy + ch - newCH));
+      cy = newCY;
+      ch = newCH;
+      outH = TARGET_DIM;
+    }
 
     const canvas = document.createElement('canvas');
     canvas.width = outW;
@@ -277,7 +314,9 @@ async function cropReferencePhoto(
     if (!ctx) throw new Error('Canvas not supported');
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, crop.cx, crop.cy, crop.cw, crop.ch, 0, 0, outW, outH);
+    ctx.drawImage(img, cx, cy, cw, ch, 0, 0, outW, outH);
+
+    // Source -> crop -> output scaling complete
 
     return new Promise<Uint8Array>((resolve, reject) => {
       canvas.toBlob(

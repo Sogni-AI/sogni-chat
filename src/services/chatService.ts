@@ -23,7 +23,7 @@ import { isInsufficientCreditsError, getAlternateToken, hasBalance } from '@/too
 import { trimConversation, getInputBudget } from '@/services/contextWindow';
 import { resizeImageForVision } from '@/utils/imageProcessing';
 import type { TokenType } from '@/types/wallet';
-import { getAllPersonas, getAllMemories } from '@/utils/userDataDB';
+import { getAllPersonas } from '@/utils/userDataDB';
 
 // ---------------------------------------------------------------------------
 // Callbacks
@@ -75,38 +75,6 @@ async function buildPersonaContext(): Promise<string> {
     return result;
   } catch (err) {
     console.warn('[CHAT SERVICE] Failed to build persona context:', err);
-    return '';
-  }
-}
-
-/** Build compact memory context for system message injection (capped at ~200 chars) */
-export async function buildMemoryContext(): Promise<string> {
-  try {
-    const memories = await getAllMemories();
-    if (memories.length === 0) return '';
-    const MAX_CHARS = 200;
-    const MAX_VALUE_LEN = 60;
-    const parts: string[] = [];
-    let totalLen = 0;
-    let included = 0;
-    for (const m of memories) {
-      const value = m.value.length > MAX_VALUE_LEN ? m.value.slice(0, MAX_VALUE_LEN) + '...' : m.value;
-      const entry = `${m.key}: ${value}`;
-      // Account for separator ", " between entries
-      const addedLen = parts.length > 0 ? entry.length + 2 : entry.length;
-      if (totalLen + addedLen > MAX_CHARS) break;
-      parts.push(entry);
-      totalLen += addedLen;
-      included++;
-    }
-    const omitted = memories.length - included;
-    let result = parts.join(', ');
-    if (omitted > 0) {
-      result += ` (+${omitted} more)`;
-    }
-    return result;
-  } catch (err) {
-    console.warn('[CHAT SERVICE] Failed to build memory context:', err);
     return '';
   }
 }
