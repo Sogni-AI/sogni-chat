@@ -132,14 +132,16 @@ export async function getAllPersonas(): Promise<PersonaSummary[]> {
 }
 
 /** Pronouns/words that implicitly refer to a persona by relationship */
-const SELF_PRONOUNS = new Set(['me', 'myself', 'i']);
+const SELF_PRONOUNS = new Set(['me', 'myself']);
 const PARTNER_PRONOUNS = new Set(['my wife', 'my husband', 'my partner', 'my spouse']);
 const CHILD_PRONOUNS = new Set(['my son', 'my daughter', 'my kid', 'my child', 'my baby']);
-const PET_PRONOUNS = new Set(['my dog', 'my cat', 'my pet']);
+const FRIEND_PRONOUNS = new Set(['my friend', 'my buddy', 'my bestie', 'my roommate']);
+const PET_PRONOUNS = new Set(['my dog', 'my cat', 'my pet', 'my puppy', 'my kitten']);
 const RELATIONSHIP_PRONOUNS: Record<string, Set<string>> = {
   self: SELF_PRONOUNS,
   partner: PARTNER_PRONOUNS,
   child: CHILD_PRONOUNS,
+  friend: FRIEND_PRONOUNS,
   pet: PET_PRONOUNS,
 };
 

@@ -20,8 +20,9 @@ export const definition: ToolDefinition = {
           description: `Edit instruction describing what to generate using the reference images as guidance. 50-200 words recommended.
 
 Tips:
-- Describe the desired output, referencing the style or content from the uploaded images.
-- E.g., "Generate a portrait in the style of the reference image" or "Combine the subject from image 1 with the background from image 2".
+- Reference context images by number: "picture 1", "picture 2" etc. (numbered in the order they appear).
+- For identity preservation: "the person from picture N — preserve their face, ethnicity, age, skin tone, hairstyle, and features exactly"
+- Include specific appearance descriptors in the prompt to reinforce the likeness.
 - Use POSITIVE phrasing ("sharp details", not "no blur").
 - Be specific about what to take from each reference image.`,
         },

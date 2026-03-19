@@ -39,6 +39,10 @@ export async function execute(
       });
     }
 
+    // Count pre-existing images so picture numbering accounts for user uploads
+    const preExistingImageCount = context.uploadedFiles.filter(f => f.type === 'image').length
+      + (context.imageData ? 1 : 0); // legacy imageData also becomes a context image
+
     // Inject persona photos into context.uploadedFiles
     const personaMap: Record<number, { name: string; description: string; relationship: string }> = {};
     let injectedCount = 0;
@@ -77,21 +81,24 @@ export async function execute(
 
     callbacks.onToolComplete('resolve_personas', []);
 
-    // Build per-persona descriptions with picture number references
+    // Build per-persona descriptions with picture number references.
+    // Picture numbers must account for pre-existing user uploads since
+    // edit_image's gatherContextImages puts them first in the context array.
     const personaDetails: string[] = [];
     const pictureMapping: string[] = [];
-    let pictureNum = 1;
+    let pictureNum = preExistingImageCount + 1; // offset past user-uploaded images
     for (const persona of personas) {
       const desc = persona.visionDescription || persona.description || '';
       const attire = persona.defaultAttire ? ` Default attire: ${persona.defaultAttire}.` : '';
       const voice = persona.voice ? ` Voice: ${persona.voice}.` : '';
+      const nicknames = persona.tags?.length ? ` Also known as: ${persona.tags.join(', ')}.` : '';
       const hasPhoto = !!(persona.referencePhotoData || persona.photoData);
       if (hasPhoto) {
         pictureMapping.push(`Picture ${pictureNum} = ${persona.name}`);
-        personaDetails.push(`${persona.name} (${persona.relationship}, picture ${pictureNum}): ${desc}${attire}${voice}`);
+        personaDetails.push(`${persona.name} (${persona.relationship}, picture ${pictureNum}): ${desc}${attire}${voice}${nicknames}`);
         pictureNum++;
       } else {
-        personaDetails.push(`${persona.name} (${persona.relationship}, no photo): ${desc}${attire}${voice}`);
+        personaDetails.push(`${persona.name} (${persona.relationship}, no photo): ${desc}${attire}${voice}${nicknames}`);
       }
     }
 
@@ -101,16 +108,21 @@ export async function execute(
     // Build prompt guidance following Qwen Image Edit multi-image reference patterns
     let promptGuidance: string;
     if (injectedCount > 0) {
-      promptGuidance = `Reference photos loaded as context images: ${mappingStr}.
+      const preExistingNote = preExistingImageCount > 0
+        ? `\nNote: The user's uploaded image(s) are pictures 1${preExistingImageCount > 1 ? `-${preExistingImageCount}` : ''}. Persona reference photos start at picture ${preExistingImageCount + 1}.`
+        : '';
 
-IMPORTANT — How to use these for identity-preserving generation with edit_image:
-1. Reference each person by their picture number in your prompt: "the person in picture 1", "the subject of picture 2"
-2. Be EXPLICIT about preserving identity: "maintaining the person's face, ethnicity, age, hairstyle, and features from picture N"
-3. Describe the new scene/pose/setting separately from the identity reference
-4. Include appearance descriptors from below to reinforce the likeness
+      promptGuidance = `Reference photos loaded as context images: ${mappingStr}.${preExistingNote}
 
-Example prompt structure for two people:
-"Generate a scene of [description]. The man is the person from picture 1 — preserve his face, ethnicity, hairstyle, and features exactly. The woman is the person from picture 2 — preserve her face, ethnicity, hairstyle, and features exactly. [scene details]"
+IMPORTANT — Identity-preserving generation with edit_image:
+1. Reference each person by their EXACT picture number: "the person in picture ${preExistingImageCount + 1}", NOT "picture 1" unless that IS the correct number
+2. Be EXPLICIT about preserving identity: "preserve the person's face, ethnicity, age, skin tone, hairstyle, and features exactly as shown in picture N"
+3. Include the appearance descriptors from below in the prompt to reinforce the likeness
+4. Describe the new scene/pose/setting separately from the identity directives
+5. Qwen Image Edit supports max 3 context images total (including any user uploads)
+
+Example prompt for the current context:
+"${personas.filter(p => p.referencePhotoData || p.photoData).map((p, i) => `The ${p.relationship === 'self' ? 'person' : p.relationship} is the subject from picture ${preExistingImageCount + 1 + i} — preserve their face, ethnicity, age, skin tone, hairstyle, and expression exactly`).join('. ')}. [scene/setting description]. ${personas.map(p => p.visionDescription || p.description || '').filter(Boolean).join('. ')}."
 
 Persona details:
 ${descriptions}`;
