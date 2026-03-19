@@ -41,6 +41,8 @@ export interface UIChatMessage {
   isFromHistory?: boolean;
   /** True for messages created by the offline recovery system */
   isRecoveryMessage?: boolean;
+  /** Persona names used for this generation (persisted for retry re-injection) */
+  referencedPersonas?: string[];
 }
 
 /** Full chat session stored in IndexedDB */

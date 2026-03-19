@@ -772,10 +772,11 @@ export function useChat(): UseChatResult {
                 setUIMessages((prev) =>
                   prev.map((msg) => {
                     if (msg.id !== currentMsgId) return msg;
-                    // Capture sourceImageUrl, videoAspectRatio, modelName from toolProgress before clearing it
+                    // Capture fields from toolProgress before clearing it
                     const srcUrl = msg.toolProgress?.sourceImageUrl;
                     const vidAR = msg.toolProgress?.videoAspectRatio;
                     const mdlName = msg.toolProgress?.modelName;
+                    const refPersonas = msg.toolProgress?.referencedPersonas;
                     // Extract model key from stored tool args for retry/switch model.
                     // Tools use different arg names: "model", "videoModel", or "quality".
                     const toolModelKey = (msg.toolArgs?.model as string)
@@ -793,6 +794,7 @@ export function useChat(): UseChatResult {
                       modelName: mdlName || undefined,
                       toolModelKey,
                       lastCompletedTool: toolName,
+                      referencedPersonas: refPersonas || msg.referencedPersonas,
                     };
                   }),
                 );
@@ -1448,7 +1450,7 @@ export function useChat(): UseChatResult {
         timestamp: Date.now(),
         isStreaming: true,
         toolArgs: modifiedArgs,
-        toolProgress: { type: 'started', toolName: effectiveToolName, totalCount: 0, referencedPersonas: targetMessage.toolProgress?.referencedPersonas },
+        toolProgress: { type: 'started', toolName: effectiveToolName, totalCount: 0, referencedPersonas: targetMessage.referencedPersonas },
       };
 
       setUIMessages(prev => [...prev, userMsg, assistantMsg]);
@@ -1484,7 +1486,7 @@ export function useChat(): UseChatResult {
 
       // If the original generation used personas, re-inject their reference photos
       // from the DB (they don't persist in uploadedFiles across sessions/retries).
-      const referencedPersonas = targetMessage.toolProgress?.referencedPersonas;
+      const referencedPersonas = targetMessage.referencedPersonas;
       if (referencedPersonas && referencedPersonas.length > 0) {
         try {
           const { getPersonasByNames } = await import('@/utils/userDataDB');
@@ -1624,6 +1626,7 @@ export function useChat(): UseChatResult {
               videoAspectRatio: vidAR || undefined,
               modelName: mdlName || undefined,
               toolModelKey: retryModelKey,
+              referencedPersonas: msg.toolProgress?.referencedPersonas || msg.referencedPersonas,
               content: '',
             };
           }));
