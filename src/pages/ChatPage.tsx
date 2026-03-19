@@ -9,7 +9,7 @@ import { createPortal } from 'react-dom';
 import { useSogniAuth } from '@/services/sogniAuth';
 import { useWallet } from '@/hooks/useWallet';
 import { useMediaUpload } from '@/hooks/useMediaUpload';
-import { useChat } from '@/hooks/useChat';
+import { useChat, getWelcomeGreeting } from '@/hooks/useChat';
 import { useChatSessions } from '@/hooks/useChatSessions';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useLayout } from '@/layouts/AppLayout';
@@ -186,10 +186,17 @@ export default function ChatPage() {
     return self?.name || null;
   }, [personas]);
 
+  const welcomeUserName = selfPersonaName || user?.username || null;
+
+  // Stable greeting per mount — re-rolls only when the name changes
+  const welcomeGreeting = useMemo(
+    () => getWelcomeGreeting(welcomeUserName),
+    [welcomeUserName],
+  );
+
   useEffect(() => {
-    const userName = selfPersonaName || user?.username || null;
     chat.updateWelcome({
-      userName,
+      userName: welcomeUserName,
       hasPersonas: personas.length > 0,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -293,7 +300,9 @@ export default function ChatPage() {
       audioResultUrls: state.audioResultUrls,
       analysisSuggestions: state.analysisSuggestions,
       sessionModel: state.sessionModel,
-      uploadedFiles: uploadedFilesRef.current,
+      // Filter out persona reference photos injected by resolve_personas — they're
+      // loaded fresh from IndexedDB each time and should not persist in the session.
+      uploadedFiles: uploadedFilesRef.current?.filter(f => !f.filename?.startsWith('persona-')),
     };
 
     const msgsWithVideos = state.uiMessages.filter(m => m.videoResults?.length);
@@ -996,7 +1005,7 @@ export default function ChatPage() {
               className="text-3xl font-semibold mb-3"
               style={{ color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}
             >
-              What would you like to create?
+              {getWelcomeGreeting()}
             </h1>
             <p className="mb-8" style={{ color: 'var(--color-text-tertiary)', lineHeight: 1.6, fontSize: '0.9375rem' }}>
               Generate images and videos, compose music, restore and transform photos — with the power of your Sogni Creative Agent.
@@ -1095,6 +1104,7 @@ export default function ChatPage() {
               onRemoveMediaFile={removeMediaFile}
               onFileDrop={handleFileDrop}
               hasPersonas={personas.length > 0}
+              welcomeGreeting={welcomeGreeting}
               getPreviewUrl={getPreviewUrl}
               onBranchChat={handleBranchChat}
               onRetry={handleRetry}

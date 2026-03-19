@@ -39,6 +39,14 @@ export async function execute(
       });
     }
 
+    // Remove any previously injected persona photos to prevent accumulation
+    // across multiple resolve_personas calls or retries
+    for (let i = context.uploadedFiles.length - 1; i >= 0; i--) {
+      if (context.uploadedFiles[i].filename?.startsWith('persona-')) {
+        context.uploadedFiles.splice(i, 1);
+      }
+    }
+
     // Count pre-existing images so picture numbering accounts for user uploads
     // Note: context.imageData is always the .data of the first image in uploadedFiles
     // (same Uint8Array reference), so we must NOT count it separately.
