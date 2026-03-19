@@ -31,6 +31,19 @@ export function DailyCreditsPopup({ isAuthenticated, sogniClient, onClaim }: Dai
   const [error, setError] = useState<string | null>(null);
   const [creditsReceived, setCreditsReceived] = useState<number>(50);
 
+  // Debug hook: call window.__showDailyBoost() from console to trigger popup
+  useEffect(() => {
+    (window as any).__showDailyBoost = () => {
+      setClaimed(false);
+      setIsClaiming(false);
+      setError(null);
+      setShowTurnstile(false);
+      setIsOpen(true);
+      console.log('[DAILY CREDITS] Debug: popup opened');
+    };
+    return () => { delete (window as any).__showDailyBoost; };
+  }, []);
+
   // Check if we should show the popup when user becomes authenticated
   useEffect(() => {
     if (!isAuthenticated || !sogniClient) return;
@@ -223,86 +236,73 @@ export function DailyCreditsPopup({ isAuthenticated, sogniClient, onClaim }: Dai
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Decorative gradient header */}
-        <div
-          style={{
-            background: '#171717',
-            padding: '2rem 1.5rem 3rem',
-            position: 'relative',
-            overflow: 'hidden'
-          }}
-        >
-          {/* Decorative circles */}
+        {/* Mascot header */}
+        <div style={{ position: 'relative' }}>
+          <img
+            src="/daily-boost-mascot.jpg"
+            alt="Daily Boost"
+            style={{
+              width: '100%',
+              height: '220px',
+              objectFit: 'cover',
+              display: 'block'
+            }}
+          />
+          {/* Gradient fade into card */}
           <div style={{
             position: 'absolute',
-            top: '-20px',
-            right: '-20px',
-            width: '80px',
+            bottom: 0,
+            left: 0,
+            right: 0,
             height: '80px',
-            borderRadius: '50%',
-            background: 'rgba(255,255,255,0.1)'
+            background: 'linear-gradient(to top, #2f2f2f, transparent)',
+            pointerEvents: 'none'
           }} />
+          {/* "Daily Boost" label */}
           <div style={{
             position: 'absolute',
-            bottom: '-30px',
-            left: '-10px',
-            width: '60px',
-            height: '60px',
-            borderRadius: '50%',
-            background: 'rgba(255,255,255,0.08)'
-          }} />
-
+            bottom: '12px',
+            left: '0',
+            right: '0',
+            textAlign: 'center',
+            pointerEvents: 'none'
+          }}>
+            <span style={{
+              fontWeight: 700,
+              fontSize: '1.25rem',
+              color: '#ffffff',
+              textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+              letterSpacing: '0.02em'
+            }}>
+              Daily Boost
+            </span>
+          </div>
           {/* Close button */}
           <button
             onClick={handleClose}
             className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full transition-colors"
             style={{
-              background: 'rgba(255, 255, 255, 0.1)',
-              color: '#b4b4b4'
+              background: 'rgba(0, 0, 0, 0.45)',
+              backdropFilter: 'blur(4px)',
+              color: '#ffffff'
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
-
-          {/* Gift icon */}
-          <div className="flex justify-center mb-3">
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center"
-              style={{
-                background: 'rgba(255,255,255,0.1)',
-                boxShadow: '0 4px 14px rgba(0,0,0,0.2)'
-              }}
-            >
-              <span style={{ fontSize: '2rem' }}>🎁</span>
-            </div>
-          </div>
-
-          <h2
-            className="text-center font-bold text-xl"
-            style={{ color: '#ececec' }}
-          >
-            Daily Credits Available!
-          </h2>
         </div>
 
         {/* Content */}
-        <div style={{ padding: '1.5rem', marginTop: '-1rem' }}>
-          <div
-            className="rounded-xl p-4 text-center"
-            style={{
-              background: 'rgba(255, 255, 255, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.08)'
-            }}
-          >
+        <div style={{ padding: '1.25rem 1.5rem 1.5rem' }}>
+          <div className="text-center">
             {claimed ? (
               <>
                 <div className="flex justify-center mb-2">
                   <div
                     className="w-12 h-12 rounded-full flex items-center justify-center"
-                    style={{ background: 'rgba(76, 175, 80, 0.1)' }}
+                    style={{ background: 'rgba(76, 175, 80, 0.15)' }}
                   >
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#4CAF50" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="20 6 9 17 4 12" />
@@ -313,30 +313,27 @@ export function DailyCreditsPopup({ isAuthenticated, sogniClient, onClaim }: Dai
                   Credits Claimed!
                 </p>
                 <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginTop: '0.25rem' }}>
-                  {creditsReceived} credits added to your account
+                  +{creditsReceived} credits added to your account
                 </p>
               </>
             ) : (
               <>
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ececec" strokeWidth="2">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-                  </svg>
+                <div className="flex items-baseline justify-center gap-1.5">
                   <span
-                    className="font-bold text-3xl"
-                    style={{ color: '#ececec' }}
+                    className="font-bold"
+                    style={{ fontSize: '2.5rem', color: '#ffffff', lineHeight: 1 }}
                   >
                     50
                   </span>
                   <span
-                    className="font-semibold text-lg"
-                    style={{ color: 'var(--color-text-primary)' }}
+                    className="font-semibold"
+                    style={{ fontSize: '1.125rem', color: 'rgba(255,255,255,0.6)' }}
                   >
                     credits
                   </span>
                 </div>
-                <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)' }}>
-                  Your daily free credits are ready!
+                <p style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginTop: '0.375rem' }}>
+                  Your daily free credits are ready
                 </p>
               </>
             )}
@@ -381,9 +378,10 @@ export function DailyCreditsPopup({ isAuthenticated, sogniClient, onClaim }: Dai
               disabled={isClaiming || showTurnstile}
               className="w-full mt-4 inline-flex items-center justify-center gap-2 px-6 py-3.5 font-semibold rounded-xl transition-all hover:scale-[1.02] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100"
               style={{
-                background: '#ffffff',
-                color: '#0a0a0a',
-                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.3)'
+                background: 'linear-gradient(135deg, #00e5ff, #d946ef)',
+                color: '#ffffff',
+                boxShadow: '0 4px 20px rgba(0, 229, 255, 0.25), 0 4px 14px rgba(0, 0, 0, 0.3)',
+                textShadow: '0 1px 2px rgba(0,0,0,0.2)'
               }}
             >
               {isClaiming ? (
@@ -399,10 +397,7 @@ export function DailyCreditsPopup({ isAuthenticated, sogniClient, onClaim }: Dai
               ) : showTurnstile ? (
                 <span>Verifying...</span>
               ) : (
-                <>
-                  <span>✨</span>
-                  <span>Claim Your Credits</span>
-                </>
+                <span>Claim Your Credits</span>
               )}
             </button>
           )}
