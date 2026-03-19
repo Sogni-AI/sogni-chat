@@ -157,7 +157,7 @@ export async function sendChatMessage(
   const personaContext = await buildPersonaContext();
   const dynamicSystemPrompt = CHAT_SYSTEM_PROMPT
     + (personaContext
-      ? `\nUser's people: ${personaContext}. When creating images of these people: call resolve_personas first, then use edit_image (never generate_image). Pronouns like "us", "we", "our" refer to these people — always call resolve_personas again for each new image generation, even in follow-up messages. If user mentions someone not listed, suggest adding them to My People.`
+      ? `\nUser's people: ${personaContext}. When creating images of these people: call resolve_personas first, then use edit_image (never generate_image). Pronouns like "us", "we", "our" refer to these people — always call resolve_personas again for each new image generation, even in follow-up messages. If user mentions someone not listed, suggest adding them to My Personas.`
       : '');
 
   // Verify the chat API is available on this client instance

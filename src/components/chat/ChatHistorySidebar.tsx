@@ -35,7 +35,7 @@ interface ChatHistorySidebarProps {
   collapsed?: boolean;
   /** Toggle sidebar collapse state */
   onToggleCollapse?: () => void;
-  /** Persona data for "My People" section */
+  /** Persona data for "My Personas" section */
   personas?: PersonaSummary[];
   onAddPersona?: () => void;
   onEditPersona?: (id: string) => void;

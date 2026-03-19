@@ -35,7 +35,7 @@ export async function execute(
       callbacks.onToolComplete('resolve_personas', []);
       return JSON.stringify({
         error: 'not_found',
-        message: `No personas found matching: ${namesList.join(', ')}. The user can add people in the "My People" section of the sidebar.`,
+        message: `No personas found matching: ${namesList.join(', ')}. The user can add people in the "My Personas" section of the sidebar.`,
       });
     }
 

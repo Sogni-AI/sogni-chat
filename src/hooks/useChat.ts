@@ -186,7 +186,7 @@ function makeWelcomeMessage(ctx: WelcomeContext | boolean): UIChatMessage {
     content = `${greeting} I can see your photo — I can restore it, apply artistic styles, animate it into a video, change the camera angle, edit details, and more.`;
   } else if (userName) {
     if (hasPersonas === false) {
-      content = `${greeting} I can create images, videos, music, and more. Want to personalize your experience? Add yourself in "My People" so I can include you in creations.`;
+      content = `${greeting} I can create images, videos, music, and more. Want to personalize your experience? Add yourself in "My Personas" so I can include you in creations.`;
     } else {
       content = `${greeting} What would you like to create?`;
     }

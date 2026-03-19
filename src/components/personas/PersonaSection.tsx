@@ -1,5 +1,5 @@
 /**
- * Sidebar section for personas — "My People" with avatar row.
+ * Sidebar section for personas — "My Personas" with avatar row.
  * Supports expanded (full row) and collapsed (icon stack) modes.
  */
 
@@ -117,7 +117,7 @@ export function PersonaSection({
           textTransform: 'uppercase',
           color: '#8e8e8e',
         }}>
-          My People
+          My Personas
         </span>
         <button
           onClick={onAddPersona}
