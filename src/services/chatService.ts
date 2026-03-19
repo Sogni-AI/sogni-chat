@@ -175,9 +175,10 @@ export async function sendChatMessage(
     onGallerySaved: callbacks.onGallerySaved,
   };
 
-  // Cache uploaded image URIs once — they never change between tool rounds.
-  // Only the latest result URI needs refreshing when new results appear.
-  const uploadedImageUris = await prepareUploadedImageUris(context);
+  // Cache uploaded image URIs — refreshed if tools modify context.uploadedFiles
+  // (e.g. resolve_personas injects persona photos).
+  let uploadedImageUris = await prepareUploadedImageUris(context);
+  let lastUploadedFilesRef = context.uploadedFiles;
   let latestResultUri = await prepareLatestResultUri(context);
   let visionResultCount = context.resultUrls.length;
   let visionDataUris = latestResultUri
@@ -384,6 +385,15 @@ export async function sendChatMessage(
               name: toolName,
             });
           }
+        }
+
+        // Refresh vision URIs if uploadedFiles was replaced (e.g. by resolve_personas)
+        if (context.uploadedFiles !== lastUploadedFilesRef) {
+          uploadedImageUris = await prepareUploadedImageUris(context);
+          lastUploadedFilesRef = context.uploadedFiles;
+          visionDataUris = latestResultUri
+            ? [latestResultUri, ...uploadedImageUris]
+            : uploadedImageUris;
         }
 
         // Continue loop to get LLM's response to tool results
