@@ -136,12 +136,8 @@ export async function execute(
   const prompt = args.prompt as string;
   const defaultModel = context.qualityTier === 'hq' ? 'qwen' : 'qwen-lightning';
   const explicitModel = args.model as string | undefined;
-  // Only honor explicit model for non-tier models (e.g. flux2).
-  // Ignore qwen/qwen-lightning from args — those are handled by qualityTier.
-  const TIER_DEFAULTS = ['qwen-lightning', 'qwen'];
-  const modelKey = (explicitModel && !TIER_DEFAULTS.includes(explicitModel))
-    ? explicitModel
-    : defaultModel;
+  // Honor explicit model if provided (from user retry menu or LLM), otherwise use quality tier default.
+  const modelKey = explicitModel || defaultModel;
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
   const sourceImageIndex = args.sourceImageIndex as number | undefined;
   const aspectRatio = args.aspectRatio as string | undefined;
@@ -153,6 +149,12 @@ export async function execute(
   if (contextImages.length === 0) {
     return JSON.stringify({ error: 'no_images', message: 'Please upload at least one image to use as a reference.' });
   }
+
+  // Detect persona reference photos in context (injected by resolve_personas)
+  const personaFiles = context.uploadedFiles.filter(
+    f => f.type === 'image' && f.filename?.startsWith('persona-'),
+  );
+  const hasPersonaPhotos = personaFiles.length > 0;
 
   // Cap to model max
   const cappedContextImages = contextImages.slice(0, modelConfig.maxContextImages);
@@ -201,13 +203,33 @@ export async function execute(
     ? registerPendingCost('edit_image', estimatedCost, context.tokenType)
     : null;
 
+  // If persona reference photos are in context but the LLM's prompt doesn't
+  // reference them by picture number, the model will ignore them.
+  // Auto-enhance the prompt with identity preservation directives.
+  let effectivePrompt = prompt;
+  if (hasPersonaPhotos && !prompt.toLowerCase().includes('picture')) {
+    // Build picture references for each persona photo
+    const personaRefs = personaFiles.map((f, i) => {
+      const personaName = f.filename?.replace('persona-', '').replace('.jpg', '').replace(/-/g, ' ') || `person ${i + 1}`;
+      const pictureIdx = contextImages.findIndex(ci => ci.data === f.data) + 1;
+      if (pictureIdx > 0) {
+        return `Preserve the face, ethnicity, age, skin tone, hairstyle, and features of the person in picture ${pictureIdx} (${personaName}) exactly`;
+      }
+      return null;
+    }).filter(Boolean);
+    if (personaRefs.length > 0) {
+      effectivePrompt = `${prompt}. ${personaRefs.join('. ')}.`;
+      console.log('[EDIT IMAGE] Enhanced prompt with persona identity directives');
+    }
+  }
+
   try {
     const resultUrls = await tryWithTokenFallback(
       (tokenType: TokenType) => runEditGeneration(
         context.sogniClient,
         {
           modelId: modelConfig.id,
-          prompt,
+          prompt: effectivePrompt,
           contextImages: cappedContextImages,
           width: outputWidth,
           height: outputHeight,
