@@ -973,6 +973,7 @@ export default function ChatPage() {
     setEditingPersonaId(null);
     setEditingPersona(null);
     setPersonaEditorOpen(true);
+    setDrawerOpen(false);
   }, []);
 
   const handleEditPersona = useCallback(async (id: string) => {
@@ -981,6 +982,7 @@ export default function ChatPage() {
       setEditingPersonaId(id);
       setEditingPersona(persona);
       setPersonaEditorOpen(true);
+      setDrawerOpen(false);
     } catch (err) {
       console.error('[CHAT PAGE] Failed to load persona for editing:', err);
     }
