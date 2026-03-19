@@ -73,6 +73,8 @@ interface ChatPanelProps {
   onRetry?: (message: UIChatMessage, modelKey?: string) => void;
   /** Whether the user has any saved personas (for suggestion chip selection) */
   hasPersonas?: boolean;
+  /** Personalized welcome heading (e.g. "Evening, Mark!") */
+  welcomeGreeting?: string;
 }
 
 /** Minimal dropdown for quality tier selection */
@@ -207,6 +209,7 @@ export function ChatPanel({
   onBranchChat,
   onRetry,
   hasPersonas,
+  welcomeGreeting,
 }: ChatPanelProps) {
   const { selectedModelVariant, setSelectedModelVariant } = useLayout();
   const isMobile = useMediaQuery('(max-width: 743px)');
@@ -358,8 +361,8 @@ export function ChatPanel({
     );
 
     if (!hasUploadEntry && freshImageUrls.length > 0) {
-      // Synthesize a presentational upload entry at the end of the conversation
-      // so the uploaded image appears near the input, not pinned to the top.
+      // Synthesize a presentational upload entry at the start of the conversation
+      // so the uploaded images appear at the top of the chat stream.
       const uploadMsg: UIChatMessage = {
         id: 'user-upload',
         role: 'user',
@@ -367,7 +370,7 @@ export function ChatPanel({
         timestamp: 0,
         uploadedImageUrls: freshImageUrls,
       };
-      msgs = [...msgs, uploadMsg];
+      msgs = [uploadMsg, ...msgs];
     }
 
     // Refresh blob URLs on the synthetic user-upload message and on sent
@@ -642,7 +645,7 @@ export function ChatPanel({
                   marginBottom: '2rem',
                 }}
               >
-                What would you like to create?
+                {welcomeGreeting || 'What would you like to create?'}
               </h1>
 
               {/* Category chips */}

@@ -335,6 +335,7 @@ async function cropReferencePhoto(
 
 interface PersonaEditorPanelProps {
   persona: Persona | null;  // null = create mode
+  hasSelfPersona?: boolean;
   onSave: (persona: Persona, faceCropBlob?: Blob | null) => Promise<void>;
   onDelete?: (id: string) => Promise<void>;
   onClose: () => void;
@@ -345,6 +346,7 @@ interface PersonaEditorPanelProps {
 
 export function PersonaEditorPanel({
   persona,
+  hasSelfPersona = false,
   onSave,
   onDelete,
   onClose,
@@ -354,7 +356,7 @@ export function PersonaEditorPanel({
 }: PersonaEditorPanelProps) {
   const isEditMode = !!persona;
   const [name, setName] = useState(persona?.name || '');
-  const [relationship, setRelationship] = useState(persona?.relationship || 'friend');
+  const [relationship, setRelationship] = useState(persona?.relationship || (hasSelfPersona ? 'friend' : 'self'));
   const [description, setDescription] = useState(persona?.description || '');
   const [tags, setTags] = useState<string[]>(persona?.tags || []);
   const [tagInput, setTagInput] = useState('');
@@ -814,6 +816,7 @@ export function PersonaEditorPanel({
               <HelpTip text={getHints(relationship).nameHelp} />
             </div>
             <input
+              className="persona-input"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={getHints(relationship).namePlaceholder}
@@ -865,6 +868,7 @@ export function PersonaEditorPanel({
               <HelpTip text={getHints(relationship).descHelp} />
             </div>
             <textarea
+              className="persona-input"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder={getHints(relationship).descPlaceholder}
@@ -907,6 +911,7 @@ export function PersonaEditorPanel({
               ))}
             </div>
             <input
+              className="persona-input"
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddTag(); } }}
@@ -952,6 +957,7 @@ export function PersonaEditorPanel({
               </div>
               <div style={{ position: 'relative' }}>
                 <input
+                  className="persona-input"
                   value={defaultAttire || ''}
                   onChange={(e) => setDefaultAttire(e.target.value || null)}
                   placeholder="e.g. casual grey t-shirt, blue jeans"
@@ -995,6 +1001,7 @@ export function PersonaEditorPanel({
               <HelpTip text="Used when generating videos with dialogue or animation. Describe their accent, tone, and vocal qualities so the AI can match their voice." />
             </div>
             <input
+              className="persona-input"
               value={voice || ''}
               onChange={(e) => setVoice(e.target.value || null)}
               placeholder={relationship === 'pet' ? 'e.g. playful bark, soft purr' : 'e.g. warm baritone, slight Southern accent'}

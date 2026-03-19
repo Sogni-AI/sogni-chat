@@ -99,3 +99,9 @@ body {
     transform: translateX(-50%) translateY(-10px);
   }
 }
+
+/* Dim placeholder text in persona editor inputs */
+.persona-input::placeholder {
+  color: #555;
+  opacity: 1;
+}

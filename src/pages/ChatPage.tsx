@@ -1141,6 +1141,7 @@ export default function ChatPage() {
       {personaEditorOpen && (
         <PersonaEditorPanel
           persona={editingPersona}
+          hasSelfPersona={personas.some(p => p.relationship === 'self')}
           onSave={handleSavePersona}
           onDelete={editingPersonaId ? deletePersona : undefined}
           onClose={() => setPersonaEditorOpen(false)}
