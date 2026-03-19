@@ -153,7 +153,7 @@ function getTimeOfDayGreeting(): string {
   return 'Evening';
 }
 
-/** Pick a random greeting template. Templates use {time} and {name} placeholders. */
+/** Pick a random greeting template for the given name. */
 function getRandomGreeting(name: string): string {
   const time = getTimeOfDayGreeting();
   const templates = [
@@ -709,6 +709,10 @@ export function useChat(): UseChatResult {
                           videoAspectRatio: progress.videoAspectRatio ?? prev?.videoAspectRatio,
                           modelName: progress.modelName ?? prev?.modelName,
                           referencedPersonas: progress.referencedPersonas ?? prev?.referencedPersonas,
+                          // Accumulate result URLs (each event only carries the latest job's URL)
+                          resultUrls: progress.resultUrls
+                            ? [...new Set([...(prev?.resultUrls || []), ...progress.resultUrls])]
+                            : prev?.resultUrls,
                           perJobProgress,
                         };
                     return { ...msg, toolProgress: merged, videoResults, galleryVideoIds };
@@ -1571,6 +1575,9 @@ export function useChat(): UseChatResult {
                   videoAspectRatio: progress.videoAspectRatio ?? prevProgress?.videoAspectRatio,
                   modelName: progress.modelName ?? prevProgress?.modelName,
                   referencedPersonas: progress.referencedPersonas ?? prevProgress?.referencedPersonas,
+                  resultUrls: progress.resultUrls
+                    ? [...new Set([...(prevProgress?.resultUrls || []), ...progress.resultUrls])]
+                    : prevProgress?.resultUrls,
                   perJobProgress,
                 };
             const videoResults = retryVideoUrls.length > 0 ? [...retryVideoUrls] : msg.videoResults;

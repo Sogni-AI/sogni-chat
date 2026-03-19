@@ -329,6 +329,35 @@ export async function sendChatMessage(
           }
         }
 
+        // Guardrail: if the LLM chose generate_image but persona reference
+        // photos are loaded in context, redirect to edit_image before recording
+        // the tool call in conversation history.  generate_image cannot use
+        // reference photos for identity preservation.
+        const EDIT_IMAGE_MODELS = new Set(['qwen-lightning', 'qwen', 'flux2']);
+        const hasPersonaPhotos = context.uploadedFiles?.some(f => f.filename?.startsWith('persona-'));
+        for (const toolCall of result.tool_calls) {
+          if (toolCall.function.name === 'generate_image' && hasPersonaPhotos) {
+            console.log('[CHAT SERVICE] Redirecting generate_image → edit_image (persona photos in context)');
+            toolCall.function.name = 'edit_image';
+            // Sanitize args: drop generate_image-only params and validate model
+            try {
+              const parsed = JSON.parse(toolCall.function.arguments);
+              delete parsed.negativePrompt;
+              delete parsed.starting_image_strength;
+              delete parsed.sourceImageIndex;
+              delete parsed.seed;
+              delete parsed.guidance;
+              if (parsed.model && !EDIT_IMAGE_MODELS.has(parsed.model)) {
+                console.log(`[CHAT SERVICE] Dropping incompatible model "${parsed.model}" for edit_image`);
+                delete parsed.model;
+              }
+              toolCall.function.arguments = JSON.stringify(parsed);
+            } catch {
+              // args will be parsed again downstream; skip sanitization
+            }
+          }
+        }
+
         // Add assistant message with tool calls to conversation
         updatedMessages.push({
           role: 'assistant',

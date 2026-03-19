@@ -11,7 +11,7 @@ export const definition: ToolDefinition = {
   function: {
     name: 'edit_image',
     description:
-      'Generate new images guided by reference photos. Upload 1-6 context images to influence the output style, subject, or composition. Best for: creating images inspired by reference photos, combining elements from multiple images, style-guided generation. For direct edits to a single image (remove objects, change background, enhance), use restore_photo or refine_result instead.',
+      'Generate new images guided by reference photos. Supports Qwen and Flux.2 models. Upload 1-6 context images to influence the output style, subject, or composition. Best for: creating images inspired by reference photos, combining elements from multiple images, style-guided generation, and ANY image creation involving personas/My People. ALWAYS use this tool (never generate_image) when persona reference photos are in context — even if the user requests Flux.2 or another model. For direct edits to a single image (remove objects, change background, enhance), use restore_photo or refine_result instead.',
     parameters: {
       type: 'object',
       properties: {

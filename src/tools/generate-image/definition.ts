@@ -11,7 +11,7 @@ export const definition: ToolDefinition = {
   function: {
     name: 'generate_image',
     description:
-      'Generate a new image from a text description ONLY. No reference photos — creates from text alone. IMPORTANT: Do NOT use this tool when the user references people from My People / personas. If resolve_personas was called and reference photos were loaded, you MUST use edit_image instead — generate_image cannot use reference photos for identity preservation. Only use generate_image for scenes with NO real people references.',
+      'Generate a new image from a text description ONLY. No reference photos — creates from text alone. IMPORTANT: Do NOT use this tool when the user references people from My People / personas — even if the user requests a specific model like Flux.2. If resolve_personas was called and reference photos were loaded, you MUST use edit_image instead (edit_image also supports Flux.2). generate_image cannot use reference photos for identity preservation. A model preference NEVER changes which tool to use.',
     parameters: {
       type: 'object',
       properties: {

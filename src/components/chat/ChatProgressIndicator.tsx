@@ -186,8 +186,11 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
           }}
         >
           {Array.from({ length: totalCount }, (_, i) => {
-            // Use per-job result URL (from perJobProgress) as fallback for completed slots
-            const resultUrl = completedResults[i] || progress.perJobProgress?.[i]?.resultUrl;
+            // Prefer per-job result URL (keyed by job index, always correct) over
+            // completedResults (top-level resultUrls array — unreliable for batches
+            // because it only contains the most recently completed job's URL, not
+            // an accumulated list indexed by slot).
+            const resultUrl = progress.perJobProgress?.[i]?.resultUrl || completedResults[i];
 
             // Per-job progress: only fall back to global for single-job operations
             const jobData = progress.perJobProgress?.[i];

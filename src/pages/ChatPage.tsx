@@ -1008,7 +1008,7 @@ export default function ChatPage() {
               className="text-3xl font-semibold mb-3"
               style={{ color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}
             >
-              {getWelcomeGreeting()}
+              {welcomeGreeting}
             </h1>
             <p className="mb-8" style={{ color: 'var(--color-text-tertiary)', lineHeight: 1.6, fontSize: '0.9375rem' }}>
               Generate images and videos, compose music, restore and transform photos — with the power of your Sogni Creative Agent.
