@@ -137,7 +137,7 @@ export interface UseChatResult {
   setOnRecoveryToast: (cb: ((message: string) => void) | null) => void;
 }
 
-const MAX_CONCURRENT_REQUESTS = 2;
+const MAX_CONCURRENT_REQUESTS = 1;
 
 
 interface WelcomeContext {
@@ -215,6 +215,7 @@ function cleanForStorage(messages: UIChatMessage[]): UIChatMessage[] {
     streamingStatus: undefined,
     chatModelLabel: undefined,
     isFromHistory: undefined,
+    wasCancelled: undefined,
   }));
 }
 
@@ -1005,12 +1006,19 @@ export function useChat(): UseChatResult {
     toolAbortControllersRef.current.clear();
     // Clear SogniTV progress overlay
     sogniTVController.clearProgress();
-    // Clear progress from any in-progress messages
-    setUIMessages((prev) =>
-      prev.map((msg) =>
-        msg.toolProgress ? { ...msg, toolProgress: null, isStreaming: false } : msg,
-      ),
-    );
+    // Clear progress from any in-progress messages and add cancellation indicator
+    setUIMessages((prev) => {
+      const updated = prev.map((msg) => {
+        if (msg.toolProgress) {
+          return { ...msg, toolProgress: null, isStreaming: false, wasCancelled: true };
+        }
+        if (msg.isStreaming) {
+          return { ...msg, isStreaming: false, wasCancelled: true };
+        }
+        return msg;
+      });
+      return updated;
+    });
     activeRequestCountRef.current = 0;
     setIsLoading(false);
     setIsSending(false);

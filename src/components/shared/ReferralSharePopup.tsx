@@ -56,72 +56,104 @@ export function ReferralSharePopup({ isOpen, onClose }: ReferralSharePopupProps)
       role="dialog"
       aria-modal="true"
       aria-labelledby="referral-popup-title"
+      className="fixed inset-0 flex items-center justify-center p-4"
       style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 99999,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(0,0,0,0.4)',
+        zIndex: 100000,
+        background: 'rgba(0, 0, 0, 0.5)',
         backdropFilter: 'blur(4px)',
       }}
     >
       <div
         ref={panelRef}
+        className="max-w-sm w-full relative overflow-hidden"
         style={{
-          background: 'var(--color-bg-elevated)',
           borderRadius: '20px',
-          width: '100%',
-          maxWidth: '420px',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+          background: '#2f2f2f',
           margin: '0 16px',
-          boxShadow: '0 20px 60px rgba(var(--rgb-dark-navy), 0.2)',
-          overflow: 'hidden',
           animation: 'menuFadeIn 0.2s ease-out',
         }}
       >
-        {/* Header */}
-        <div
-          style={{
-            padding: '24px 24px 20px',
-            background: 'linear-gradient(135deg, rgba(var(--rgb-primary), 0.08), rgba(var(--rgb-accent), 0.06))',
-            borderBottom: '1px solid var(--color-border-light)',
-            textAlign: 'center',
-          }}
-        >
-          <div style={{ fontSize: '2rem', marginBottom: '8px' }}>✨</div>
-          <h2
-            id="referral-popup-title"
+        {/* Mascot header — same layout as Daily Boost */}
+        <div style={{ position: 'relative' }}>
+          <img
+            src="/daily-boost-mascot.jpg"
+            alt="Share & Earn"
             style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: '1.25rem',
-              fontWeight: 700,
-              color: 'var(--color-primary)',
-              margin: 0,
-              letterSpacing: '-0.02em',
+              width: '100%',
+              height: '220px',
+              objectFit: 'cover',
+              display: 'block',
+            }}
+          />
+          {/* Gradient fade into card */}
+          <div style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: '80px',
+            background: 'linear-gradient(to top, #2f2f2f, transparent)',
+            pointerEvents: 'none',
+          }} />
+          {/* "Share & Earn" label */}
+          <div style={{
+            position: 'absolute',
+            bottom: '12px',
+            left: '0',
+            right: '0',
+            textAlign: 'center',
+            pointerEvents: 'none',
+          }}>
+            <span
+              id="referral-popup-title"
+              style={{
+                fontWeight: 700,
+                fontSize: '1.25rem',
+                color: '#ffffff',
+                textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+                letterSpacing: '0.02em',
+              }}
+            >
+              Share & Earn
+            </span>
+          </div>
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full transition-colors"
+            style={{
+              background: 'rgba(0, 0, 0, 0.45)',
+              backdropFilter: 'blur(4px)',
+              color: '#ffffff',
+              border: 'none',
+              cursor: 'pointer',
             }}
           >
-            Share & Earn
-          </h2>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
         </div>
 
         {/* Body */}
-        <div style={{ padding: '20px 24px' }}>
+        <div style={{ padding: '1.25rem 1.5rem 1.5rem' }}>
           <ul
             style={{
               fontSize: '0.8125rem',
               lineHeight: 1.7,
-              color: 'var(--color-text-secondary)',
+              color: 'rgba(255, 255, 255, 0.6)',
               margin: '0 0 20px',
               paddingLeft: '20px',
               listStyleType: 'disc',
             }}
           >
             <li>
-              Friends who sign up with your link get <strong style={{ color: 'var(--color-accent)' }}>25 bonus credits</strong>.
+              Friends who sign up with your link get <strong style={{ color: '#00e5ff' }}>25 bonus credits</strong>.
             </li>
             <li>
-              You earn <strong style={{ color: 'var(--color-accent)' }}>25 credits</strong> after their first purchase.
+              You earn <strong style={{ color: '#00e5ff' }}>25 credits</strong> after their first purchase.
             </li>
             <li>
               You also earn a share of rewards on every credit purchase they make — or that their own referrals make.
@@ -136,7 +168,7 @@ export function ReferralSharePopup({ isOpen, onClose }: ReferralSharePopupProps)
               fontWeight: 600,
               letterSpacing: '0.06em',
               textTransform: 'uppercase',
-              color: 'var(--color-text-light)',
+              color: 'rgba(255, 255, 255, 0.4)',
               marginBottom: '6px',
             }}
           >
@@ -157,10 +189,10 @@ export function ReferralSharePopup({ isOpen, onClose }: ReferralSharePopupProps)
                 flex: 1,
                 padding: '10px 12px',
                 borderRadius: '10px',
-                border: '1px solid var(--color-border)',
-                background: 'var(--color-bg-parchment, var(--color-bg))',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
+                background: 'rgba(255, 255, 255, 0.06)',
                 fontSize: '0.8125rem',
-                color: 'var(--color-text-secondary)',
+                color: 'rgba(255, 255, 255, 0.7)',
                 outline: 'none',
                 minWidth: 0,
               }}
@@ -171,9 +203,9 @@ export function ReferralSharePopup({ isOpen, onClose }: ReferralSharePopupProps)
               style={{
                 padding: '10px 16px',
                 borderRadius: '10px',
-                background: copied ? '#10b981' : 'var(--color-bg-hover)',
-                color: copied ? 'white' : 'var(--color-text-primary)',
-                border: '1px solid var(--color-border)',
+                background: copied ? '#10b981' : 'rgba(255, 255, 255, 0.1)',
+                color: '#ffffff',
+                border: '1px solid rgba(255, 255, 255, 0.12)',
                 fontSize: '0.8125rem',
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -195,7 +227,7 @@ export function ReferralSharePopup({ isOpen, onClose }: ReferralSharePopupProps)
               style={{
                 fontSize: '0.8125rem',
                 fontWeight: 500,
-                color: 'var(--color-primary)',
+                color: '#00e5ff',
                 textDecoration: 'none',
               }}
               onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
@@ -204,39 +236,6 @@ export function ReferralSharePopup({ isOpen, onClose }: ReferralSharePopupProps)
               Learn about the Referral Program →
             </a>
           </div>
-        </div>
-
-        {/* Footer */}
-        <div
-          style={{
-            padding: '12px 24px 16px',
-            textAlign: 'center',
-          }}
-        >
-          <button
-            onClick={onClose}
-            style={{
-              padding: '8px 24px',
-              borderRadius: '10px',
-              border: '1px solid var(--color-border)',
-              background: 'transparent',
-              fontSize: '0.8125rem',
-              fontWeight: 500,
-              color: 'var(--color-text-light)',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(var(--rgb-primary), 0.04)';
-              e.currentTarget.style.borderColor = 'var(--color-border-hover)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent';
-              e.currentTarget.style.borderColor = 'var(--color-border)';
-            }}
-          >
-            Close
-          </button>
         </div>
       </div>
     </div>,

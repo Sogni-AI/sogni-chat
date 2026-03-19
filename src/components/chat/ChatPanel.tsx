@@ -857,6 +857,8 @@ export function ChatPanel({
         onAddMediaFile={onAddMediaFile}
         onRemoveMediaFile={onRemoveMediaFile}
         getPreviewUrl={getPreviewUrl}
+        isLoading={isLoading}
+        onCancel={chat.cancelToolExecution}
       />
 
       {/* Fullscreen before/after viewer */}

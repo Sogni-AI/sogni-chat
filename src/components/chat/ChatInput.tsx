@@ -21,6 +21,10 @@ interface ChatInputProps {
   onRemoveMediaFile?: (index: number) => void;
   /** Get a blob URL preview for an image at the given index */
   getPreviewUrl?: (index: number) => string | null;
+  /** True while the chat is processing (thinking, streaming, or tool execution) */
+  isLoading?: boolean;
+  /** Called when the user clicks the stop button during loading */
+  onCancel?: () => void;
 }
 
 /** Human-readable label for an uploaded file */
@@ -198,6 +202,8 @@ export const ChatInput = memo(function ChatInput({
   onAddMediaFile,
   onRemoveMediaFile,
   getPreviewUrl,
+  isLoading = false,
+  onCancel,
 }: ChatInputProps) {
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -278,7 +284,8 @@ export const ChatInput = memo(function ChatInput({
   );
 
   const hasFiles = uploadedFiles && uploadedFiles.length > 0;
-  const canSendNow = !disabled && value.trim().length > 0;
+  const canSendNow = !disabled && !isLoading && value.trim().length > 0;
+  const showStopButton = isLoading && onCancel;
 
   return (
     <div
@@ -419,32 +426,58 @@ export const ChatInput = memo(function ChatInput({
             }}
           />
 
-          {/* Send button */}
-          <button
-            onClick={handleSend}
-            disabled={!canSendNow}
-            style={{
-              flexShrink: 0,
-              alignSelf: 'flex-end',
-              width: '2rem',
-              height: '2rem',
-              borderRadius: '50%',
-              border: 'none',
-              background: canSendNow ? '#ffffff' : 'rgba(255, 255, 255, 0.1)',
-              color: canSendNow ? '#0a0a0a' : '#666666',
-              cursor: canSendNow ? 'pointer' : 'not-allowed',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.15s',
-            }}
-            title="Send message"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="19" x2="12" y2="5" />
-              <polyline points="5 12 12 5 19 12" />
-            </svg>
-          </button>
+          {/* Send / Stop button */}
+          {showStopButton ? (
+            <button
+              onClick={onCancel}
+              style={{
+                flexShrink: 0,
+                alignSelf: 'flex-end',
+                width: '2rem',
+                height: '2rem',
+                borderRadius: '50%',
+                border: 'none',
+                background: '#ffffff',
+                color: '#0a0a0a',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s',
+              }}
+              title="Stop generation"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="4" y="4" width="16" height="16" rx="2" />
+              </svg>
+            </button>
+          ) : (
+            <button
+              onClick={handleSend}
+              disabled={!canSendNow}
+              style={{
+                flexShrink: 0,
+                alignSelf: 'flex-end',
+                width: '2rem',
+                height: '2rem',
+                borderRadius: '50%',
+                border: 'none',
+                background: canSendNow ? '#ffffff' : 'rgba(255, 255, 255, 0.1)',
+                color: canSendNow ? '#0a0a0a' : '#666666',
+                cursor: canSendNow ? 'pointer' : 'not-allowed',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'all 0.15s',
+              }}
+              title="Send message"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="19" x2="12" y2="5" />
+                <polyline points="5 12 12 5 19 12" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
     </div>

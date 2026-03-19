@@ -45,6 +45,8 @@ export interface UIChatMessage {
   referencedPersonas?: string[];
   /** Memory chip: present when the LLM saved a user memory via manage_memory tool */
   memorySaved?: { key: string; value: string };
+  /** True when the user cancelled this message's generation/tool execution */
+  wasCancelled?: boolean;
 }
 
 /** Full chat session stored in IndexedDB */

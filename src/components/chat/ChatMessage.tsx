@@ -75,8 +75,8 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
   const handleVideoIndexChange = useCallback((i: number) => setActiveVideoIndex(i), []);
   const handleAudioIndexChange = useCallback((i: number) => setActiveAudioIndex(i), []);
 
-  // Don't render empty assistant messages (but keep streaming ones visible for the cursor)
-  if (isAssistant && !hasVisibleContent && !hasProgress && !hasImages && !hasVideos && !hasAudios && !message.isStreaming) {
+  // Don't render empty assistant messages (but keep streaming/cancelled ones visible)
+  if (isAssistant && !hasVisibleContent && !hasProgress && !hasImages && !hasVideos && !hasAudios && !message.isStreaming && !message.wasCancelled) {
     return null;
   }
 
@@ -212,7 +212,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
       {/* Uploaded image thumbnails above the text bubble */}
       {uploadedImageThumbnails}
       {/* Message bubble */}
-      {(hasVisibleContent || (isAssistant && message.isStreaming && !hasProgress)) && (
+      {(hasVisibleContent || (isAssistant && (message.isStreaming && !hasProgress || (message.wasCancelled && !hasImages && !hasVideos && !hasAudios)))) && (
         <div
           style={{
             maxWidth: isUser ? '75%' : '85%',
@@ -232,6 +232,11 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
                 <ReactMarkdown components={markdownComponents}>
                   {displayContent}
                 </ReactMarkdown>
+              )}
+              {message.wasCancelled && !hasVisibleContent && !hasImages && !hasVideos && !hasAudios && (
+                <span style={{ fontSize: '0.8125rem', color: '#8e8e8e', fontStyle: 'italic' }}>
+                  Cancelled
+                </span>
               )}
               {message.isStreaming && !message.toolProgress && (
                 hasVisibleContent ? (
