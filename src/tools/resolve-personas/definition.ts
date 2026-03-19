@@ -10,7 +10,7 @@ export const definition: ToolDefinition = {
   function: {
     name: 'resolve_personas',
     description:
-      'Load persona reference photos and appearance descriptions for identity-preserving image generation. Call this BEFORE edit_image when the user references a person by name (e.g. "make a picture of me", "draw Sarah and the kids"). Returns reference photos as numbered context images (picture 1, picture 2, etc.) plus appearance descriptions. After calling this, use edit_image and reference each person by their picture number (e.g. "the person from picture 1") with explicit instructions to preserve their face, ethnicity, age, and features. Do NOT call this for non-person subjects.',
+      'Load persona reference photos for identity-preserving image generation. Call this BEFORE edit_image when the user references a person from My People (e.g. "make a picture of me", "draw Sarah and the kids"). Returns reference photos as numbered context images plus appearance descriptions. CRITICAL: After calling this, you MUST use edit_image (NOT generate_image) — only edit_image supports reference photos for identity preservation. Reference each person by picture number with explicit face preservation directives. Do NOT call this for fictional/non-persona subjects.',
     parameters: {
       type: 'object',
       properties: {

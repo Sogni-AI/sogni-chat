@@ -11,7 +11,7 @@ export const definition: ToolDefinition = {
   function: {
     name: 'generate_image',
     description:
-      'Generate a new image from a text description. No source image needed — creates entirely new images from your prompt. Supports multiple AI models for different styles and quality levels.',
+      'Generate a new image from a text description ONLY. No reference photos — creates from text alone. IMPORTANT: Do NOT use this tool when the user references people from My People / personas. If resolve_personas was called and reference photos were loaded, you MUST use edit_image instead — generate_image cannot use reference photos for identity preservation. Only use generate_image for scenes with NO real people references.',
     parameters: {
       type: 'object',
       properties: {

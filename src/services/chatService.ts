@@ -189,7 +189,7 @@ export async function sendChatMessage(
   const personaContext = await buildPersonaContext();
   const dynamicSystemPrompt = CHAT_SYSTEM_PROMPT
     + (personaContext
-      ? `\nUser's people: ${personaContext}. Call resolve_personas for image creation with these people. If user mentions a specific person by name who is not listed, suggest they add them to My People.`
+      ? `\nUser's people: ${personaContext}. When creating images of these people: call resolve_personas first, then use edit_image (never generate_image — it cannot use reference photos). If user mentions someone not listed, suggest adding them to My People.`
       : '');
 
   // Verify the chat API is available on this client instance
