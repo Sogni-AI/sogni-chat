@@ -19,7 +19,9 @@ export const definition: ToolDefinition = {
           type: 'string',
           description: `Text description of the image (50-200 words). Subject first, then environment, then style/mood.
 
-Include: lighting ("soft golden hour light"), composition ("close-up portrait", "wide shot"), and style ("oil painting", "shot on Canon EOS R5, 85mm f/1.4"). POSITIVE phrasing only.`,
+Include: lighting ("soft golden hour light"), composition ("close-up portrait", "wide shot"), and style ("oil painting", "shot on Canon EOS R5, 85mm f/1.4"). POSITIVE phrasing only.
+
+BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary unspecified dimensions. Example: "4 images of a black cat" → "a black cat {lounging in a sunlit window|prowling through autumn leaves|sitting on a vintage bookshelf|curled up by a fireplace}". Vary setting, style, lighting, or composition — never override what the user specified.`,
         },
         model: {
           type: 'string',

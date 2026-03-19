@@ -24,7 +24,9 @@ Tips:
 - For identity preservation: "the person from picture N — preserve their face, ethnicity, age, skin tone, hairstyle, and features exactly"
 - Include specific appearance descriptors in the prompt to reinforce the likeness.
 - Use POSITIVE phrasing ("sharp details", not "no blur").
-- Be specific about what to take from each reference image.`,
+- Be specific about what to take from each reference image.
+
+BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. For personas: vary scene, activity, or environment — never vary identity. Example: "[persona] at the beach {building a sandcastle|surfing a wave|reading under a palm tree}". For direct edits: vary the approach, e.g., "make the sky {a vibrant sunset|stormy and dramatic|clear blue}".`,
         },
         model: {
           type: 'string',

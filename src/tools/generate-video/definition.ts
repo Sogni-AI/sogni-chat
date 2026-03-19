@@ -25,7 +25,9 @@ DIALOGUE: Write ACTUAL spoken words in double quotes. Never summarize as "they a
 
 For specific characters (movies, TV): describe visual appearance (clothing, hair, build) — don't rely on names alone.
 
-Capture the user's creative intent faithfully. Present tense. Positive phrasing. No vague words ("beautiful", "nice") — concrete sensory details. Natural, plausible movements.`,
+Capture the user's creative intent faithfully. Present tense. Positive phrasing. No vague words ("beautiful", "nice") — concrete sensory details. Natural, plausible movements.
+
+BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. Lock in any camera/subject/style the user specified, vary the rest. Example: "slow dolly in on a city street {at dawn with golden light|during a rainstorm|at night with neon reflections}".`,
         },
         duration: {
           type: 'number',

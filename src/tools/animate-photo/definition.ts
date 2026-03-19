@@ -32,7 +32,9 @@ For specific characters (movies, TV): describe visual appearance (clothing, hair
 
 For complex/creative scenes (characters talking, skits), capture full creative intent — system auto-expands into detailed prompt.
 
-Present tense. Positive phrasing. No vague words ("beautiful", "nice") — use concrete sensory details. Subtle, natural movements.`,
+Present tense. Positive phrasing. No vague words ("beautiful", "nice") — use concrete sensory details. Subtle, natural movements.
+
+BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary motion, camera, or atmosphere while preserving the user's specified elements. Example: "{gentle sway with soft birdsong|dramatic zoom with rolling thunder|slow pan with ambient music}".`,
         },
         videoModel: {
           type: 'string',

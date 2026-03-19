@@ -26,7 +26,9 @@ Examples by mode:
 - animate-move (camera animation from reference image): "Smooth cinematic camera movement following the subject."
 - animate-replace (swap subject from reference image): "The character from the reference image performing the video's movements."
 
-Present tense. Positive phrasing. Concrete visual details.`,
+Present tense. Positive phrasing. Concrete visual details.
+
+BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary the artistic treatment while keeping control mode and structural intent consistent. Example: "transform to {watercolor with soft edges|oil painting with bold strokes|anime with clean lines} style".`,
         },
         videoSourceIndex: {
           type: 'number',

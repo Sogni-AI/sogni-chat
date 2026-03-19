@@ -23,7 +23,9 @@ Rules:
 - Use POSITIVE phrasing only. The model ignores negatives.
 - Be specific about what to change: "warmer skin tones", "cooler shadows", "sharper facial features", "more natural greens".
 - ALWAYS include "Keep everything else unchanged" to prevent unwanted changes.
-- CRITICAL for photos with people: append identity preservation directive.`,
+- CRITICAL for photos with people: append identity preservation directive.
+
+BATCH VARIATIONS: Only use Dynamic Prompt syntax when the user explicitly asks to explore different refinement directions. Example: "refine with {more contrast|softer lighting|richer colors}". Default to identical prompts for refine_result batches.`,
         },
         sourceImageIndex: {
           type: 'number',

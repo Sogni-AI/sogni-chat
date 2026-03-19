@@ -21,7 +21,9 @@ export const definition: ToolDefinition = {
 
 Lip-sync: describe how the person speaks and the atmosphere. Music visualization: describe visual style reacting to the beat. Audio-reactive: describe motion synchronized to sounds.
 
-Present tense. Positive phrasing. Describe motion as it relates to the audio.`,
+Present tense. Positive phrasing. Describe motion as it relates to the audio.
+
+BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary the visual interpretation while keeping audio sync intent consistent. Example: "{abstract neon visualization|nature scene with swaying trees|urban street with rain} synced to the beat".`,
         },
         audioSourceIndex: {
           type: 'number',

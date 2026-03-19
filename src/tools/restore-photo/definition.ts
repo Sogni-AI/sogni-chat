@@ -24,7 +24,9 @@ Format: [action] + [details] + [what to preserve]. Describe desired final state,
 - Object removal: describe scene WITHOUT the object, matching surrounding textures
 - Colorization: "Restore and colorize the photo" or "Apply natural [decade] color palette"
 - For photos with people (unless removing them): ALWAYS append "Preserve all facial features, expressions, identity, positioning, and composition."
-- No keyword spam ("8k, masterpiece") — use plain descriptions.`,
+- No keyword spam ("8k, masterpiece") — use plain descriptions.
+
+BATCH VARIATIONS: Only use Dynamic Prompt syntax when the user explicitly requests multiple approaches to compare. Example: "restore with {warm vintage|cool modern|natural balanced} tones". Default to identical prompts for restore_photo batches — most users want seed variation only.`,
         },
         numberOfVariations: {
           type: 'number',
