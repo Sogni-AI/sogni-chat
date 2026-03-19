@@ -114,6 +114,7 @@ export async function getAllPersonas(): Promise<PersonaSummary[]> {
           description: p.description,
           tags: p.tags,
           hasPhoto: !!p.photoData,
+          voice: p.voice || null,
           createdAt: p.createdAt,
           updatedAt: p.updatedAt,
         });

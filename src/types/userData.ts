@@ -39,6 +39,8 @@ export interface PersonaSummary {
   description: string;
   tags: string[];
   hasPhoto: boolean;
+  /** Voice description — included in summary for system prompt injection */
+  voice: string | null;
   createdAt: number;
   updatedAt: number;
 }
