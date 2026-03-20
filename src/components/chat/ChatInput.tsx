@@ -233,10 +233,20 @@ export const ChatInput = memo(function ChatInput({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      // Ctrl/Cmd+Enter to send; plain Enter inserts a newline (better for mobile)
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        handleSend();
+      if (e.key !== 'Enter') return;
+      const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      if (isMobile) {
+        // Mobile: Enter inserts newline naturally; Ctrl/Cmd+Enter sends
+        if (e.ctrlKey || e.metaKey) {
+          e.preventDefault();
+          handleSend();
+        }
+      } else {
+        // Desktop: Enter sends, Shift+Enter inserts newline
+        if (!e.shiftKey) {
+          e.preventDefault();
+          handleSend();
+        }
       }
     },
     [handleSend],
