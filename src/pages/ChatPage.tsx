@@ -144,7 +144,7 @@ export default function ChatPage() {
     clearPendingRestore,
   } = useChatSessions();
   const isDesktop = useMediaQuery('(min-width: 900px)');
-  const { showOutOfCreditsPopup, showSignupModal, sidebarCollapsed, toggleSidebar, selectedModelVariant, setSelectedModelVariant, safeContentFilter, setSafeContentFilter, isLoginModalOpen } = useLayout();
+  const { showOutOfCreditsPopup, showSignupModal, sidebarCollapsed, toggleSidebar, selectedModelVariant, setSelectedModelVariant, safeContentFilter, setSafeContentFilter, requestDisableContentFilter, isLoginModalOpen } = useLayout();
   const { personas, addPersona, updatePersona, deletePersona, getPersonaThumbnailUrl } = usePersonas();
   const [personaEditorOpen, setPersonaEditorOpen] = useState(false);
   const [editingPersonaId, setEditingPersonaId] = useState<string | null>(null);
@@ -960,12 +960,13 @@ export default function ChatPage() {
       qualityTier,
       safeContentFilter,
       onContentFilterChange: setSafeContentFilter,
+      requestDisableContentFilter,
       uploadedFiles,
       onTokenSwitch: handleTokenSwitch,
       onInsufficientCredits: handleInsufficientCredits,
       modelVariantId: selectedModelVariant,
     }, modelKey);
-  }, [chat, getSogniClient, imageData, width, height, tokenType, balances, qualityTier, safeContentFilter, setSafeContentFilter, uploadedFiles, handleTokenSwitch, handleInsufficientCredits, selectedModelVariant]);
+  }, [chat, getSogniClient, imageData, width, height, tokenType, balances, qualityTier, safeContentFilter, setSafeContentFilter, requestDisableContentFilter, uploadedFiles, handleTokenSwitch, handleInsufficientCredits, selectedModelVariant]);
 
   const sogniClient = getSogniClient();
 

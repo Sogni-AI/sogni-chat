@@ -23,7 +23,7 @@ import { isInsufficientCreditsError, getAlternateToken, hasBalance } from '@/too
 import { trimConversation, getInputBudget } from '@/services/contextWindow';
 import { resizeImageForVision } from '@/utils/imageProcessing';
 import type { TokenType } from '@/types/wallet';
-import { getAllPersonas } from '@/utils/userDataDB';
+import { getAllPersonas, getAllMemories } from '@/utils/userDataDB';
 
 // ---------------------------------------------------------------------------
 // Callbacks
@@ -92,6 +92,20 @@ async function buildPersonaContext(): Promise<string> {
     return result;
   } catch (err) {
     console.warn('[CHAT SERVICE] Failed to build persona context:', err);
+    return '';
+  }
+}
+
+/** Build compact memory context for system prompt injection so the LLM always sees user preferences */
+async function buildMemoryContext(): Promise<string> {
+  try {
+    const memories = await getAllMemories();
+    if (memories.length === 0) return '';
+    return memories
+      .map(m => `${m.key}: ${m.value}`)
+      .join('; ');
+  } catch (err) {
+    console.warn('[CHAT SERVICE] Failed to build memory context:', err);
     return '';
   }
 }
@@ -170,12 +184,16 @@ export async function sendChatMessage(
   let toolRound = 0;
   let streamNullRetries = 0;
 
-  // Build persona context once (not per tool round)
+  // Build persona + memory context once (not per tool round)
   const personaContext = await buildPersonaContext();
   const personaNames = await getPersonaNames();
+  const memoryContext = await buildMemoryContext();
   const dynamicSystemPrompt = CHAT_SYSTEM_PROMPT
     + (personaContext
       ? `\nUser's people: ${personaContext}. "me", "I", "myself" = the person marked (self) — call resolve_personas with their name immediately, never ask who they mean. When creating images of these people: call resolve_personas first, then use edit_image (never generate_image). When creating videos of these people: ALWAYS generate an image first (resolve_personas → edit_image), then STOP — show the image result and ask if it looks good before proceeding to animate_photo. Never chain image → video without user approval. Pronouns like "us", "we", "our" refer to these people — always call resolve_personas again for each new image generation, even in follow-up messages. If user mentions someone not listed, suggest adding them to My Personas.`
+      : '')
+    + (memoryContext
+      ? `\nUser preferences (always respect these): ${memoryContext}`
       : '');
 
   // Verify the chat API is available on this client instance

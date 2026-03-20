@@ -12,6 +12,7 @@ import { SogniTV } from '@/components/shared/SogniTV';
 import { captureReferralFromURL } from '@/utils/referralTracking';
 import { DEFAULT_VARIANT_ID } from '@/config/modelVariants';
 import { getSavedContentFilter, saveContentFilter } from '@/config/contentFilterPreset';
+import DisableContentFilterPopup from '@/components/content-filter/DisableContentFilterPopup';
 import { useState, useEffect, useRef, createContext, useContext, useCallback } from 'react';
 
 // Shared layout context for child pages to trigger modals and access layout state
@@ -32,6 +33,8 @@ interface LayoutContextValue {
   safeContentFilter: boolean;
   /** Toggle the safe content filter */
   setSafeContentFilter: (enabled: boolean) => void;
+  /** Request to disable the content filter — shows confirmation popup, resolves true if confirmed */
+  requestDisableContentFilter: () => Promise<boolean>;
   /** Whether the login/signup modal is currently open */
   isLoginModalOpen: boolean;
 }
@@ -47,6 +50,7 @@ const LayoutContext = createContext<LayoutContextValue>({
   toggleSidebar: () => {},
   safeContentFilter: true,
   setSafeContentFilter: () => {},
+  requestDisableContentFilter: () => Promise.resolve(false),
   isLoginModalOpen: false,
 });
 
@@ -102,6 +106,35 @@ export function AppLayout() {
     saveContentFilter(enabled);
   }, []);
 
+  // Content filter confirmation popup
+  const [showDisableFilterPopup, setShowDisableFilterPopup] = useState(false);
+  const filterResolverRef = useRef<((confirmed: boolean) => void) | null>(null);
+
+  const requestDisableContentFilter = useCallback(() => {
+    // Guard against concurrent requests
+    if (filterResolverRef.current) {
+      return new Promise<boolean>(() => {});
+    }
+    return new Promise<boolean>((resolve) => {
+      filterResolverRef.current = resolve;
+      setShowDisableFilterPopup(true);
+    });
+  }, []);
+
+  const handleFilterConfirm = useCallback((permanent: boolean) => {
+    saveContentFilter(false, permanent);
+    setSafeContentFilterState(false);
+    setShowDisableFilterPopup(false);
+    filterResolverRef.current?.(true);
+    filterResolverRef.current = null;
+  }, []);
+
+  const handleFilterCancel = useCallback(() => {
+    setShowDisableFilterPopup(false);
+    filterResolverRef.current?.(false);
+    filterResolverRef.current = null;
+  }, []);
+
   const showSignupModal = useCallback((mode: LoginModalMode = 'signup') => {
     setSignupMode(mode);
     setShowSignup(true);
@@ -135,6 +168,7 @@ export function AppLayout() {
     toggleSidebar,
     safeContentFilter,
     setSafeContentFilter,
+    requestDisableContentFilter,
     isLoginModalOpen: showSignup,
   };
 
@@ -209,6 +243,12 @@ export function AppLayout() {
       />
 
       <SogniTV />
+
+      <DisableContentFilterPopup
+        isOpen={showDisableFilterPopup}
+        onConfirm={handleFilterConfirm}
+        onCancel={handleFilterCancel}
+      />
 
       {/* Alpha version badge */}
       <div style={{

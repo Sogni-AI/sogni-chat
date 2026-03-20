@@ -214,7 +214,7 @@ export function ChatPanel({
   welcomeGreeting,
   onAddPersona,
 }: ChatPanelProps) {
-  const { selectedModelVariant, setSelectedModelVariant } = useLayout();
+  const { selectedModelVariant, setSelectedModelVariant, requestDisableContentFilter } = useLayout();
   const isMobile = useMediaQuery('(max-width: 743px)');
   const {
     messages,
@@ -327,6 +327,7 @@ export function ChatPanel({
         qualityTier,
         safeContentFilter,
         onContentFilterChange,
+        requestDisableContentFilter,
         uploadedFiles,
         onTokenSwitch,
         onInsufficientCredits,
@@ -334,7 +335,7 @@ export function ChatPanel({
         uploadedImageUrls: uploadedImageUrls.length > 0 ? uploadedImageUrls : undefined,
       });
     },
-    [sogniClient, imageData, width, height, tokenType, balances, qualityTier, safeContentFilter, onContentFilterChange, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, selectedModelVariant, getPreviewUrl],
+    [sogniClient, imageData, width, height, tokenType, balances, qualityTier, safeContentFilter, onContentFilterChange, requestDisableContentFilter, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, selectedModelVariant, getPreviewUrl],
   );
 
   const handleImageClick = useCallback((url: string, _index: number) => {
@@ -680,7 +681,7 @@ export function ChatPanel({
                   e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.10)';
                 }}
               >
-                What can I do?
+                What can you help me create?
               </button>
 
               {/* Add Persona CTA — only for logged-in users without personas */}

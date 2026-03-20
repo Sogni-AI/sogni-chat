@@ -19,7 +19,7 @@ import { useMemories } from '@/hooks/useMemories';
 
 export function AuthStatus() {
   const { isAuthenticated, isLoading, user, authMode, logout } = useSogniAuth();
-  const { showSignupModal, safeContentFilter, setSafeContentFilter } = useLayout();
+  const { showSignupModal, safeContentFilter, setSafeContentFilter, requestDisableContentFilter } = useLayout();
   const { balances, tokenType, switchPaymentMethod } = useWallet();
   const { tokenToUSD } = useTokenPrice(tokenType);
 
@@ -355,7 +355,15 @@ export function AuthStatus() {
 
             {/* Safe Content Filter toggle */}
             <button
-              onClick={() => setSafeContentFilter(!safeContentFilter)}
+              onClick={() => {
+                if (safeContentFilter) {
+                  // Disabling — show confirmation popup
+                  requestDisableContentFilter();
+                } else {
+                  // Re-enabling — no popup needed
+                  setSafeContentFilter(true);
+                }
+              }}
               style={{
                 display: 'flex',
                 alignItems: 'center',

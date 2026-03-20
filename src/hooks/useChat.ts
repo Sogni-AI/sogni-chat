@@ -46,6 +46,7 @@ export interface UseChatResult {
       qualityTier?: 'fast' | 'hq';
       safeContentFilter?: boolean;
       onContentFilterChange?: (enabled: boolean) => void;
+      requestDisableContentFilter?: () => Promise<boolean>;
       uploadedFiles?: UploadedFile[];
       onTokenSwitch?: (newType: TokenType) => void;
       onInsufficientCredits?: () => void;
@@ -98,6 +99,7 @@ export interface UseChatResult {
       qualityTier?: 'fast' | 'hq';
       safeContentFilter?: boolean;
       onContentFilterChange?: (enabled: boolean) => void;
+      requestDisableContentFilter?: () => Promise<boolean>;
       uploadedFiles?: UploadedFile[];
       onTokenSwitch?: (newType: TokenType) => void;
       onInsufficientCredits?: () => void;
@@ -468,6 +470,7 @@ export function useChat(): UseChatResult {
         qualityTier?: 'fast' | 'hq';
         safeContentFilter?: boolean;
         onContentFilterChange?: (enabled: boolean) => void;
+        requestDisableContentFilter?: () => Promise<boolean>;
         uploadedFiles?: UploadedFile[];
         onTokenSwitch?: (newType: TokenType) => void;
         onInsufficientCredits?: () => void;
@@ -563,6 +566,7 @@ export function useChat(): UseChatResult {
           qualityTier: context.qualityTier,
           safeContentFilter: context.safeContentFilter,
           onContentFilterChange: context.onContentFilterChange,
+          requestDisableContentFilter: context.requestDisableContentFilter,
           onTokenSwitch: context.onTokenSwitch,
           onInsufficientCredits: context.onInsufficientCredits,
           signal: toolAbortController.signal,
@@ -1435,6 +1439,7 @@ export function useChat(): UseChatResult {
         qualityTier?: 'fast' | 'hq';
         safeContentFilter?: boolean;
         onContentFilterChange?: (enabled: boolean) => void;
+        requestDisableContentFilter?: () => Promise<boolean>;
         uploadedFiles?: UploadedFile[];
         onTokenSwitch?: (newType: TokenType) => void;
         onInsufficientCredits?: () => void;
@@ -1537,6 +1542,7 @@ export function useChat(): UseChatResult {
         qualityTier: isQualityOverride ? (modelKeyOverride as 'fast' | 'hq') : context.qualityTier,
         safeContentFilter: context.safeContentFilter,
         onContentFilterChange: context.onContentFilterChange,
+        requestDisableContentFilter: context.requestDisableContentFilter,
         onTokenSwitch: context.onTokenSwitch,
         onInsufficientCredits: context.onInsufficientCredits,
         signal: toolAbortController.signal,
