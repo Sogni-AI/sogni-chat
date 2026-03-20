@@ -34,8 +34,10 @@ export async function execute(
   const scale = (args.scale as number) || 1;
   const aspectRatio = args.aspectRatio as string | undefined;
   const modelKey = args.model as string | undefined;
-  const modelOverride = modelKey ? EXTRA_MODELS[modelKey] : undefined;
-  const qualityTier = (args.quality as 'fast' | 'hq') || context.qualityTier || 'fast';
+  const isPro = !modelKey && context.qualityTier === 'pro';
+  const modelOverride = modelKey ? EXTRA_MODELS[modelKey] : (isPro ? EXTRA_MODELS['flux2'] : undefined);
+  const costTier = isPro ? 'pro' : ((args.quality as 'fast' | 'hq') || context.qualityTier || 'fast');
+  const qualityTier = isPro ? 'hq' : ((args.quality as 'fast' | 'hq') || context.qualityTier || 'fast');
 
   if (!context.imageData && context.resultUrls.length === 0) {
     return JSON.stringify({ error: 'no_image', message: 'Please upload or generate an image first.' });
@@ -74,7 +76,7 @@ export async function execute(
   );
 
   const originalToken = context.tokenType;
-  let estimatedCost = await fetchRestorationCostEstimate(context.sogniClient, context.tokenType, 1, qualityTier);
+  let estimatedCost = await fetchRestorationCostEstimate(context.sogniClient, context.tokenType, 1, costTier);
 
   // Pre-flight credit check before creating placeholders
   const preflight = preflightCreditCheck(context, estimatedCost);

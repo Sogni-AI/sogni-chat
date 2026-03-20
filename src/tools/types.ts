@@ -46,7 +46,7 @@ export interface ToolExecutionContext {
   /** Current wallet balances for auto-switch logic */
   balances: Balances | null;
   /** Default quality tier set by the UI toggle */
-  qualityTier?: 'fast' | 'hq';
+  qualityTier?: 'fast' | 'hq' | 'pro';
   /** Called when token type is auto-switched due to insufficient balance */
   onTokenSwitch?: (newType: TokenType) => void;
   /** Called when both token types are exhausted */

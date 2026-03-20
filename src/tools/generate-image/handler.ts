@@ -111,7 +111,7 @@ const IMAGE_MODELS: Record<string, ImageModelConfig> = {
     defaultHeight: 832,
     maxWidth: 2048,
     maxHeight: 2048,
-    defaultSteps: 20,
+    defaultSteps: 40,
     defaultGuidance: 4.0,
     sampler: 'euler',
     scheduler: 'simple',
@@ -360,11 +360,12 @@ export async function execute(
   callbacks: ToolCallbacks,
 ): Promise<string> {
   const prompt = args.prompt as string;
-  const defaultModel = context.qualityTier === 'hq' ? 'z-image' : 'z-turbo';
+  const defaultModel = context.qualityTier === 'pro' ? 'flux2'
+    : context.qualityTier === 'hq' ? 'z-image' : 'z-turbo';
   const explicitModel = args.model as string | undefined;
   // Only honor explicit model for specialized (non-tier) models like chroma/flux/pony.
-  // Ignore z-turbo/z-image from args — those are handled by qualityTier.
-  const TIER_DEFAULTS = ['z-turbo', 'z-image'];
+  // Ignore z-turbo/z-image/flux2 from args when they match the tier default — those are handled by qualityTier.
+  const TIER_DEFAULTS = ['z-turbo', 'z-image', 'flux2'];
   const modelKey = (explicitModel && !TIER_DEFAULTS.includes(explicitModel))
     ? explicitModel
     : defaultModel;

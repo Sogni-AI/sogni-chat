@@ -17,7 +17,7 @@ export interface ModelOption {
 const QUALITY_TIER_MODELS: ModelOption[] = [
   { key: 'fast', displayName: 'Qwen Image Edit 2511 Lightning' },
   { key: 'hq', displayName: 'Qwen Image Edit 2511' },
-  { key: 'flux2', displayName: 'Flux.2 Dev' },
+  { key: 'pro', displayName: 'Flux.2 Dev (Pro)' },
 ];
 
 /** Quality-only models for tools where Flux.2 is not compatible (e.g. SV3D pipeline) */

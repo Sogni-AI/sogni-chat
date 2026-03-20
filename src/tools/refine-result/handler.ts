@@ -34,7 +34,8 @@ export async function execute(
   const sourceIndex = (args.sourceImageIndex as number | undefined) ?? (context.resultUrls.length > 0 ? context.resultUrls.length - 1 : 0);
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
   const modelKey = args.model as string | undefined;
-  const modelOverride = modelKey ? EXTRA_MODELS[modelKey] : undefined;
+  const isPro = !modelKey && context.qualityTier === 'pro';
+  const modelOverride = modelKey ? EXTRA_MODELS[modelKey] : (isPro ? EXTRA_MODELS['flux2'] : undefined);
   const scale = (args.scale as number) || 1;
   const aspectRatio = args.aspectRatio as string | undefined;
 
@@ -62,15 +63,16 @@ export async function execute(
     sourceWidth, sourceHeight, { scale, aspectRatio },
   );
 
-  const qualityTier = context.qualityTier || 'fast';
+  const costTier = isPro ? 'pro' : (context.qualityTier || 'fast');
+  const qualityTier = isPro ? 'hq' : (context.qualityTier || 'fast');
   const originalToken = context.tokenType;
-  let estimatedCost = await fetchRestorationCostEstimate(context.sogniClient, context.tokenType, numberOfMedia, qualityTier);
+  let estimatedCost = await fetchRestorationCostEstimate(context.sogniClient, context.tokenType, numberOfMedia, costTier);
 
   // Pre-flight credit check before creating placeholders
   const preflight = preflightCreditCheck(context, estimatedCost);
   if (!preflight.ok) return preflight.errorJson;
   if (context.tokenType !== originalToken) {
-    estimatedCost = await fetchRestorationCostEstimate(context.sogniClient, context.tokenType, numberOfMedia, qualityTier);
+    estimatedCost = await fetchRestorationCostEstimate(context.sogniClient, context.tokenType, numberOfMedia, costTier);
   }
 
   const sourceImageUrl = context.resultUrls[sourceIndex];

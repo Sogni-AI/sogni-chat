@@ -31,9 +31,12 @@ export async function execute(
   const prompt = args.prompt as string;
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
   const modelKey = args.model as string | undefined;
-  const modelOverride = modelKey ? EXTRA_MODELS[modelKey] : undefined;
-  const qualityTier = modelOverride
-    ? (context.qualityTier || 'fast')                              // model override — qualityTier only affects output format
+  const isPro = !modelKey && context.qualityTier === 'pro';
+  const modelOverride = modelKey ? EXTRA_MODELS[modelKey] : (isPro ? EXTRA_MODELS['flux2'] : undefined);
+  // For cost estimation, use 'pro' so the Flux.2 preset is used; for output format, fall back to 'hq'
+  const costTier = isPro ? 'pro' : ((args.quality as 'fast' | 'hq') || context.qualityTier || 'fast');
+  const qualityTier = isPro ? 'hq'
+    : modelOverride ? (context.qualityTier || 'fast')
     : (args.quality as 'fast' | 'hq') || context.qualityTier || 'fast';
   const scale = (args.scale as number) || 1;
   const aspectRatio = args.aspectRatio as string | undefined;
@@ -47,7 +50,7 @@ export async function execute(
   );
 
   const originalToken = context.tokenType;
-  let estimatedCost = await fetchRestorationCostEstimate(context.sogniClient, context.tokenType, numberOfMedia, qualityTier);
+  let estimatedCost = await fetchRestorationCostEstimate(context.sogniClient, context.tokenType, numberOfMedia, costTier);
 
   // Pre-flight credit check before creating placeholders
   const preflight = preflightCreditCheck(context, estimatedCost);

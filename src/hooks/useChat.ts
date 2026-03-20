@@ -43,7 +43,7 @@ export interface UseChatResult {
       height: number;
       tokenType: TokenType;
       balances: Balances | null;
-      qualityTier?: 'fast' | 'hq';
+      qualityTier?: 'fast' | 'hq' | 'pro';
       safeContentFilter?: boolean;
       onContentFilterChange?: (enabled: boolean) => void;
       requestDisableContentFilter?: () => Promise<boolean>;
@@ -96,7 +96,7 @@ export interface UseChatResult {
       height: number;
       tokenType: TokenType;
       balances: Balances | null;
-      qualityTier?: 'fast' | 'hq';
+      qualityTier?: 'fast' | 'hq' | 'pro';
       safeContentFilter?: boolean;
       onContentFilterChange?: (enabled: boolean) => void;
       requestDisableContentFilter?: () => Promise<boolean>;
@@ -467,7 +467,7 @@ export function useChat(): UseChatResult {
         height: number;
         tokenType: TokenType;
         balances: Balances | null;
-        qualityTier?: 'fast' | 'hq';
+        qualityTier?: 'fast' | 'hq' | 'pro';
         safeContentFilter?: boolean;
         onContentFilterChange?: (enabled: boolean) => void;
         requestDisableContentFilter?: () => Promise<boolean>;
@@ -1436,7 +1436,7 @@ export function useChat(): UseChatResult {
         height: number;
         tokenType: TokenType;
         balances: Balances | null;
-        qualityTier?: 'fast' | 'hq';
+        qualityTier?: 'fast' | 'hq' | 'pro';
         safeContentFilter?: boolean;
         onContentFilterChange?: (enabled: boolean) => void;
         requestDisableContentFilter?: () => Promise<boolean>;
@@ -1465,7 +1465,7 @@ export function useChat(): UseChatResult {
       const modifiedArgs = { ...toolArgs };
       let isQualityOverride = false;
       if (modelKeyOverride && isQualityTierTool(effectiveToolName)) {
-        if (modelKeyOverride === 'fast' || modelKeyOverride === 'hq') {
+        if (modelKeyOverride === 'fast' || modelKeyOverride === 'hq' || modelKeyOverride === 'pro') {
           isQualityOverride = true;
           modifiedArgs[getModelArgKey(effectiveToolName)] = modelKeyOverride;
           // Remove orphaned "model" arg from a previous non-quality switch (e.g. flux2 → hq)
@@ -1539,7 +1539,7 @@ export function useChat(): UseChatResult {
         get resultUrls() { return allResultUrlsRef.current; },
         get audioResultUrls() { return audioResultUrlsRef.current; },
         balances: context.balances,
-        qualityTier: isQualityOverride ? (modelKeyOverride as 'fast' | 'hq') : context.qualityTier,
+        qualityTier: isQualityOverride ? (modelKeyOverride as 'fast' | 'hq' | 'pro') : context.qualityTier,
         safeContentFilter: context.safeContentFilter,
         onContentFilterChange: context.onContentFilterChange,
         requestDisableContentFilter: context.requestDisableContentFilter,

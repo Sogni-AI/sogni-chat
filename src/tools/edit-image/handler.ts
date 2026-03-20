@@ -134,7 +134,8 @@ export async function execute(
   callbacks: ToolCallbacks,
 ): Promise<string> {
   const prompt = args.prompt as string;
-  const defaultModel = context.qualityTier === 'hq' ? 'qwen' : 'qwen-lightning';
+  const defaultModel = context.qualityTier === 'pro' ? 'flux2'
+    : context.qualityTier === 'hq' ? 'qwen' : 'qwen-lightning';
   const explicitModel = args.model as string | undefined;
   // Honor explicit model if provided (from user retry menu or LLM), otherwise use quality tier default.
   const modelKey = explicitModel || defaultModel;

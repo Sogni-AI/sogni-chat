@@ -9,7 +9,7 @@ import type { TokenType, Balances } from '@/types/wallet';
 import type { UseChatResult } from '@/hooks/useChat';
 import type { UIChatMessage } from '@/types/chat';
 import type { UploadedFile } from '@/tools/types';
-import { QUALITY_PRESETS } from '@/config/qualityPresets';
+import { QUALITY_PRESETS, type QualityTier } from '@/config/qualityPresets';
 import { generateSuggestions, EDIT_INTENT_SUGGESTIONS } from '@/utils/chatSuggestions';
 import { FullscreenBeforeAfter } from '@/components/FullscreenBeforeAfter';
 import { useLayout } from '@/layouts/AppLayout';
@@ -35,8 +35,8 @@ interface ChatPanelProps {
   balances: Balances | null;
   isAuthenticated: boolean;
   chat: UseChatResult;
-  qualityTier: 'fast' | 'hq';
-  onQualityTierChange: (tier: 'fast' | 'hq') => void;
+  qualityTier: QualityTier;
+  onQualityTierChange: (tier: QualityTier) => void;
   safeContentFilter?: boolean;
   onContentFilterChange?: (enabled: boolean) => void;
   onResultsChange?: (urls: string[]) => void;
@@ -81,8 +81,8 @@ interface ChatPanelProps {
 
 /** Minimal dropdown for quality tier selection */
 const QualityDropdown: React.FC<{
-  qualityTier: 'fast' | 'hq';
-  onQualityTierChange: (tier: 'fast' | 'hq') => void;
+  qualityTier: QualityTier;
+  onQualityTierChange: (tier: QualityTier) => void;
   disabled?: boolean;
 }> = ({ qualityTier, onQualityTierChange, disabled }) => {
   const [open, setOpen] = useState(false);
@@ -141,7 +141,7 @@ const QualityDropdown: React.FC<{
           overflow: 'hidden',
           minWidth: '120px',
         }}>
-          {(['fast', 'hq'] as const).map((tier) => {
+          {(['fast', 'hq', 'pro'] as const).map((tier) => {
             const isSelected = qualityTier === tier;
             return (
               <button

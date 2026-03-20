@@ -27,7 +27,8 @@ export async function execute(
   const rawSourceIndex = args.sourceImageIndex as number | undefined;
   const aspectRatio = args.aspectRatio as string | undefined;
   const loraStrength = args.loraStrength as number | undefined;
-  const qualityTier = context.qualityTier || 'fast';
+  // SV3D pipeline is incompatible with Flux.2 — fall back pro to hq
+  const qualityTier = context.qualityTier === 'pro' ? 'hq' : (context.qualityTier || 'fast');
   const preset = QUALITY_PRESETS[qualityTier];
 
   if (!context.imageData && context.resultUrls.length === 0) {
@@ -111,7 +112,7 @@ export async function execute(
           height: sourceHeight,
           tokenType,
           description,
-          qualityTier: context.qualityTier,
+          qualityTier,
           aspectRatio,
           loraStrength,
         },
