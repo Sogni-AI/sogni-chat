@@ -182,8 +182,8 @@ export const ChatImageResults = memo(function ChatImageResults({
                         height: 'auto',
                         display: 'block',
                       }),
-                  opacity: isLoaded ? 1 : 0,
-                  transition: 'opacity 1.5s ease-in-out',
+                  opacity: sourceImageUrl ? (isLoaded ? 1 : 0) : 1,
+                  transition: sourceImageUrl ? 'opacity 1.5s ease-in-out' : 'none',
                   zIndex: 1,
                 }}
               />
