@@ -20,7 +20,7 @@ import { calculateOutputDimensions } from '@/utils/imageDimensions';
 
 /** Model configs for non-quality-tier models that restore_photo can use via retry/switch */
 const EXTRA_MODELS: Record<string, ModelOverride> = {
-  flux2: { modelId: 'flux2_dev_fp8', name: 'Flux.2 Dev', steps: 20, guidance: 4.0 },
+  flux2: { modelId: 'flux2_dev_fp8', name: 'Flux.2 Dev', steps: 40, guidance: 4.0 },
 };
 
 export async function execute(

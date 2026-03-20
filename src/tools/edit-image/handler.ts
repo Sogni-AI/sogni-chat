@@ -15,6 +15,7 @@ import {
   recordCompletion,
   discardPending,
   formatCredits,
+  sanitizeBatchPrompt,
 } from '../shared';
 import type { TokenType } from '@/types/wallet';
 import { parseAspectRatio } from '@/utils/imageDimensions';
@@ -65,7 +66,7 @@ const IMAGE_EDIT_MODELS: Record<string, ImageEditModelConfig> = {
     name: 'Flux.2 Dev',
     maxWidth: 2048,
     maxHeight: 2048,
-    defaultSteps: 20,
+    defaultSteps: 40,
     defaultGuidance: 4.0,
     maxContextImages: 6,
     sampler: 'euler',
@@ -221,6 +222,15 @@ export async function execute(
     if (personaRefs.length > 0) {
       effectivePrompt = `${prompt}. ${personaRefs.join('. ')}.`;
       console.log('[EDIT IMAGE] Enhanced prompt with persona identity directives');
+    }
+  }
+
+  // Strip grid/collage-causing language for batch variations
+  if (numberOfMedia > 1) {
+    const before = effectivePrompt;
+    effectivePrompt = sanitizeBatchPrompt(effectivePrompt);
+    if (effectivePrompt !== before) {
+      console.log('[EDIT IMAGE] Sanitized batch prompt to prevent grid output');
     }
   }
 

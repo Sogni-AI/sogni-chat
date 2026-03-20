@@ -27,6 +27,7 @@ export {
   stripThinkBlocks,
 } from './llmHelpers';
 export { uint8ArrayToDataUri } from './imageEncoding';
+export { sanitizeBatchPrompt } from './promptSanitizer';
 export { needsCreativeRefinement, refineVideoPrompt } from './videoPromptRefinement';
 export { getModelOptions, getAlternativeModels, getModelArgKey, isQualityTierTool } from './modelRegistry';
 export type { ModelOption } from './modelRegistry';
