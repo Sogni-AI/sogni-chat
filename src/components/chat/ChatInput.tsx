@@ -233,7 +233,8 @@ export const ChatInput = memo(function ChatInput({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      // Ctrl/Cmd+Enter to send; plain Enter inserts a newline (better for mobile)
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
         handleSend();
       }
