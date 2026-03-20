@@ -35,6 +35,10 @@ interface ChatMessageProps {
   /** Original uploaded image URL — used for blurred progress placeholder */
   imageUrl?: string | null;
   onImageClick?: (url: string, index: number) => void;
+  onVideoClick?: (url: string, index: number) => void;
+  onAudioClick?: (url: string, index: number) => void;
+  /** Called when user clicks a completed result in the progress grid */
+  onProgressMediaClick?: (index: number, mediaType: 'image' | 'video' | 'audio') => void;
   /** Called when the user cancels an in-progress tool execution */
   onCancelTool?: () => void;
   /** Called when user accepts switching to unrestricted model */
@@ -49,7 +53,7 @@ interface ChatMessageProps {
   onRetry?: (message: UIChatMessage, modelKey?: string) => void;
 }
 
-export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImageClick, onCancelTool, onAcceptModelSwitch, onDeclineModelSwitch, downloadSlug, onBranchChat, onRetry }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImageClick, onVideoClick: _onVideoClick, onAudioClick: _onAudioClick, onProgressMediaClick, onCancelTool, onAcceptModelSwitch, onDeclineModelSwitch, downloadSlug, onBranchChat, onRetry }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
   const isSystem = message.role === 'system';
@@ -339,7 +343,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
       {/* Tool execution progress */}
       {message.toolProgress && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
-          <ChatProgressIndicator progress={message.toolProgress} imageUrl={imageUrl} onCancel={onCancelTool} />
+          <ChatProgressIndicator progress={message.toolProgress} imageUrl={imageUrl} onCancel={onCancelTool} onMediaClick={onProgressMediaClick} />
           <SogniTVOffer executionId={message.id} etaSeconds={message.toolProgress?.etaSeconds} />
         </div>
       )}

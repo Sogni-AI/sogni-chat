@@ -1050,10 +1050,67 @@ export function useChat(): UseChatResult {
     toolAbortControllersRef.current.clear();
     // Clear SogniTV progress overlay
     sogniTVController.clearProgress();
-    // Clear progress from any in-progress messages and add cancellation indicator
+    // Clear progress from any in-progress messages and add cancellation indicator.
+    // Rescue any completed result URLs from batch jobs so partially-completed
+    // generations aren't lost when the user cancels mid-batch.
+    const rescuedImageUrls: string[] = [];
     setUIMessages((prev) => {
       const updated = prev.map((msg) => {
         if (msg.toolProgress) {
+          // Extract completed result URLs from per-job progress
+          const completedUrls: string[] = [];
+          if (msg.toolProgress.perJobProgress) {
+            for (const job of Object.values(msg.toolProgress.perJobProgress)) {
+              if (job.resultUrl) completedUrls.push(job.resultUrl);
+            }
+          }
+          // Also check toolProgress.resultUrls as a fallback
+          if (msg.toolProgress.resultUrls) {
+            for (const url of msg.toolProgress.resultUrls) {
+              if (!completedUrls.includes(url)) completedUrls.push(url);
+            }
+          }
+
+          if (completedUrls.length > 0) {
+            const toolName = msg.toolProgress.toolName;
+            const isVideoTool = toolName === 'animate_photo'
+              || toolName === 'generate_video'
+              || toolName === 'sound_to_video'
+              || toolName === 'video_to_video';
+            const isAudioTool = toolName === 'generate_music';
+
+            // Preserve metadata from toolProgress (same as onToolComplete)
+            const srcUrl = msg.toolProgress.sourceImageUrl;
+            const vidAR = msg.toolProgress.videoAspectRatio;
+            const mdlName = msg.toolProgress.modelName;
+            const refPersonas = msg.toolProgress.referencedPersonas;
+            const toolModelKey = (msg.toolArgs?.model as string)
+              || (msg.toolArgs?.videoModel as string)
+              || (msg.toolArgs?.quality as string)
+              || undefined;
+
+            // Track rescued image URLs for allResultUrls persistence
+            if (!isVideoTool && !isAudioTool) {
+              rescuedImageUrls.push(...completedUrls);
+            }
+
+            return {
+              ...msg,
+              imageResults: !isVideoTool && !isAudioTool ? completedUrls : undefined,
+              videoResults: isVideoTool ? completedUrls : undefined,
+              audioResults: isAudioTool ? completedUrls : undefined,
+              toolProgress: null,
+              isStreaming: false,
+              wasCancelled: true,
+              sourceImageUrl: srcUrl || undefined,
+              videoAspectRatio: vidAR || undefined,
+              modelName: mdlName || undefined,
+              toolModelKey,
+              lastCompletedTool: toolName,
+              referencedPersonas: refPersonas || msg.referencedPersonas,
+            };
+          }
+
           return { ...msg, toolProgress: null, isStreaming: false, wasCancelled: true };
         }
         if (msg.isStreaming) {
@@ -1063,6 +1120,14 @@ export function useChat(): UseChatResult {
       });
       return updated;
     });
+
+    // Persist rescued image URLs so session restore picks them up
+    if (rescuedImageUrls.length > 0) {
+      const combined = [...new Set([...allResultUrlsRef.current, ...rescuedImageUrls])];
+      allResultUrlsRef.current = combined;
+      setAllResultUrls(combined);
+    }
+
     activeRequestCountRef.current = 0;
     setIsLoading(false);
     setIsSending(false);

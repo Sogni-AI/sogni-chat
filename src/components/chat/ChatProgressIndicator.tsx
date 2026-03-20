@@ -89,6 +89,8 @@ interface ChatProgressIndicatorProps {
   imageUrl?: string | null;
   /** Called when the user clicks the cancel button */
   onCancel?: () => void;
+  /** Called when user clicks a completed result in the progress grid */
+  onMediaClick?: (index: number, mediaType: 'image' | 'video' | 'audio') => void;
 }
 
 const TOOL_LABELS: Record<string, string> = {
@@ -109,6 +111,7 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
   progress,
   imageUrl,
   onCancel,
+  onMediaClick,
 }: ChatProgressIndicatorProps) {
   const label = progress.stepLabel || TOOL_LABELS[progress.toolName] || 'Processing';
   const percentage = progress.progress ? Math.round(progress.progress * 100) : 0;
@@ -209,16 +212,28 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
             const isCompletedVideo = !!resultUrl && isVideoTool;
             const jobError = jobData?.error;
 
+            const isCompleted = !!resultUrl;
+
             return (
               <div
                 key={i}
+                onClick={isCompleted && onMediaClick ? () => onMediaClick(i, isVideoTool ? 'video' : 'image') : undefined}
                 style={{
                   position: 'relative',
                   borderRadius: 'var(--radius-md)',
                   overflow: 'hidden',
                   background: 'rgba(var(--rgb-primary), 0.05)',
                   border: '1px solid var(--color-border)',
+                  ...(isCompleted && onMediaClick ? { cursor: 'pointer', transition: 'border-color 0.2s ease, transform 0.2s ease' } : {}),
                 }}
+                onMouseEnter={isCompleted && onMediaClick ? (e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-accent)';
+                  e.currentTarget.style.transform = 'scale(1.02)';
+                } : undefined}
+                onMouseLeave={isCompleted && onMediaClick ? (e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-border)';
+                  e.currentTarget.style.transform = 'scale(1)';
+                } : undefined}
               >
                 {/* Completed video result — render inline player */}
                 {isCompletedVideo ? (

@@ -11,7 +11,7 @@ import type { UIChatMessage } from '@/types/chat';
 import type { UploadedFile } from '@/tools/types';
 import { QUALITY_PRESETS, type QualityTier } from '@/config/qualityPresets';
 import { generateSuggestions, EDIT_INTENT_SUGGESTIONS } from '@/utils/chatSuggestions';
-import { FullscreenBeforeAfter } from '@/components/FullscreenBeforeAfter';
+import { FullscreenMediaViewer, type MediaItem } from '@/components/FullscreenMediaViewer';
 import { useLayout } from '@/layouts/AppLayout';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useTypingPlaceholder } from '@/hooks/useTypingPlaceholder';
@@ -230,7 +230,7 @@ export function ChatPanel({
   const prevResultCountRef = useRef(0);
   const prevMessageCountRef = useRef(messages.length);
   const isUserNearBottomRef = useRef(true);
-  const [fullscreenIndex, setFullscreenIndex] = useState<number | null>(null);
+  const [fullscreenState, setFullscreenState] = useState<{ items: MediaItem[]; index: number } | null>(null);
 
   // Message pagination — show last PAGE_SIZE messages initially, expand on scroll-up
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -338,10 +338,61 @@ export function ChatPanel({
     [sogniClient, imageData, width, height, tokenType, balances, qualityTier, safeContentFilter, onContentFilterChange, requestDisableContentFilter, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, selectedModelVariant, getPreviewUrl],
   );
 
-  const handleImageClick = useCallback((url: string, _index: number) => {
-    const globalIndex = allResultUrls.indexOf(url);
-    setFullscreenIndex(globalIndex >= 0 ? globalIndex : 0);
-  }, [allResultUrls]);
+  const handleMediaClick = useCallback((message: UIChatMessage, index: number, mediaType: 'image' | 'video' | 'audio') => {
+    const items: MediaItem[] = [];
+    const isVideoTool = message.toolProgress && ['animate_photo', 'generate_video', 'sound_to_video', 'video_to_video'].includes(message.toolProgress.toolName);
+
+    // Build items from finalized results first
+    if (message.imageResults) {
+      items.push(...message.imageResults.map(url => ({ type: 'image' as const, url })));
+    }
+    if (message.videoResults) {
+      items.push(...message.videoResults.map(url => ({ type: 'video' as const, url, aspectRatio: message.videoAspectRatio })));
+    }
+    if (message.audioResults) {
+      items.push(...message.audioResults.map(url => ({ type: 'audio' as const, url })));
+    }
+
+    // During active generation, completed results live in perJobProgress, not imageResults.
+    // Pull them in so clicking a completed progress slot actually opens the viewer.
+    // Build in slot order and track which position the clicked slot maps to.
+    let progressClickIndex = 0;
+    if (items.length === 0 && message.toolProgress?.perJobProgress) {
+      const vidAR = message.toolProgress.videoAspectRatio;
+      const sortedKeys = Object.keys(message.toolProgress.perJobProgress)
+        .map(Number)
+        .sort((a, b) => a - b);
+      for (const key of sortedKeys) {
+        const job = message.toolProgress.perJobProgress[key];
+        if (job.resultUrl) {
+          if (key === index) progressClickIndex = items.length;
+          items.push({
+            type: isVideoTool ? 'video' : 'image',
+            url: job.resultUrl,
+            ...(isVideoTool && vidAR ? { aspectRatio: vidAR } : {}),
+          });
+        }
+      }
+    }
+
+    if (items.length === 0) return; // nothing to show
+
+    // Find the correct starting index based on media type and index within that type
+    let startIndex = 0;
+    if (message.toolProgress?.perJobProgress && !message.imageResults && !message.videoResults && !message.audioResults) {
+      // Clicked a progress slot — use the mapped position
+      startIndex = progressClickIndex;
+    } else if (mediaType === 'video') {
+      startIndex = (message.imageResults?.length || 0) + index;
+    } else if (mediaType === 'audio') {
+      startIndex = (message.imageResults?.length || 0) + (message.videoResults?.length || 0) + index;
+    } else {
+      startIndex = index;
+    }
+    // Clamp to valid range
+    startIndex = Math.min(startIndex, items.length - 1);
+    setFullscreenState({ items, index: startIndex });
+  }, []);
 
   const processedMessages = useMemo(() => {
     let msgs = messages;
@@ -467,20 +518,6 @@ export function ChatPanel({
     isLoadingMoreRef.current = false;
   }, [paginatedMessages]);
 
-  const galleryItems = useMemo(
-    () => allResultUrls.map((url) => ({ before: imageUrl || '', after: url })),
-    [allResultUrls, imageUrl],
-  );
-
-  const allGalleryImageIds = useMemo(() => {
-    const ids: string[] = [];
-    for (const msg of messages) {
-      if (msg.imageResults && msg.galleryImageIds) {
-        ids.push(...msg.galleryImageIds);
-      }
-    }
-    return ids;
-  }, [messages]);
 
   const hasImage = !!(uploadedFiles && uploadedFiles.some(f => f.type === 'image'));
   const canSend = isAuthenticated && !!sogniClient;
@@ -740,7 +777,10 @@ export function ChatPanel({
                 key={msg.id}
                 message={msg}
                 imageUrl={imageUrl}
-                onImageClick={handleImageClick}
+                onImageClick={(_url, index) => handleMediaClick(msg, index, 'image')}
+                onVideoClick={(_url, index) => handleMediaClick(msg, index, 'video')}
+                onAudioClick={(_url, index) => handleMediaClick(msg, index, 'audio')}
+                onProgressMediaClick={(index, mediaType) => handleMediaClick(msg, index, mediaType)}
                 onCancelTool={msg.toolProgress ? chat.cancelToolExecution : undefined}
                 onAcceptModelSwitch={msg.modelRefusal ? handleAcceptModelSwitch : undefined}
                 onDeclineModelSwitch={msg.modelRefusal ? chat.declineModelSwitch : undefined}
@@ -821,15 +861,13 @@ export function ChatPanel({
         onCancel={chat.cancelToolExecution}
       />
 
-      {/* Fullscreen before/after viewer */}
-      {fullscreenIndex !== null && galleryItems.length > 0 && (
-        <FullscreenBeforeAfter
-          items={galleryItems}
-          currentIndex={fullscreenIndex}
-          onClose={() => setFullscreenIndex(null)}
-          onNavigate={setFullscreenIndex}
-          downloadSlug={downloadSlug}
-          galleryImageIds={allGalleryImageIds}
+      {/* Fullscreen media viewer */}
+      {fullscreenState && (
+        <FullscreenMediaViewer
+          items={fullscreenState.items}
+          currentIndex={fullscreenState.index}
+          onClose={() => setFullscreenState(null)}
+          onNavigate={(index) => setFullscreenState(prev => prev ? { ...prev, index } : null)}
         />
       )}
     </div>
