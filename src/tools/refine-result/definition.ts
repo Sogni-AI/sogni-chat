@@ -22,6 +22,7 @@ export const definition: ToolDefinition = {
 Rules:
 - Use POSITIVE phrasing only. The model ignores negatives.
 - Be specific about what to change: "warmer skin tones", "cooler shadows", "sharper facial features", "more natural greens".
+- For creative refinements: lean into specifics — "add more dramatic Rembrandt lighting", "push the colors more toward Warhol neon pop", "make the anime eyes larger and more expressive", "add more superhero energy with glowing effects".
 - ALWAYS include "Keep everything else unchanged" to prevent unwanted changes.
 - CRITICAL for photos with people: append identity preservation directive.
 

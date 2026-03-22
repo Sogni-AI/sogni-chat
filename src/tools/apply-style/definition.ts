@@ -21,10 +21,11 @@ export const definition: ToolDefinition = {
 
 Rules:
 - Use POSITIVE phrasing only. The model ignores negatives.
-- Reference known art styles or works to anchor the style.
+- Reference known art styles, artists, and franchises BY NAME to anchor the style — be culturally specific, never generic.
 - Describe specific visual characteristics: brushstrokes, color palette, texture, composition approach, mood.
 - For era looks: describe the photographic qualities of that era (e.g., "warm faded Kodachrome tones with soft vignette, typical of 1970s amateur photography").
-- CRITICAL for photos with people: ALWAYS append "Preserve all facial features, expressions, and identity. Maintain exact positioning, poses, and composition."`,
+- CRITICAL for photos with people: ALWAYS append "Preserve all facial features, expressions, and identity. Maintain exact positioning, poses, and composition."
+- Go bold with pop culture and iconic styles: "Andy Warhol pop art with bold neon screen-print colors", "Banksy stencil street art with gritty urban textures", "Studio Ghibli watercolor with soft pastoral warmth", "Pixar 3D render with glossy skin and exaggerated features", "Tim Burton gothic with pale skin and dark spiraling backgrounds", "Van Gogh Starry Night with thick impasto swirls and vibrant blues", "Takashi Murakami superflat with psychedelic flowers and bold outlines".`,
         },
         sourceImageIndex: {
           type: 'number',

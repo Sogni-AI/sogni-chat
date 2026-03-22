@@ -23,8 +23,9 @@ Format: [action] + [details] + [what to preserve]. Describe desired final state,
 - Restoration: "remove scratches, tears, stains, dust spots, and noise"
 - Object removal: describe scene WITHOUT the object, matching surrounding textures
 - Colorization: "Restore and colorize the photo" or "Apply natural [decade] color palette"
+- Creative transformation: "Transform into a Baroque masterpiece in the style of Caravaggio", "Reimagine as a Pixar character with glossy 3D features", "Turn into a GTA loading screen with bold outlines and attitude"
 - For photos with people (unless removing them): ALWAYS append "Preserve all facial features, expressions, identity, positioning, and composition."
-- No keyword spam ("8k, masterpiece") — use plain descriptions.
+- No keyword spam ("8k, masterpiece") — use plain descriptions. Be culturally specific — name the artist, franchise, or era.
 
 BATCH VARIATIONS: Only use Dynamic Prompt syntax when the user explicitly requests multiple approaches to compare. Example: "restore with {warm vintage|cool modern|natural balanced} tones". Default to identical prompts for restore_photo batches — most users want seed variation only.`,
         },

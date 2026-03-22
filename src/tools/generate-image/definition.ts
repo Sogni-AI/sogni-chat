@@ -19,7 +19,7 @@ export const definition: ToolDefinition = {
           type: 'string',
           description: `Text description of the image (50-200 words). Subject first, then environment, then style/mood.
 
-Include: lighting ("soft golden hour light"), composition ("close-up portrait", "wide shot"), and style ("oil painting", "shot on Canon EOS R5, 85mm f/1.4"). POSITIVE phrasing only.
+Include: lighting ("soft golden hour light"), composition ("close-up portrait", "wide shot"), and style ("oil painting", "shot on Canon EOS R5, 85mm f/1.4"). POSITIVE phrasing only. Be culturally specific and vivid — reference real artists, franchises, and aesthetics by name: "in the style of Monet's Water Lilies", "Pixar 3D render", "cyberpunk Blade Runner neon city", "Miyazaki fantasy landscape", "Wes Anderson symmetrical pastel composition".
 
 BATCH VARIATIONS: When numberOfVariations > 1, the prompt must describe ONE subject in ONE scene — never mention counts, "versions", "different", or "multiple" in the prompt text. NEVER describe multiple copies or duplicates of the subject in a single image (no grids, collages, or side-by-side). Use Dynamic Prompt syntax to vary ONE dimension across separate images. Example: user asks "4 cats in different spots" → numberOfVariations=4, prompt="a black cat {lounging in a sunlit window|prowling through autumn leaves|sitting on a vintage bookshelf|curled up by a fireplace}" — each output is ONE cat in ONE spot. Vary setting, style, lighting, expression, or composition — never override what the user specified.`,
         },

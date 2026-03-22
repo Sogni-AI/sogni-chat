@@ -32,17 +32,18 @@ export interface Suggestion {
 /** Suggestions shown when the user has uploaded an image */
 const WELCOME_SUGGESTIONS: Suggestion[] = [
   { label: 'Restore this photo', prompt: 'Restore this photo' },
+  { label: 'Creative transformation', prompt: 'Give this photo a creative transformation — surprise me' },
   { label: 'Apply an artistic style', prompt: 'Apply an artistic style to this photo' },
   { label: 'Animate this photo', prompt: 'Animate this photo' },
 ];
 
 /** Suggestions shown when uploadIntent is 'edit' and an image has been uploaded */
 export const EDIT_INTENT_SUGGESTIONS: Suggestion[] = [
-  { label: 'Apply artistic style', prompt: 'Apply an artistic style to this photo' },
-  { label: 'Change the background', prompt: 'Change the background of this photo' },
-  { label: 'Edit specific details', prompt: 'Edit specific details in this photo' },
+  { label: 'As a famous painting', prompt: 'Transform this into a famous Renaissance painting, preserving my likeness' },
+  { label: 'As a superhero', prompt: 'Reimagine me as a Marvel superhero with a dramatic pose and cinematic lighting' },
+  { label: 'Anime transformation', prompt: 'Transform this photo into a Studio Ghibli anime character' },
   { label: 'Generate variations', prompt: 'Generate variations of this photo' },
-  { label: 'Change the viewing angle', prompt: 'Change the viewing angle of this photo' },
+  { label: 'Change the angle', prompt: 'Change the viewing angle of this photo' },
 ];
 
 /** Suggestions shown when no image is uploaded — short prompts that trigger LLM conversation */
@@ -62,19 +63,21 @@ const NO_PERSONAS_SUGGESTIONS: Suggestion[] = [
 
 const SUGGESTIONS_BY_TOOL: Record<ChatToolName, Suggestion[]> = {
   restore_photo: [
+    { label: 'As a famous painting', prompt: 'Now transform this into a famous painting style' },
     { label: 'Apply an artistic style', prompt: 'Apply an artistic style' },
     { label: 'Bring it to life', prompt: 'Animate this photo' },
     { label: 'Try different variations', prompt: 'Try different variations' },
   ],
   apply_style: [
-    { label: 'Try a different style', prompt: 'Try a different style' },
-    { label: 'Restore the original instead', prompt: 'Restore the original instead' },
+    { label: 'Try a different vibe', prompt: 'Try a completely different creative style — something unexpected' },
+    { label: 'As a movie character', prompt: 'Reimagine this as a cinematic movie character portrait' },
     { label: 'Refine this result', prompt: 'Refine this result' },
+    { label: 'Try the original', prompt: 'Restore the original instead' },
   ],
   refine_result: [
+    { label: 'Try another vibe', prompt: 'Try a completely different creative transformation' },
     { label: 'Apply an artistic style', prompt: 'Apply an artistic style' },
     { label: 'Bring it to life', prompt: 'Animate this photo' },
-    { label: 'Start fresh with new settings', prompt: 'Start fresh with new settings' },
   ],
   animate_photo: [
     { label: 'Try different motion', prompt: 'Animate it with different motion' },
@@ -94,8 +97,8 @@ const SUGGESTIONS_BY_TOOL: Record<ChatToolName, Suggestion[]> = {
     { label: 'Animate into a video', prompt: 'Animate this into a video' },
   ],
   edit_image: [
+    { label: 'Try another vibe', prompt: 'Try a completely different creative transformation on this' },
     { label: 'Edit it further', prompt: 'Make another edit to this result' },
-    { label: 'Try a different style', prompt: 'Apply an artistic style to this' },
     { label: 'Animate it', prompt: 'Animate this' },
   ],
   generate_video: [
@@ -130,8 +133,9 @@ const SUGGESTIONS_BY_TOOL: Record<ChatToolName, Suggestion[]> = {
     { label: 'What model was used?', prompt: 'What model was used to generate this?' },
   ],
   resolve_personas: [
-    { label: 'Generate an image with them', prompt: 'Generate an image featuring them' },
-    { label: 'Create a portrait', prompt: 'Create a portrait of them' },
+    { label: 'As a superhero', prompt: 'Reimagine them as a superhero with cinematic lighting and an action-ready pose' },
+    { label: 'As a famous painting', prompt: 'Paint them into a famous masterpiece — Renaissance, Impressionist, or Baroque style' },
+    { label: 'Create a portrait', prompt: 'Create a stunning portrait of them' },
     { label: 'Animate into a video', prompt: 'Animate them into a video' },
   ],
   manage_memory: [
@@ -263,10 +267,10 @@ function getMidConversationSuggestions(messages: UIChatMessage[]): Suggestion[] 
   if (topic) {
     if (topic === 'image') {
       return [
-        { label: 'Photorealistic style', prompt: 'Make it photorealistic' },
-        { label: 'Anime style', prompt: 'Use anime style' },
-        { label: 'Oil painting', prompt: 'Make it look like an oil painting' },
-        { label: 'Surprise me', prompt: 'Surprise me with a creative style' },
+        { label: 'Famous painting', prompt: 'Make it look like a famous painting — think Klimt, Frida Kahlo, or Hokusai' },
+        { label: 'Comic book hero', prompt: 'Transform it into a Marvel comic book style with bold lines and dramatic action' },
+        { label: 'Anime character', prompt: 'Transform it into a Studio Ghibli anime character' },
+        { label: 'Surprise me', prompt: 'Surprise me with something creative and unexpected' },
       ];
     }
     if (topic === 'video') {
