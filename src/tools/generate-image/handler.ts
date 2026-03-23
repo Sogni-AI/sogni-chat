@@ -393,6 +393,14 @@ export async function execute(
   let startingImageData: Uint8Array | undefined;
   let startingImageMime = 'image/jpeg';
   if (startingImageStrength !== undefined && startingImageStrength > 0 && modelConfig.supportsImg2Img) {
+    // Bounds check for explicitly-provided source index
+    if (rawSourceIndex !== undefined && rawSourceIndex >= 0 && rawSourceIndex >= context.resultUrls.length) {
+      return JSON.stringify({
+        error: 'invalid_source_index',
+        message: `sourceImageIndex ${rawSourceIndex} is out of range — only ${context.resultUrls.length} results are available (0-based). Check the index and try again.`,
+      });
+    }
+
     const useOriginal = rawSourceIndex === -1;
     const effectiveSourceIndex = useOriginal
       ? undefined

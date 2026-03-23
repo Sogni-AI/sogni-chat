@@ -46,6 +46,14 @@ export async function execute(
   // Determine source image: auto-select latest result when no explicit index and no upload
   const effectiveSourceIndex = sourceIndex ?? (context.resultUrls.length > 0 ? context.resultUrls.length - 1 : undefined);
 
+  // Bounds check for explicitly-provided source index
+  if (sourceIndex !== undefined && sourceIndex >= 0 && sourceIndex >= context.resultUrls.length) {
+    return JSON.stringify({
+      error: 'invalid_source_index',
+      message: `sourceImageIndex ${sourceIndex} is out of range — only ${context.resultUrls.length} results are available (0-based). Check the index and try again.`,
+    });
+  }
+
   let sourceImageData = context.imageData;
   let sourceWidth = context.width;
   let sourceHeight = context.height;

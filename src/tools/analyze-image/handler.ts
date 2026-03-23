@@ -81,6 +81,14 @@ export async function execute(
   const compareIndex = args.compareImageIndex as number | undefined;
   const detailed = (args.detailed as boolean) || false;
 
+  // Bounds check for explicitly-provided source index
+  if (rawSourceIndex !== undefined && rawSourceIndex >= 0 && rawSourceIndex >= context.resultUrls.length) {
+    return JSON.stringify({
+      error: 'invalid_source_index',
+      message: `sourceImageIndex ${rawSourceIndex} is out of range — only ${context.resultUrls.length} results are available (0-based). Check the index and try again.`,
+    });
+  }
+
   // Resolve primary image
   const imageData = await resolveImage(rawSourceIndex, context);
 

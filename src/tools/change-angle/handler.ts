@@ -40,6 +40,15 @@ export async function execute(
   // - sourceImageIndex === undefined -> auto-select latest result (or original if none)
   // - sourceImageIndex >= 0 -> use that specific result
   const useOriginal = rawSourceIndex === -1 && context.imageData !== null;
+
+  // Bounds check for explicitly-provided source index
+  if (rawSourceIndex !== undefined && rawSourceIndex >= 0 && rawSourceIndex >= context.resultUrls.length) {
+    return JSON.stringify({
+      error: 'invalid_source_index',
+      message: `sourceImageIndex ${rawSourceIndex} is out of range — only ${context.resultUrls.length} results are available (0-based). Check the index and try again.`,
+    });
+  }
+
   const effectiveSourceIndex = useOriginal
     ? undefined
     : rawSourceIndex ?? (context.resultUrls.length > 0 ? context.resultUrls.length - 1 : undefined);

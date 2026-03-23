@@ -150,6 +150,14 @@ export async function execute(
     ? undefined
     : rawSourceIndex ?? autoSelectIndex;
 
+  // Bounds check: if the LLM explicitly provided a sourceImageIndex, validate it
+  if (rawSourceIndex !== undefined && rawSourceIndex >= 0 && rawSourceIndex >= context.resultUrls.length) {
+    return JSON.stringify({
+      error: 'invalid_source_index',
+      message: `sourceImageIndex ${rawSourceIndex} is out of range — only ${context.resultUrls.length} results are available (0-based). Check the index and try again.`,
+    });
+  }
+
   console.log(`[ANIMATE] source selection:`, {
     rawSourceIndex,
     useOriginal,
@@ -204,6 +212,11 @@ export async function execute(
     if (rawEndImageIndex === -1 && context.imageData) {
       // Explicit: use primary uploaded image as end frame
       endImageData = context.imageData;
+    } else if (rawEndImageIndex !== undefined && rawEndImageIndex >= 0 && rawEndImageIndex >= context.resultUrls.length) {
+      return JSON.stringify({
+        error: 'invalid_end_index',
+        message: `endImageIndex ${rawEndImageIndex} is out of range — only ${context.resultUrls.length} results are available (0-based). Check the index and try again.`,
+      });
     } else if (rawEndImageIndex !== undefined && rawEndImageIndex >= 0 && context.resultUrls[rawEndImageIndex]) {
       // Use a specific result image as end frame
       try {
