@@ -65,29 +65,32 @@ router.get('/', async (req, res) => {
 
     console.log('[Download] Proxying download:', { url, filename: safeFilename });
 
-    // Fetch the image from the source URL
+    // Fetch from the source URL
     const response = await fetch(url);
 
     if (!response.ok) {
-      console.error('[Download] Failed to fetch image:', response.status, response.statusText);
+      console.error('[Download] Failed to fetch:', response.status, response.statusText);
       return res.status(response.status).json({
-        error: 'Failed to fetch image'
+        error: 'Failed to fetch file'
       });
     }
 
-    // Get content type from the source response, or default to image/jpeg
-    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    // Get content type from the source response, or default to application/octet-stream
+    const contentType = response.headers.get('content-type') || 'application/octet-stream';
+    const contentLength = response.headers.get('content-length');
 
     // Set headers to trigger download with native OS dialog
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', `attachment; filename="${safeFilename}"`);
     res.setHeader('Cache-Control', 'no-cache');
+    if (contentLength) {
+      res.setHeader('Content-Length', contentLength);
+    }
 
-    // Stream the image data to the client
-    const arrayBuffer = await response.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    res.send(buffer);
+    // Pipe the response body directly to the client (no buffering)
+    const { Readable } = await import('stream');
+    const readable = Readable.fromWeb(response.body);
+    readable.pipe(res);
   } catch (error) {
     console.error('[Download] Download failed:', error);
     res.status(500).json({ error: 'Failed to download image' });
