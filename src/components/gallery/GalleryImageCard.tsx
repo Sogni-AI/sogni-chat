@@ -192,12 +192,13 @@ const GalleryImageCard: React.FC<GalleryImageCardProps> = ({
             muted
             loop
             playsInline
-            preload="metadata"
+            preload="auto"
             style={{
               width: '100%',
               height: '100%',
               objectFit: 'cover',
               display: 'block',
+              pointerEvents: 'none',
             }}
           />
         ) : (
