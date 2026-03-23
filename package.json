@@ -42,7 +42,7 @@
     "prepare": "husky && npm run server:install"
   },
   "dependencies": {
-    "@sogni-ai/sogni-client": "^4.1.0-alpha.4",
+    "@sogni-ai/sogni-client": "^4.1.0-alpha.6",
     "@types/uuid": "^10.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

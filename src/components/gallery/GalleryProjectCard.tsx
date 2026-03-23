@@ -182,6 +182,7 @@ const GalleryProjectCard: React.FC<GalleryProjectCardProps> = ({
         <video
           ref={videoRef}
           src={thumbnailUrl}
+          autoPlay
           muted
           loop
           playsInline

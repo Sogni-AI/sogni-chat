@@ -189,6 +189,7 @@ const GalleryImageCard: React.FC<GalleryImageCardProps> = ({
           <video
             ref={videoRef}
             src={imageUrl}
+            autoPlay
             muted
             loop
             playsInline
