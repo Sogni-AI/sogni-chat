@@ -15,11 +15,9 @@ import {
 import { resizeImageToFit } from '@/utils/imageProcessing';
 import { projectSessionMap } from '@/services/projectSessionMap';
 
-/** Which frame slot the source image should occupy */
-export type FrameMode = 'first' | 'last';
-
 export interface VideoGenerationParams {
-  imageData: Uint8Array;
+  /** Start frame image data. Null when using end-frame-only mode. */
+  imageData: Uint8Array | null;
   width: number;
   height: number;
   tokenType: TokenType;
@@ -38,8 +36,12 @@ export interface VideoGenerationParams {
   targetResolution?: number;
   /** Whether to disable the NSFW safety filter */
   disableNSFWFilter?: boolean;
-  /** Which frame slot the source image occupies: 'first' (default) or 'last' (LTX-2 only) */
-  frameMode?: FrameMode;
+  /** Optional end frame image data for keyframe interpolation */
+  endImageData?: Uint8Array;
+  /** How strictly to match the first frame (0-1, default 0.6). Set to 0 to disable start frame. */
+  firstFrameStrength?: number;
+  /** How strictly to match the last frame (0-1, default 0.6). */
+  lastFrameStrength?: number;
 }
 
 export interface VideoGenerationProgress {
@@ -76,28 +78,20 @@ export async function generateVideo(
   const duration = params.duration ?? 5;
   const numberOfMedia = params.numberOfMedia ?? 1;
   const config = getVideoModelConfig(modelId);
-  const frameMode = params.frameMode ?? 'first';
-  const isLastFrameMode = frameMode === 'last';
 
   const { width, height } = calculateVideoDimensions(srcWidth, srcHeight, params.targetResolution, modelId, params.aspectRatio);
   const frames = calculateVideoFrames(duration, modelId);
 
   console.log('[VIDEO SERVICE] Starting video generation...', {
-    srcDimensions: `${srcWidth}x${srcHeight}`,
+    srcDimensions: imageData ? `${srcWidth}x${srcHeight}` : '(end-frame-only)',
     videoDimensions: `${width}x${height}`,
     frames,
     fps: config.fps,
     model: config.model,
     modelId,
     numberOfMedia,
-    frameMode,
+    hasEndFrame: !!params.endImageData,
   });
-
-  // Resize source image to match target video dimensions (contain mode: scale to fit, center, black fill)
-  const resized = await resizeImageToFit(imageData, srcWidth, srcHeight, width, height, params.imageMimeType || 'image/jpeg');
-
-  // Convert to Blob for SDK referenceImage param
-  const referenceImageBlob = new Blob([new Uint8Array(resized.data)], { type: resized.mimeType });
 
   // Build project config — model-specific params applied dynamically
   const projectConfig: any = {
@@ -117,12 +111,29 @@ export async function generateVideo(
     sampler: config.sampler,
     scheduler: config.scheduler,
     seed: -1,
-    ...(isLastFrameMode
-      ? { referenceImageEnd: referenceImageBlob }
-      : { referenceImage: referenceImageBlob }),
     tokenType,
     disableNSFWFilter: !!params.disableNSFWFilter,
   };
+
+  // Start frame (referenceImage) — only when imageData is provided
+  if (imageData) {
+    const resized = await resizeImageToFit(imageData, srcWidth, srcHeight, width, height, params.imageMimeType || 'image/jpeg');
+    projectConfig.referenceImage = new Blob([new Uint8Array(resized.data)], { type: resized.mimeType });
+  }
+
+  // End frame for keyframe interpolation
+  if (params.endImageData) {
+    const resizedEnd = await resizeImageToFit(params.endImageData, srcWidth, srcHeight, width, height, params.imageMimeType || 'image/jpeg');
+    projectConfig.referenceImageEnd = new Blob([new Uint8Array(resizedEnd.data)], { type: resizedEnd.mimeType });
+  }
+
+  // Frame strength controls
+  if (params.firstFrameStrength !== undefined) {
+    projectConfig.firstFrameStrength = params.firstFrameStrength;
+  }
+  if (params.lastFrameStrength !== undefined) {
+    projectConfig.lastFrameStrength = params.lastFrameStrength;
+  }
 
   // Model-specific params
   if (config.shift !== undefined) {

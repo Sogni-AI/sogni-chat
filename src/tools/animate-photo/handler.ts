@@ -122,7 +122,8 @@ export async function execute(
     : 'ltx23';
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
   const aspectRatio = args.aspectRatio as string | undefined;
-  const frameMode = (args.frameMode as 'first' | 'last' | undefined) ?? 'first';
+  const frameRole = (args.frameRole as 'start' | 'end' | 'both' | undefined) ?? 'start';
+  const rawEndImageIndex = args.endImageIndex as number | undefined;
   const isLTX = videoModelId.startsWith('ltx');
 
   if (!context.imageData && context.resultUrls.length === 0) {
@@ -183,6 +184,45 @@ export async function execute(
     return JSON.stringify({ error: 'no_image', message: 'No source image available for animation.' });
   }
 
+  // ---------------------------------------------------------------------------
+  // Resolve end frame image (for "end" and "both" modes)
+  // ---------------------------------------------------------------------------
+  let endImageData: Uint8Array | null = null;
+
+  if (frameRole === 'end') {
+    // User's image IS the end frame — it will be sent as referenceImageEnd only.
+    // sourceImageData is still used for vision description (LTX 2.3 prompt anchoring)
+    // so the prompt describes what the video converges toward.
+    endImageData = sourceImageData;
+  } else if (frameRole === 'both') {
+    // Resolve end frame from endImageIndex, uploaded files, or second uploaded image
+    if (rawEndImageIndex === -1 && context.imageData) {
+      // Explicit: use primary uploaded image as end frame
+      endImageData = context.imageData;
+    } else if (rawEndImageIndex !== undefined && rawEndImageIndex >= 0 && context.resultUrls[rawEndImageIndex]) {
+      // Use a specific result image as end frame
+      try {
+        const fetched = await fetchImageAsUint8Array(context.resultUrls[rawEndImageIndex]);
+        endImageData = fetched.data;
+        console.log(`[ANIMATE] End frame from result #${rawEndImageIndex}: ${fetched.width}x${fetched.height}`);
+      } catch (err) {
+        console.error('[ANIMATE] Failed to fetch end frame image:', err);
+        return JSON.stringify({ error: 'fetch_failed', message: 'Could not retrieve the end frame image.' });
+      }
+    } else {
+      // Auto: look for a second uploaded image
+      const imageFiles = context.uploadedFiles.filter(f => f.type === 'image');
+      if (imageFiles.length >= 2) {
+        endImageData = imageFiles[1].data;
+        console.log(`[ANIMATE] End frame from second uploaded image: ${imageFiles[1].filename}`);
+      } else {
+        return JSON.stringify({ error: 'missing_end_frame', message: 'frameRole is "both" but no end frame image was found. Please upload a second image or specify endImageIndex.' });
+      }
+    }
+  }
+
+  console.log(`[ANIMATE] Frame role: ${frameRole}, hasEndImage: ${!!endImageData}`);
+
   // Pre-compute video dimensions for aspect ratio (used in all progress callbacks)
   const { width: vidW, height: vidH } = calculateVideoDimensions(sourceWidth, sourceHeight, targetResolution, videoModelId, aspectRatio);
   const videoAspectRatio = `${vidW} / ${vidH}`;
@@ -201,7 +241,7 @@ export async function execute(
       videoAspectRatio,
       modelName: mediaLabel,
     });
-    console.log(`[ANIMATE] Describing source image for LTX 2.3 video prompt (frameMode=${frameMode})...`);
+    console.log(`[ANIMATE] Describing source image for LTX 2.3 video prompt (frameRole=${frameRole})...`);
     const sceneDescription = await withTimeout(
       describeImageForVideo(context.sogniClient, sourceImageData, context.tokenType),
       LLM_SUBCALL_TIMEOUT_MS,
@@ -227,8 +267,8 @@ export async function execute(
       ) ?? prompt;
     }
 
-    if (frameMode === 'last') {
-      // Last-frame mode: describe the motion that leads TO the target image
+    if (frameRole === 'end') {
+      // End-frame mode: describe the motion that leads TO the target image
       composedPrompt = sceneDescription
         ? `${refinedPrompt} The scene resolves to ${sceneDescription}`
         : refinedPrompt;
@@ -241,7 +281,7 @@ export async function execute(
     // WAN 2.2: Use the prompt directly — no scene description or cinematic prefix
     composedPrompt = prompt;
   }
-  console.log(`[ANIMATE] Video prompt (${videoModelId}, frameMode=${frameMode}, ${composedPrompt.length} chars):`, composedPrompt);
+  console.log(`[ANIMATE] Video prompt (${videoModelId}, frameRole=${frameRole}, ${composedPrompt.length} chars):`, composedPrompt);
   console.log(`[ANIMATE] Video quality: ${qualityTier} -> ${targetResolution ? `${targetResolution}p shorter side` : 'default resolution'}`);
 
   // Estimate video cost using the selected model config
@@ -301,10 +341,14 @@ export async function execute(
     });
   };
 
+  // For "end" mode: don't send the image as start frame (referenceImage),
+  // only as end frame (referenceImageEnd)
+  const startImageData = frameRole === 'end' ? null : sourceImageData;
+
   const runVideoGeneration = (tokenType: TokenType) => generateVideo(
     context.sogniClient,
     {
-      imageData: sourceImageData,
+      imageData: startImageData,
       width: sourceWidth,
       height: sourceHeight,
       tokenType,
@@ -316,7 +360,8 @@ export async function execute(
       aspectRatio,
       targetResolution,
       disableNSFWFilter: context.safeContentFilter === false,
-      frameMode: isLTX ? frameMode : undefined,
+      ...(endImageData ? { endImageData } : {}),
+      ...(frameRole === 'end' ? { firstFrameStrength: 0, lastFrameStrength: 0.9 } : {}),
     },
     (progress) => {
       if (progress.type === 'progress' || progress.type === 'completed') {

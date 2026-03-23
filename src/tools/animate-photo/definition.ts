@@ -11,7 +11,7 @@ export const definition: ToolDefinition = {
   function: {
     name: 'animate_photo',
     description:
-      'Animate a photo into video with motion, audio, and dialogue. LTX 2.3 generates audio natively — describe audio in the prompt. Do NOT use sound_to_video or generate_music for dialogue/audio. Auto-uses latest result unless sourceImageIndex is set. If the request is vague, analyze the image first and suggest 2-3 specific animation ideas tailored to what you see. Only call once you have clear creative intent.',
+      'Animate a photo into video with motion, audio, and dialogue. LTX 2.3 generates audio natively — describe audio in the prompt. Do NOT use sound_to_video or generate_music for dialogue/audio. Auto-uses latest result unless sourceImageIndex is set. Supports start-frame (default), end-frame, and start+end interpolation modes — ask the user which frame role their image should play if they mention "end frame", "last frame", or provide two images. If the request is vague, analyze the image first and suggest 2-3 specific animation ideas tailored to what you see. Only call once you have clear creative intent.',
     parameters: {
       type: 'object',
       properties: {
@@ -63,11 +63,16 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
           type: 'string',
           description: ASPECT_RATIO_DESCRIPTION,
         },
-        frameMode: {
+        frameRole: {
           type: 'string',
-          enum: ['first', 'last'],
+          enum: ['start', 'end', 'both'],
           description:
-            'Which frame the source image anchors. "first" (default): image is the first frame — video animates forward from it. "last": image is the LAST frame — video generates motion that ends at the image (LTX 2.3 only). Use "last" when the user says "end at this image", "use as last frame", "arrive at this pose", or similar.',
+            'How to use the source image(s) for video generation. "start" (default): image is the first frame — video animates forward from it. "end": image is the last frame — video leads up to it. "both": two images provided — source image is the start frame, endImageIndex specifies the end frame, and the video interpolates between them. Only set when the user explicitly indicates their image should be the end frame or provides two images for interpolation.',
+        },
+        endImageIndex: {
+          type: 'number',
+          description:
+            'Which image to use as the END frame (0-based index into results). Only used when frameRole is "both". Use -1 for the primary/first uploaded image. If omitted when frameRole is "both", uses the second uploaded image if available.',
         },
       },
       required: ['prompt'],
