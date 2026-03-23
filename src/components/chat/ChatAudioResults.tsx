@@ -3,20 +3,24 @@
  *
  * Renders an <audio> element with controls for playing back generated music.
  * Follows the same pattern as ChatVideoResults but for audio content.
+ * Prefers gallery blob URLs (persistent) over remote URLs (may expire).
  */
 
 import React, { useRef, useState, useCallback } from 'react';
+import { useGalleryBlobUrls } from '@/hooks/useGalleryBlobUrls';
 
 interface ChatAudioResultsProps {
   /** URLs of generated audio files */
   audioUrls: string[];
+  /** Gallery audio IDs for persistent blob-based rendering (parallel to audioUrls) */
+  galleryAudioIds?: string[];
   /** Optional label shown above the player */
   label?: string;
   /** Called when the active track changes (for menu sync) */
   onActiveIndexChange?: (index: number) => void;
 }
 
-const ChatAudioResults: React.FC<ChatAudioResultsProps> = ({ audioUrls, label, onActiveIndexChange }) => {
+const ChatAudioResults: React.FC<ChatAudioResultsProps> = ({ audioUrls, galleryAudioIds, label, onActiveIndexChange }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -29,11 +33,15 @@ const ChatAudioResults: React.FC<ChatAudioResultsProps> = ({ audioUrls, label, o
     }
   }, [onActiveIndexChange]);
 
+  // Resolve gallery IDs to blob URLs — persistent local copies that never expire
+  const galleryBlobUrls = useGalleryBlobUrls(galleryAudioIds);
+
   if (!audioUrls || audioUrls.length === 0) {
     return null;
   }
 
-  const activeUrl = audioUrls[activeIndex];
+  // Prefer gallery blob URL (persistent) over remote URL (may expire)
+  const activeUrl = galleryBlobUrls.get(activeIndex) || audioUrls[activeIndex];
 
   return (
     <div className="chat-audio-results">

@@ -407,7 +407,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
       {message.audioResults && message.audioResults.length > 0 && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
           <LazyMedia enabled={!!message.isFromHistory} placeholderHeight={80}>
-            <ChatAudioResults audioUrls={message.audioResults} onActiveIndexChange={handleAudioIndexChange} />
+            <ChatAudioResults audioUrls={message.audioResults} galleryAudioIds={message.galleryAudioIds} onActiveIndexChange={handleAudioIndexChange} />
           </LazyMedia>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.25rem' }}>
             <MediaActionsMenu

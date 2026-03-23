@@ -12,6 +12,7 @@ import type { UploadedFile } from '@/tools/types';
 import { QUALITY_PRESETS, type QualityTier } from '@/config/qualityPresets';
 import { generateSuggestions, EDIT_INTENT_SUGGESTIONS } from '@/utils/chatSuggestions';
 import { FullscreenMediaViewer, type MediaItem } from '@/components/FullscreenMediaViewer';
+import { getImage } from '@/utils/galleryDB';
 import { useLayout } from '@/layouts/AppLayout';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useTypingPlaceholder } from '@/hooks/useTypingPlaceholder';
@@ -231,6 +232,15 @@ export function ChatPanel({
   const prevMessageCountRef = useRef(messages.length);
   const isUserNearBottomRef = useRef(true);
   const [fullscreenState, setFullscreenState] = useState<{ items: MediaItem[]; index: number } | null>(null);
+  // Track blob URLs created for the fullscreen viewer so we can revoke them on close
+  const fullscreenBlobUrlsRef = useRef<string[]>([]);
+  // Revoke any outstanding fullscreen blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      fullscreenBlobUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      fullscreenBlobUrlsRef.current = [];
+    };
+  }, []);
 
   // Message pagination — show last PAGE_SIZE messages initially, expand on scroll-up
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -350,19 +360,46 @@ export function ChatPanel({
     [sogniClient, imageData, width, height, tokenType, balances, qualityTier, safeContentFilter, onContentFilterChange, requestDisableContentFilter, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, selectedModelVariant, getPreviewUrl, messages],
   );
 
-  const handleMediaClick = useCallback((message: UIChatMessage, index: number, mediaType: 'image' | 'video' | 'audio') => {
+  const handleMediaClick = useCallback(async (message: UIChatMessage, index: number, mediaType: 'image' | 'video' | 'audio') => {
+    // Revoke any blob URLs from a previous fullscreen open (prevents leaks on rapid clicks)
+    fullscreenBlobUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+    fullscreenBlobUrlsRef.current = [];
+
     const items: MediaItem[] = [];
     const isVideoTool = message.toolProgress && ['animate_photo', 'generate_video', 'sound_to_video', 'video_to_video'].includes(message.toolProgress.toolName);
 
-    // Build items from finalized results first
+    // Resolve a gallery ID to a persistent blob URL, falling back to the original remote URL
+    const resolveUrl = async (url: string, galleryId?: string): Promise<string> => {
+      if (!galleryId) return url;
+      try {
+        const img = await getImage(galleryId);
+        if (img?.blob) {
+          const blobUrl = URL.createObjectURL(img.blob);
+          fullscreenBlobUrlsRef.current.push(blobUrl);
+          return blobUrl;
+        }
+      } catch { /* fall back to remote URL */ }
+      return url;
+    };
+
+    // Build items from finalized results, preferring gallery blob URLs over remote CDN URLs
     if (message.imageResults) {
-      items.push(...message.imageResults.map(url => ({ type: 'image' as const, url })));
+      const resolved = await Promise.all(
+        message.imageResults.map((url, i) => resolveUrl(url, message.galleryImageIds?.[i]))
+      );
+      items.push(...resolved.map(url => ({ type: 'image' as const, url })));
     }
     if (message.videoResults) {
-      items.push(...message.videoResults.map(url => ({ type: 'video' as const, url, aspectRatio: message.videoAspectRatio })));
+      const resolved = await Promise.all(
+        message.videoResults.map((url, i) => resolveUrl(url, message.galleryVideoIds?.[i]))
+      );
+      items.push(...resolved.map(url => ({ type: 'video' as const, url, aspectRatio: message.videoAspectRatio })));
     }
     if (message.audioResults) {
-      items.push(...message.audioResults.map(url => ({ type: 'audio' as const, url })));
+      const resolved = await Promise.all(
+        message.audioResults.map((url, i) => resolveUrl(url, message.galleryAudioIds?.[i]))
+      );
+      items.push(...resolved.map(url => ({ type: 'audio' as const, url })));
     }
 
     // During active generation, completed results live in perJobProgress, not imageResults.
@@ -879,7 +916,12 @@ export function ChatPanel({
         <FullscreenMediaViewer
           items={fullscreenState.items}
           currentIndex={fullscreenState.index}
-          onClose={() => setFullscreenState(null)}
+          onClose={() => {
+            setFullscreenState(null);
+            // Revoke blob URLs created for the fullscreen viewer to free memory
+            fullscreenBlobUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+            fullscreenBlobUrlsRef.current = [];
+          }}
           onNavigate={(index) => setFullscreenState(prev => prev ? { ...prev, index } : null)}
         />
       )}
