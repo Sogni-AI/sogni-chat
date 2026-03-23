@@ -248,12 +248,19 @@ export function ChatPanel({
   const suggestions = useMemo(
     () => {
       if (isLoading) return [];
-      if (uploadIntent === 'restore' && imageData) return [];
-      if (uploadIntent === 'edit' && imageData) return EDIT_INTENT_SUGGESTIONS;
-      // For video intent, use analysis suggestions directly (skip restoration preset chips)
-      if (uploadIntent === 'video' && imageData && analysisSuggestions && analysisSuggestions.length > 0) {
-        return analysisSuggestions;
+
+      // Upload-intent overrides only apply before any tool has completed.
+      // Once a tool runs, defer to generateSuggestions() for tool-contextual chips.
+      const hasCompletedTool = messages.some(m => m.role === 'assistant' && m.lastCompletedTool);
+      if (!hasCompletedTool) {
+        if (uploadIntent === 'restore' && imageData) return [];
+        if (uploadIntent === 'edit' && imageData) return EDIT_INTENT_SUGGESTIONS;
+        // For video intent, use analysis suggestions directly (skip restoration preset chips)
+        if (uploadIntent === 'video' && imageData && analysisSuggestions && analysisSuggestions.length > 0) {
+          return analysisSuggestions;
+        }
       }
+
       return generateSuggestions(messages, analysisSuggestions, !!imageData, hasPersonas);
     },
     [messages, isLoading, analysisSuggestions, imageData, uploadIntent, hasPersonas],
