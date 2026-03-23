@@ -314,9 +314,14 @@ export function ChatPanel({
   const handleSend = useCallback(
     (content: string) => {
       if (!sogniClient) return;
-      // Collect current image preview URLs so the user message displays them inline
+      // Only attach image previews to the first user message — once images are
+      // visible in the message stream they shouldn't be re-attached on every send.
+      const hasImageInMessages = messages.some(
+        (m) => m.role === 'user' &&
+          ((m.uploadedImageUrls && m.uploadedImageUrls.length > 0) || m.uploadedImageUrl),
+      );
       const uploadedImageUrls: string[] = [];
-      if (uploadedFiles && getPreviewUrl) {
+      if (!hasImageInMessages && uploadedFiles && getPreviewUrl) {
         uploadedFiles.forEach((f, i) => {
           if (f.type === 'image') {
             const url = getPreviewUrl(i);
@@ -342,7 +347,7 @@ export function ChatPanel({
         uploadedImageUrls: uploadedImageUrls.length > 0 ? uploadedImageUrls : undefined,
       });
     },
-    [sogniClient, imageData, width, height, tokenType, balances, qualityTier, safeContentFilter, onContentFilterChange, requestDisableContentFilter, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, selectedModelVariant, getPreviewUrl],
+    [sogniClient, imageData, width, height, tokenType, balances, qualityTier, safeContentFilter, onContentFilterChange, requestDisableContentFilter, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, selectedModelVariant, getPreviewUrl, messages],
   );
 
   const handleMediaClick = useCallback((message: UIChatMessage, index: number, mediaType: 'image' | 'video' | 'audio') => {

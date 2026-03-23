@@ -107,6 +107,7 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
         src={src}
         autoPlay={autoPlay}
         controls
+        controlsList="nodownload"
         loop
         playsInline={!isMobile()}
         preload={(autoPlay || isLocalBlob) ? 'auto' : 'metadata'}

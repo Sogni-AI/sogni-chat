@@ -6,12 +6,12 @@
  * instead of flying out to the right (which would overflow the screen).
  * Touch targets are sized to at least 44px for comfortable tapping.
  */
-import { memo, useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { memo, useMemo, useState, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import type { UIChatMessage } from '@/types/chat';
 import { getModelOptions } from '@/tools/shared/modelRegistry';
 import type { ModelOption } from '@/tools/shared/modelRegistry';
 import { downloadImage } from '@/utils/download';
-import { buildDownloadFilename } from '@/utils/downloadFilename';
+import { buildDownloadFilename, type DownloadMetadata } from '@/utils/downloadFilename';
 import { useGalleryBlobUrls } from '@/hooks/useGalleryBlobUrls';
 import { toggleFavorite as dbToggleFavorite, getImage } from '@/utils/galleryDB';
 
@@ -97,6 +97,20 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
   const isMulti = !!mediaUrls && mediaUrls.length > 1;
   const filenameType = mediaType === 'video' ? 'video' as const : mediaType === 'audio' ? 'audio' as const : 'restored' as const;
 
+  // Extract generation metadata from tool args for rich download filenames
+  const downloadMetadata: DownloadMetadata | undefined = useMemo(() => {
+    const args = message.toolArgs;
+    if (!args && !message.modelName) return undefined;
+    return {
+      model: message.modelName || (args?.model as string) || (args?.videoModel as string) || (args?.quality as string) || undefined,
+      width: (args?.width as number) || undefined,
+      height: (args?.height as number) || undefined,
+      fps: (args?.fps as number) || undefined,
+      seed: (args?.seed as number | string) || undefined,
+      duration: (args?.duration as number) || undefined,
+    };
+  }, [message.toolArgs, message.modelName]);
+
   // Labels for single vs multi
   const singleLabel = mediaType === 'video' ? 'Save video' : mediaType === 'audio' ? 'Save audio' : 'Save image';
   const currentLabel = mediaType === 'video' ? 'Save current video' : mediaType === 'audio' ? 'Save current track' : singleLabel;
@@ -110,11 +124,12 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
       downloadSlug,
       mediaUrls.length > 1 ? index + 1 : undefined,
       filenameType,
+      downloadMetadata,
     );
     downloadImage(displayUrl, filename).catch(err =>
       console.error('[MEDIA MENU] Download failed:', err),
     );
-  }, [mediaUrls, galleryBlobUrls, downloadSlug, filenameType]);
+  }, [mediaUrls, galleryBlobUrls, downloadSlug, filenameType, downloadMetadata]);
 
   // Download all items
   const handleDownloadAll = useCallback((e: React.MouseEvent) => {

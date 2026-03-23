@@ -4,7 +4,7 @@
  */
 import { useState, useCallback, useEffect } from 'react';
 import { downloadImage } from '@/utils/download';
-import { buildDownloadFilename } from '@/utils/downloadFilename';
+import { buildDownloadFilename, type DownloadMetadata } from '@/utils/downloadFilename';
 import { toggleFavorite as dbToggleFavorite, getImage } from '@/utils/galleryDB';
 
 interface ResultActionBarProps {
@@ -14,6 +14,12 @@ interface ResultActionBarProps {
   disabled?: boolean;
   /** Gallery image ID for the active result (enables favorite toggle) */
   galleryImageId?: string;
+  /** Descriptive slug for download filenames (e.g. slugified session title) */
+  downloadSlug?: string;
+  /** Media type for correct file extension and prefix */
+  mediaType?: 'image' | 'video' | 'audio';
+  /** Generation metadata for rich download filenames */
+  downloadMetadata?: DownloadMetadata;
 }
 
 const REFINE_PRESETS = [
@@ -37,6 +43,9 @@ export function ResultActionBar({
   onSendMessage,
   disabled,
   galleryImageId,
+  downloadSlug,
+  mediaType,
+  downloadMetadata,
 }: ResultActionBarProps) {
   const [expandedAction, setExpandedAction] = useState<'refine' | 'style' | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -63,11 +72,12 @@ export function ResultActionBar({
 
   const handleDownload = useCallback(() => {
     if (!activeUrl) return;
-    const filename = buildDownloadFilename(undefined, activeIndex + 1);
+    const filenameType = mediaType === 'video' ? 'video' as const : mediaType === 'audio' ? 'audio' as const : 'restored' as const;
+    const filename = buildDownloadFilename(downloadSlug, activeIndex + 1, filenameType, downloadMetadata);
     downloadImage(activeUrl, filename).catch((err) =>
       console.error('[RESULT ACTION] Download failed:', err),
     );
-  }, [activeUrl, activeIndex]);
+  }, [activeUrl, activeIndex, downloadSlug, mediaType, downloadMetadata]);
 
   const handlePresetClick = useCallback(
     (message: string) => {
