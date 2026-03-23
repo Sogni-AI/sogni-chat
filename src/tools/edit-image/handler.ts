@@ -135,16 +135,9 @@ export async function execute(
   callbacks: ToolCallbacks,
 ): Promise<string> {
   const prompt = args.prompt as string;
-  const defaultModel = context.qualityTier === 'pro' ? 'flux2'
-    : context.qualityTier === 'hq' ? 'qwen' : 'qwen-lightning';
-  const explicitModel = args.model as string | undefined;
-  // Honor explicit model if provided (from user retry menu or LLM), otherwise use quality tier default.
-  const modelKey = explicitModel || defaultModel;
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
   const sourceImageIndex = args.sourceImageIndex as number | undefined;
   const aspectRatio = args.aspectRatio as string | undefined;
-
-  const modelConfig = IMAGE_EDIT_MODELS[modelKey] ?? IMAGE_EDIT_MODELS['qwen-lightning'];
 
   // Gather context images from uploads
   const contextImages = gatherContextImages(context, sourceImageIndex);
@@ -157,6 +150,13 @@ export async function execute(
     f => f.type === 'image' && f.filename?.startsWith('persona-'),
   );
   const hasPersonaPhotos = personaFiles.length > 0;
+
+  const defaultModel = context.qualityTier === 'pro' ? 'flux2'
+    : context.qualityTier === 'hq' ? 'qwen' : 'qwen-lightning';
+  const explicitModel = args.model as string | undefined;
+  // Honor explicit model if provided (from user retry menu or LLM), otherwise use quality tier default.
+  const modelKey = explicitModel || defaultModel;
+  const modelConfig = IMAGE_EDIT_MODELS[modelKey] ?? IMAGE_EDIT_MODELS['qwen-lightning'];
 
   // Cap to model max
   const cappedContextImages = contextImages.slice(0, modelConfig.maxContextImages);
@@ -207,21 +207,23 @@ export async function execute(
 
   // If persona reference photos are in context but the LLM's prompt doesn't
   // reference them by picture number, the model will ignore them.
-  // Auto-enhance the prompt with identity preservation directives.
+  // Auto-enhance: prepend light identity anchors, keep creative direction last
+  // so the model prioritizes the transformation over raw preservation.
   let effectivePrompt = prompt;
   if (hasPersonaPhotos && !prompt.toLowerCase().includes('picture')) {
-    // Build picture references for each persona photo
-    const personaRefs = personaFiles.map((f, i) => {
-      const personaName = f.filename?.replace('persona-', '').replace('.jpg', '').replace(/-/g, ' ') || `person ${i + 1}`;
+    // Build brief picture anchors — just enough for the model to bind identity
+    const personaAnchors = personaFiles.map((f) => {
+      const personaName = f.filename?.replace('persona-', '').replace('.jpg', '').replace(/-/g, ' ') || 'person';
       const pictureIdx = cappedContextImages.findIndex(ci => ci.data === f.data) + 1;
       if (pictureIdx > 0) {
-        return `Preserve the face, ethnicity, age, skin tone, hairstyle, and features of the person in picture ${pictureIdx} (${personaName}) exactly`;
+        return `Use the face from picture ${pictureIdx} (${personaName})`;
       }
       return null;
     }).filter(Boolean);
-    if (personaRefs.length > 0) {
-      effectivePrompt = `${prompt}. ${personaRefs.join('. ')}.`;
-      console.log('[EDIT IMAGE] Enhanced prompt with persona identity directives');
+    if (personaAnchors.length > 0) {
+      // Identity anchors first, creative direction last — last instruction wins
+      effectivePrompt = `${personaAnchors.join('. ')}. ${prompt}`;
+      console.log('[EDIT IMAGE] Enhanced prompt with persona identity anchors (creative-last)');
     }
   }
 

@@ -117,16 +117,16 @@ export async function execute(
 
       promptGuidance = `Reference photos loaded as context images: ${mappingStr}.${preExistingNote}
 
-IMPORTANT — Identity-preserving generation with edit_image:
-1. Reference each person by picture number AND name: "${personas[0]?.name || 'Name'} is the person in picture ${preExistingImageCount + 1}"
-2. Be EXPLICIT about preserving identity: "preserve ${personas[0]?.name || 'Name'}'s face, ethnicity, age, skin tone, hairstyle, and features exactly as shown in picture N"
-3. NEVER use "you", "your", "I", or "me" in the prompt — always use the person's NAME. The image model doesn't know who "you" is.
-4. DO NOT copy appearance descriptions into the prompt — the model can already see the reference photos. The picture number + "preserve face/features exactly" is enough.
-5. Focus the prompt on the SCENE: what they're doing, wearing, where they are. Keep it natural and concise.
+IMPORTANT — Creative generation with edit_image using persona references:
+1. Anchor each person's face with their picture number: "use the face from picture ${preExistingImageCount + 1} for ${personas[0]?.name || 'Name'}"
+2. LEAD with the creative transformation — what to create, the scene, the style, the mood. This is the MAIN instruction.
+3. Keep identity anchors brief — the model already sees the reference photos. Just the picture number is enough to bind the face.
+4. NEVER use "you", "your", "I", or "me" in the prompt — always use the person's NAME.
+5. Do NOT say "preserve exactly" or list physical features — this causes the model to reproduce the photo unchanged. Instead, let the picture reference handle identity naturally.
 6. Qwen Image Edit supports max 3 context images total (including any user uploads)
 
 Example prompt for the current context:
-"${personas.filter(p => p.referencePhotoData || p.photoData).map((p, i) => `${p.name} is the person in picture ${preExistingImageCount + 1 + i} — preserve ${p.name}'s face and features exactly`).join('. ')}. [describe the scene, clothing, action, mood — not their physical appearance]."
+"${personas.filter(p => p.referencePhotoData || p.photoData).map((p, i) => `Use the face from picture ${preExistingImageCount + 1 + i} for ${p.name}`).join('. ')}. [MAIN CREATIVE DIRECTION: describe the scene, style, transformation, action, mood — be vivid and specific]."
 
 Persona details (for your reference, NOT for pasting into prompts):
 ${descriptions}`;
