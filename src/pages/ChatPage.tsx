@@ -19,6 +19,7 @@ import { ChatPanel } from '@/components/chat/ChatPanel';
 import { ChatHistorySidebar } from '@/components/chat/ChatHistorySidebar';
 import { MobileChatDrawer } from '@/components/chat/MobileChatDrawer';
 import { usePersonas } from '@/hooks/usePersonas';
+import { useWakeLock } from '@/hooks/useWakeLock';
 import { PersonaEditorPanel } from '@/components/personas/PersonaEditorPanel';
 import { getPersona } from '@/utils/userDataDB';
 import type { Persona } from '@/types/userData';
@@ -325,6 +326,9 @@ export default function ChatPage() {
   const resultCount = chat.allResultUrls.length;
   const chatIsLoading = chat.isLoading;
   const chatIsSending = chat.isSending;
+
+  // Keep screen awake while AI tools are executing (image gen, video, music, etc.)
+  useWakeLock(chatIsLoading);
 
   // Count video results across all messages (videos aren't tracked in allResultUrls)
   const videoResultCount = useMemo(() =>

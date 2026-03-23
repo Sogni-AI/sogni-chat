@@ -871,6 +871,7 @@ export function ChatPanel({
         getPreviewUrl={getPreviewUrl}
         isLoading={isLoading}
         onCancel={chat.cancelToolExecution}
+        isMobile={isMobile}
       />
 
       {/* Fullscreen media viewer */}

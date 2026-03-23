@@ -25,6 +25,8 @@ interface ChatInputProps {
   isLoading?: boolean;
   /** Called when the user clicks the stop button during loading */
   onCancel?: () => void;
+  /** Whether the device is mobile (controls Enter key behavior) */
+  isMobile?: boolean;
 }
 
 /** Human-readable label for an uploaded file */
@@ -204,6 +206,7 @@ export const ChatInput = memo(function ChatInput({
   getPreviewUrl,
   isLoading = false,
   onCancel,
+  isMobile = false,
 }: ChatInputProps) {
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -234,7 +237,6 @@ export const ChatInput = memo(function ChatInput({
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key !== 'Enter') return;
-      const isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
       if (isMobile) {
         // Mobile: Enter inserts newline naturally; Ctrl/Cmd+Enter sends
         if (e.ctrlKey || e.metaKey) {
@@ -249,7 +251,7 @@ export const ChatInput = memo(function ChatInput({
         }
       }
     },
-    [handleSend],
+    [handleSend, isMobile],
   );
 
   const handleAttachClick = useCallback(() => {
