@@ -64,12 +64,29 @@ function ProgressVideo({ src, aspectRatio }: { src: string; aspectRatio?: string
   }, []);
 
   return (
-    <>
+    <div style={{ position: 'relative' }}>
+      {/* Video always in DOM — display:none prevents loading on iOS Safari */}
+      <video
+        ref={videoRef}
+        src={src}
+        loop
+        muted
+        controls
+        playsInline
+        preload="auto"
+        onLoadedData={handleLoadedData}
+        style={{
+          width: '100%',
+          height: 'auto',
+          opacity: ready ? 1 : 0,
+          ...(!ready && { aspectRatio: aspectRatio || '16 / 9' }),
+        }}
+      />
       {!ready && (
         <div
           style={{
-            aspectRatio: aspectRatio || '16 / 9',
-            width: '100%',
+            position: 'absolute',
+            inset: 0,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -88,22 +105,7 @@ function ProgressVideo({ src, aspectRatio }: { src: string; aspectRatio?: string
           />
         </div>
       )}
-      <video
-        ref={videoRef}
-        src={src}
-        loop
-        muted
-        controls
-        playsInline
-        preload="auto"
-        onLoadedData={handleLoadedData}
-        style={{
-          width: '100%',
-          height: 'auto',
-          display: ready ? 'block' : 'none',
-        }}
-      />
-    </>
+    </div>
   );
 }
 

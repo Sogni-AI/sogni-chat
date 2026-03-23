@@ -121,17 +121,43 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
 
   return (
     <div style={{ position: 'relative' }}>
-      {/* Loading placeholder — shown until the video is ready to display.
-          Clicking it forces the video to show with native controls. */}
+      {/* Video always in DOM — display:none prevents loading on iOS Safari,
+          causing onLoadedData to never fire and the spinner to stay forever.
+          We use opacity:0 so the element stays in the render tree and the
+          browser fetches video data even before the first frame is decoded. */}
+      <video
+        ref={videoRef}
+        src={src}
+        controls
+        controlsList="nodownload"
+        loop
+        playsInline
+        preload="auto"
+        onLoadedData={handleLoadedData}
+        onError={onError}
+        style={{
+          borderRadius: 'var(--radius-md)',
+          opacity: ready ? 1 : 0,
+          ...(ready
+            ? (fillWidth
+                ? { width: '100%', height: 'auto' }
+                : { maxWidth: '100%', maxHeight: '400px' })
+            : (fillWidth || !placeholderSize
+                ? { width: '100%', aspectRatio: aspectRatio || '16 / 9' }
+                : { width: placeholderSize.width, height: placeholderSize.height, maxWidth: '100%' })
+          ),
+        }}
+      >
+        Your browser does not support video playback.
+      </video>
+      {/* Loading overlay — covers the video until the first frame is decoded.
+          Clicking forces the video to show with native controls. */}
       {!ready && (
         <div
           onClick={handlePlaceholderClick}
           style={{
-            ...(placeholderSize
-              ? { width: placeholderSize.width, height: placeholderSize.height }
-              : { width: '100%', aspectRatio: aspectRatio || '16 / 9' }
-            ),
-            maxWidth: '100%',
+            position: 'absolute',
+            inset: 0,
             borderRadius: 'var(--radius-md)',
             background: 'rgba(var(--rgb-primary), 0.06)',
             display: 'flex',
@@ -152,27 +178,6 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
           />
         </div>
       )}
-      <video
-        ref={videoRef}
-        src={src}
-        controls
-        controlsList="nodownload"
-        loop
-        playsInline
-        preload="auto"
-        onLoadedData={handleLoadedData}
-        onError={onError}
-        style={{
-          display: ready ? 'block' : 'none',
-          borderRadius: 'var(--radius-md)',
-          ...(fillWidth
-            ? { width: '100%', height: 'auto' }
-            : { maxWidth: '100%', maxHeight: '400px' }
-          ),
-        }}
-      >
-        Your browser does not support video playback.
-      </video>
     </div>
   );
 }
@@ -254,7 +259,8 @@ function VideoThumbnailCard({ src, aspectRatio, onClick, onError }: {
           width: '100%',
           height: '100%',
           objectFit: 'cover',
-          display: ready ? 'block' : 'none',
+          // display:none prevents loading on iOS Safari — use opacity instead
+          opacity: ready ? 1 : 0,
           pointerEvents: 'none',
         }}
       />
