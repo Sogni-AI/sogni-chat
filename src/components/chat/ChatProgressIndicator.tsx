@@ -48,8 +48,6 @@ function ProgressVideo({ src, aspectRatio }: { src: string; aspectRatio?: string
     };
   }, []);
 
-  const markReady = useCallback(() => setReady(true), []);
-
   /** Programmatic auto-play: only plays if no fullscreen viewer is open
    *  and no other inline video is already playing. */
   const handleLoadedData = useCallback(() => {
@@ -98,7 +96,6 @@ function ProgressVideo({ src, aspectRatio }: { src: string; aspectRatio?: string
         controls
         playsInline
         preload="auto"
-        onLoadedMetadata={markReady}
         onLoadedData={handleLoadedData}
         style={{
           width: '100%',

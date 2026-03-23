@@ -18,7 +18,7 @@ import { activeVideos, pauseOtherVideos, isFullscreenOpen, markAutoPlay, consume
  *  Shows a poster-frame overlay until the video is ready, then reveals the
  *  native player. The overlay is always clickable so users can force-play
  *  even if the ready signal hasn't fired yet. */
-function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPlay = true, isLocalBlob = false }: { src: string; onError: () => void; onPlay?: () => void; aspectRatio?: string; fillWidth?: boolean; autoPlay?: boolean; isLocalBlob?: boolean }) {
+function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPlay = true }: { src: string; onError: () => void; onPlay?: () => void; aspectRatio?: string; fillWidth?: boolean; autoPlay?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const onPlayRef = useRef(onPlay);
   onPlayRef.current = onPlay;
@@ -96,13 +96,6 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
     setReady(false);
   }, [src]);
 
-  /** Mark the video as ready to display — called from multiple events as a
-   *  belt-and-suspenders approach since browser support for loadeddata vs
-   *  loadedmetadata varies, especially on mobile Safari. */
-  const markReady = useCallback(() => {
-    setReady(true);
-  }, []);
-
   /** Programmatic auto-play: only plays if no fullscreen viewer is open
    *  and no other inline video is already playing. This prevents the
    *  chaotic multi-video-play when a batch of videos finish loading. */
@@ -166,8 +159,7 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
         controlsList="nodownload"
         loop
         playsInline
-        preload={(autoPlay || isLocalBlob) ? 'auto' : 'metadata'}
-        onLoadedMetadata={markReady}
+        preload="auto"
         onLoadedData={handleLoadedData}
         onError={onError}
         style={{
@@ -187,12 +179,11 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
 
 /** Thumbnail card for grid mode — shows the first frame of a video with a
  *  play-button overlay. Clicking opens the fullscreen media viewer. */
-function VideoThumbnailCard({ src, aspectRatio, onClick, onError, isLocalBlob = false }: {
+function VideoThumbnailCard({ src, aspectRatio, onClick, onError }: {
   src: string;
   aspectRatio?: string;
   onClick: () => void;
   onError: () => void;
-  isLocalBlob?: boolean;
 }) {
   const [ready, setReady] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -201,8 +192,6 @@ function VideoThumbnailCard({ src, aspectRatio, onClick, onError, isLocalBlob = 
   useEffect(() => {
     setReady(false);
   }, [src]);
-
-  const markReady = useCallback(() => setReady(true), []);
 
   return (
     <button
@@ -256,9 +245,8 @@ function VideoThumbnailCard({ src, aspectRatio, onClick, onError, isLocalBlob = 
         src={src}
         muted
         playsInline
-        preload={isLocalBlob ? 'auto' : 'metadata'}
-        onLoadedMetadata={markReady}
-        onLoadedData={markReady}
+        preload="auto"
+        onLoadedData={() => setReady(true)}
         onError={onError}
         style={{
           position: 'absolute',
@@ -418,7 +406,6 @@ export const ChatVideoResults = memo(function ChatVideoResults({
                 onVideoClick?.(displayUrl, index);
               }}
               onError={() => handleError(index)}
-              isLocalBlob={!!blobUrl}
             />
           ) : (
             /* Single video — full inline player */
@@ -429,7 +416,6 @@ export const ChatVideoResults = memo(function ChatVideoResults({
               aspectRatio={videoAspectRatio}
               fillWidth={false}
               autoPlay={autoPlay}
-              isLocalBlob={!!blobUrl}
             />
           )}
 
