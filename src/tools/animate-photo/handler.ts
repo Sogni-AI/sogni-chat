@@ -138,12 +138,17 @@ export async function execute(
 
   // Determine source image:
   // - sourceImageIndex === -1 -> explicitly use original
-  // - sourceImageIndex === undefined -> auto-select latest result (or original if none)
+  // - sourceImageIndex === undefined -> auto-select (see below)
   // - sourceImageIndex >= 0 -> use that specific result
+  // When frameRole is "both" and sourceImageIndex is omitted, use the FIRST result
+  // (not the latest) since the latest is likely the end frame.
   const useOriginal = rawSourceIndex === -1 && context.imageData !== null;
+  const autoSelectIndex = context.resultUrls.length > 0
+    ? (frameRole === 'both' ? 0 : context.resultUrls.length - 1)
+    : undefined;
   const effectiveSourceIndex = useOriginal
     ? undefined
-    : rawSourceIndex ?? (context.resultUrls.length > 0 ? context.resultUrls.length - 1 : undefined);
+    : rawSourceIndex ?? autoSelectIndex;
 
   console.log(`[ANIMATE] source selection:`, {
     rawSourceIndex,
@@ -195,7 +200,7 @@ export async function execute(
     // so the prompt describes what the video converges toward.
     endImageData = sourceImageData;
   } else if (frameRole === 'both') {
-    // Resolve end frame from endImageIndex, uploaded files, or second uploaded image
+    // Resolve end frame from endImageIndex, uploaded files, or auto-select from results
     if (rawEndImageIndex === -1 && context.imageData) {
       // Explicit: use primary uploaded image as end frame
       endImageData = context.imageData;
@@ -210,13 +215,24 @@ export async function execute(
         return JSON.stringify({ error: 'fetch_failed', message: 'Could not retrieve the end frame image.' });
       }
     } else {
-      // Auto: look for a second uploaded image
+      // Auto: try second uploaded image first, then latest result
       const imageFiles = context.uploadedFiles.filter(f => f.type === 'image');
       if (imageFiles.length >= 2) {
         endImageData = imageFiles[1].data;
         console.log(`[ANIMATE] End frame from second uploaded image: ${imageFiles[1].filename}`);
+      } else if (context.resultUrls.length >= 2) {
+        // Auto-select latest result as end frame (source was auto-selected as first result)
+        const endResultIndex = context.resultUrls.length - 1;
+        try {
+          const fetched = await fetchImageAsUint8Array(context.resultUrls[endResultIndex]);
+          endImageData = fetched.data;
+          console.log(`[ANIMATE] End frame auto-selected from latest result #${endResultIndex}: ${fetched.width}x${fetched.height}`);
+        } catch (err) {
+          console.error('[ANIMATE] Failed to fetch end frame from latest result:', err);
+          return JSON.stringify({ error: 'fetch_failed', message: 'Could not retrieve the end frame image.' });
+        }
       } else {
-        return JSON.stringify({ error: 'missing_end_frame', message: 'frameRole is "both" but no end frame image was found. Please upload a second image or specify endImageIndex.' });
+        return JSON.stringify({ error: 'missing_end_frame', message: 'frameRole is "both" but no end frame image was found. Please provide two images or specify endImageIndex.' });
       }
     }
   }

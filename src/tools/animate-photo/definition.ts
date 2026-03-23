@@ -50,7 +50,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
         sourceImageIndex: {
           type: 'number',
           description:
-            'Which result image to animate (0-based index). Omit to use the latest result automatically (or the original if no results exist). Only set explicitly when the user specifies a particular image number or explicitly says "original" (use -1 for original).',
+            'Which result image to use as the START frame (0-based index). Omit to auto-select: uses the latest result for "start"/"end" modes, or the FIRST result for "both" mode. Use -1 for the original uploaded image. IMPORTANT: When frameRole is "both", set this to the start frame image index and endImageIndex to the end frame image index.',
         },
         numberOfVariations: {
           type: 'number',
@@ -67,12 +67,12 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
           type: 'string',
           enum: ['start', 'end', 'both'],
           description:
-            'How to use the source image(s) for video generation. "start" (default): image is the first frame — video animates forward from it. "end": image is the last frame — video leads up to it. "both": two images provided — source image is the start frame, endImageIndex specifies the end frame, and the video interpolates between them. Only set when the user explicitly indicates their image should be the end frame or provides two images for interpolation.',
+            'How to use the source image(s) for video generation. "start" (default): image is the first frame — video animates forward from it. "end": image is the last frame — video leads up to it. "both": two images provided — interpolates between start and end frames. When using "both", you MUST set sourceImageIndex to the start frame and endImageIndex to the end frame.',
         },
         endImageIndex: {
           type: 'number',
           description:
-            'Which image to use as the END frame (0-based index into results). Only used when frameRole is "both". Use -1 for the primary/first uploaded image. If omitted when frameRole is "both", uses the second uploaded image if available.',
+            'Which image to use as the END frame (0-based index into results). Required when frameRole is "both". Use -1 for the primary/first uploaded image. If omitted when frameRole is "both", auto-selects the latest generated result.',
         },
       },
       required: ['prompt'],
