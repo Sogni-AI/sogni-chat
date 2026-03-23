@@ -14,10 +14,10 @@ import { formatTokenAmount, getTokenLabel } from '@/services/walletService';
 import type { TokenType } from '@/types/wallet';
 import { PackPurchaseModal } from '@/components/billing/PackPurchaseModal';
 import BillingHistoryModal from '@/components/billing/BillingHistoryModal';
-import ChangelogModal from '@/components/changelog/ChangelogModal';
 import { MemoryViewer } from '@/components/personas/MemoryViewer';
 import { useMemories } from '@/hooks/useMemories';
-import { useChangelog } from '@/hooks/useChangelog';
+import { PersonalityPanel } from '@/components/personality/PersonalityPanel';
+import { usePersonality } from '@/hooks/usePersonality';
 
 export function AuthStatus() {
   const { isAuthenticated, isLoading, user, authMode, logout } = useSogniAuth();
@@ -30,7 +30,8 @@ export function AuthStatus() {
   const [showBillingModal, setShowBillingModal] = useState(false);
   const [showMemoryViewer, setShowMemoryViewer] = useState(false);
   const { memories, deleteMemory, upsertByKey } = useMemories();
-  const { changelog, hasNew, isModalOpen: showChangelog, openChangelog, closeChangelog } = useChangelog();
+  const [showPersonalityPanel, setShowPersonalityPanel] = useState(false);
+  const { personality, savePersonality, clearPersonality } = usePersonality();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -118,19 +119,8 @@ export function AuthStatus() {
           onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
         >
-          <span className="text-sm" style={{ color: '#b4b4b4', position: 'relative' }}>
+          <span className="text-sm" style={{ color: '#b4b4b4' }}>
             {user?.username}
-            {hasNew && (
-              <span style={{
-                position: 'absolute',
-                top: '-2px',
-                right: '-8px',
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: '#22C55E',
-              }} />
-            )}
           </span>
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{
             transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
@@ -367,9 +357,9 @@ export function AuthStatus() {
               )}
             </button>
 
-            {/* What's New */}
+            {/* Personality */}
             <button
-              onClick={() => { openChangelog(); setOpen(false); }}
+              onClick={() => { setShowPersonalityPanel(true); setOpen(false); }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -389,13 +379,14 @@ export function AuthStatus() {
               onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#b4b4b4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
               </svg>
-              <span>What's New</span>
-              {hasNew && (
+              <span>Personality</span>
+              {personality && (
                 <span style={{
-                  width: '8px',
-                  height: '8px',
+                  width: '6px',
+                  height: '6px',
                   borderRadius: '50%',
                   background: '#22C55E',
                   marginLeft: 'auto',
@@ -498,18 +489,21 @@ export function AuthStatus() {
         onClose={() => setShowBillingModal(false)}
       />
 
-      <ChangelogModal
-        isOpen={showChangelog}
-        onClose={closeChangelog}
-        entries={changelog}
-      />
-
       {showMemoryViewer && (
         <MemoryViewer
           memories={memories}
           onDelete={deleteMemory}
           onAdd={(key, value) => upsertByKey(key, value, 'preference', 'user')}
           onClose={() => setShowMemoryViewer(false)}
+        />
+      )}
+
+      {showPersonalityPanel && (
+        <PersonalityPanel
+          personality={personality}
+          onSave={savePersonality}
+          onClear={clearPersonality}
+          onClose={() => setShowPersonalityPanel(false)}
         />
       )}
     </>

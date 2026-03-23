@@ -23,7 +23,7 @@ import { isInsufficientCreditsError, getAlternateToken, hasBalance } from '@/too
 import { trimConversation, getInputBudget } from '@/services/contextWindow';
 import { resizeImageForVision } from '@/utils/imageProcessing';
 import type { TokenType } from '@/types/wallet';
-import { getAllPersonas, getAllMemories } from '@/utils/userDataDB';
+import { getAllPersonas, getAllMemories, getPersonality } from '@/utils/userDataDB';
 
 // ---------------------------------------------------------------------------
 // Callbacks
@@ -110,6 +110,18 @@ async function buildMemoryContext(): Promise<string> {
   }
 }
 
+/** Build personality context for system prompt injection */
+async function buildPersonalityContext(): Promise<string> {
+  try {
+    const pref = await getPersonality();
+    if (!pref?.instruction) return '';
+    return pref.instruction;
+  } catch (err) {
+    console.warn('[CHAT SERVICE] Failed to build personality context:', err);
+    return '';
+  }
+}
+
 /**
  * Prepare vision-ready data URIs from uploaded images.
  * These don't change between tool rounds so we cache them.
@@ -188,12 +200,16 @@ export async function sendChatMessage(
   const personaContext = await buildPersonaContext();
   const personaNames = await getPersonaNames();
   const memoryContext = await buildMemoryContext();
+  const personalityContext = await buildPersonalityContext();
   const dynamicSystemPrompt = CHAT_SYSTEM_PROMPT
     + (personaContext
       ? `\nUser's people: ${personaContext}. "me", "I", "myself" = the person marked (self) — call resolve_personas with their name immediately, never ask who they mean. When creating images of these people: call resolve_personas first, then use edit_image (never generate_image). When creating videos of these people: ALWAYS generate an image first (resolve_personas → edit_image), then STOP — show the image result and ask if it looks good before proceeding to animate_photo. Never chain image → video without user approval. Pronouns like "us", "we", "our" refer to these people — always call resolve_personas again for each new image generation, even in follow-up messages. If user mentions someone not listed, suggest adding them to My Personas.`
       : '')
     + (memoryContext
       ? `\nUser preferences (always respect these): ${memoryContext}`
+      : '')
+    + (personalityContext
+      ? `\nUSER PERSONALITY PREFERENCE: The user has customized your personality as follows: "${personalityContext}". Adopt this personality while following all other instructions above.`
       : '');
 
   // Verify the chat API is available on this client instance

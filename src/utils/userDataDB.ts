@@ -6,13 +6,14 @@
  * survive history clears.
  */
 
-import type { Persona, PersonaSummary, PersonaThumbnail, Memory } from '@/types/userData';
+import type { Persona, PersonaSummary, PersonaThumbnail, Memory, PersonalityPreference } from '@/types/userData';
 
 const DB_NAME = 'sogni_user_data';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const PERSONAS_STORE = 'personas';
 const MEMORIES_STORE = 'memories';
 const THUMBNAILS_STORE = 'persona_thumbnails';
+const PERSONALITY_STORE = 'personality';
 
 let dbInstance: IDBDatabase | null = null;
 
@@ -40,6 +41,8 @@ function openDB(): Promise<IDBDatabase> {
     };
 
     request.onupgradeneeded = (event) => {
+      // Invalidate cached instance — the upgrade creates a new connection
+      dbInstance = null;
       const db = (event.target as IDBOpenDBRequest).result;
 
       if (!db.objectStoreNames.contains(PERSONAS_STORE)) {
@@ -56,6 +59,10 @@ function openDB(): Promise<IDBDatabase> {
 
       if (!db.objectStoreNames.contains(THUMBNAILS_STORE)) {
         db.createObjectStore(THUMBNAILS_STORE, { keyPath: 'personaId' });
+      }
+
+      if (!db.objectStoreNames.contains(PERSONALITY_STORE)) {
+        db.createObjectStore(PERSONALITY_STORE, { keyPath: 'id' });
       }
     };
   });
@@ -417,4 +424,57 @@ export async function deleteMemoryByKey(key: string): Promise<void> {
   if (memory) {
     await deleteMemory(memory.id);
   }
+}
+
+// ============================================================================
+// Personality CRUD
+// ============================================================================
+
+const PERSONALITY_ID = 'default';
+
+/** Get the user's personality preference (singleton) */
+export async function getPersonality(): Promise<PersonalityPreference | null> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(PERSONALITY_STORE, 'readonly');
+    const request = tx.objectStore(PERSONALITY_STORE).get(PERSONALITY_ID);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => {
+      console.error('[USER DATA DB] Failed to get personality:', request.error);
+      reject(new Error('Failed to load personality'));
+    };
+  });
+}
+
+/** Save or update the user's personality instruction */
+export async function savePersonalityInstruction(instruction: string): Promise<PersonalityPreference> {
+  const db = await openDB();
+  const pref: PersonalityPreference = {
+    id: PERSONALITY_ID,
+    instruction,
+    updatedAt: Date.now(),
+  };
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(PERSONALITY_STORE, 'readwrite');
+    tx.objectStore(PERSONALITY_STORE).put(pref);
+    tx.oncomplete = () => resolve(pref);
+    tx.onerror = () => {
+      console.error('[USER DATA DB] Failed to save personality:', tx.error);
+      reject(new Error('Failed to save personality'));
+    };
+  });
+}
+
+/** Clear the user's personality instruction (revert to default) */
+export async function clearPersonality(): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(PERSONALITY_STORE, 'readwrite');
+    tx.objectStore(PERSONALITY_STORE).delete(PERSONALITY_ID);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => {
+      console.error('[USER DATA DB] Failed to clear personality:', tx.error);
+      reject(new Error('Failed to clear personality'));
+    };
+  });
 }

@@ -65,3 +65,14 @@ export interface Memory {
   createdAt: number;
   updatedAt: number;
 }
+
+// ---------------------------------------------------------------------------
+// Personality
+// ---------------------------------------------------------------------------
+
+/** User's custom LLM personality instruction */
+export interface PersonalityPreference {
+  id: string;           // always 'default' (singleton)
+  instruction: string;  // freeform text
+  updatedAt: number;
+}
