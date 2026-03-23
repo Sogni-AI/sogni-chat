@@ -315,6 +315,8 @@ export default function ChatPage() {
     await saveCurrentSession(id, session);
     sessionUpdatedAtRef.current = updatedAt;
     sessionDirtyRef.current = false;
+    // Clear emergency backup — the IndexedDB write succeeded, so the backup is stale
+    try { sessionStorage.removeItem('sogni_session_backup'); } catch { /* ignore */ }
     console.log(`[CHAT PAGE] saveActiveSession: IndexedDB write completed for ${id}`);
   }, [saveCurrentSession]); // saveCurrentSession is stable (useCallback in useChatSessions)
 
@@ -379,7 +381,12 @@ export default function ChatPage() {
     // the 1500ms debounce — which may not fire before a page refresh.
     const wasLoading = prevChatIsLoadingRef.current;
     prevChatIsLoadingRef.current = chatIsLoading;
-    if (wasLoading && !chatIsLoading && activeSessionId && sessionDirtyRef.current && !isRestoringRef.current) {
+    // Always save when chat finishes loading — don't gate on sessionDirtyRef.
+    // The dirty flag can be reset to false by an earlier async save (the await
+    // in saveActiveSession completes and clears dirty AFTER effects set it true),
+    // which would cause this critical save to be skipped entirely.  The debounced
+    // save below is the only fallback, and 1500ms is too slow if the user refreshes.
+    if (wasLoading && !chatIsLoading && activeSessionId && !isRestoringRef.current) {
       saveActiveSession();
       return; // skip the debounce — we just saved
     }
@@ -399,7 +406,31 @@ export default function ChatPage() {
     const handleVisibilityChange = () => {
       if (document.hidden) saveActiveSession();
     };
-    const handleBeforeUnload = () => { saveActiveSession(); };
+    const handleBeforeUnload = () => {
+      // Write a synchronous sessionStorage backup as a safety net.
+      // saveActiveSession() is async — if the page unloads before the IndexedDB
+      // transaction commits, the write is silently discarded.  sessionStorage
+      // writes are synchronous and survive page refreshes within the same tab.
+      try {
+        const id = activeSessionIdRef.current;
+        if (id && !isRestoringRef.current) {
+          const state = chatRef.current.getSessionState();
+          if (state.uiMessages.length > 1 || state.uiMessages[0]?.id !== 'welcome') {
+            sessionStorage.setItem('sogni_session_backup', JSON.stringify({
+              id,
+              uiMessages: state.uiMessages,
+              conversation: state.conversation,
+              allResultUrls: state.allResultUrls,
+              audioResultUrls: state.audioResultUrls,
+              analysisSuggestions: state.analysisSuggestions,
+              sessionModel: state.sessionModel,
+              timestamp: Date.now(),
+            }));
+          }
+        }
+      } catch { /* sessionStorage quota or serialization failure — ignore */ }
+      saveActiveSession();
+    };
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {

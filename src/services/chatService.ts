@@ -43,6 +43,9 @@ export interface ChatStreamCallbacks {
   onModelRefusal?: (refusedContent: string) => void;
   /** Called after a gallery save completes, providing gallery IDs for persistent rendering */
   onGallerySaved?: (galleryImageIds: string[], galleryVideoIds: string[], galleryAudioIds?: string[]) => void;
+  /** Called after each message is added to the conversation array, so the caller can
+   *  keep its own ref in sync for mid-loop persistence (e.g. saves triggered by tool results). */
+  onConversationUpdate?: (messages: ChatMessage[]) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -245,20 +248,21 @@ export async function sendChatMessage(
     try {
       // Sliding window: trim conversation if approaching context limit.
       // Reserve token budget for the vision image that will be attached.
+      // IMPORTANT: Trim a COPY for the API call — keep full history in updatedMessages
+      // so that mid-loop saves (triggered by tool results) persist the complete conversation.
       const systemMessage: ChatMessage = { role: 'system', content: dynamicSystemPrompt };
       const rawBudget = getInputBudget(context.sogniClient);
       const budget = visionDataUris.length > 0 ? rawBudget - VISION_IMAGE_TOKENS * visionDataUris.length : rawBudget;
       const trimResult = trimConversation(updatedMessages, systemMessage, budget);
+      const messagesForApi = trimResult.trimmedCount > 0 ? trimResult.messages : updatedMessages;
       if (trimResult.trimmedCount > 0) {
-        console.log(`[CHAT SERVICE] Trimmed ${trimResult.trimmedCount} messages to fit context window`);
-        // Replace conversation with trimmed version
-        updatedMessages.splice(0, updatedMessages.length, ...trimResult.messages);
+        console.log(`[CHAT SERVICE] Trimmed ${trimResult.trimmedCount} messages for API (full history preserved for persistence)`);
         callbacks.onContextTrimmed?.(trimResult.trimmedCount);
       }
 
       const allMessages: ChatMessage[] = [
         systemMessage,
-        ...updatedMessages,
+        ...messagesForApi,
       ];
 
       // If a tool generated new results since last round, only refresh the result URI
@@ -376,6 +380,7 @@ export async function sendChatMessage(
             const match = unquotedTail.match(confirmPattern);
             console.log(`[CHAT SERVICE] Suppressed tool calls — matched: "${match?.[0]}" in last 500 chars`);
             updatedMessages.push({ role: 'assistant', content: result.content });
+            callbacks.onConversationUpdate?.(updatedMessages);
             callbacks.onComplete(result.content);
             break;
           }
@@ -455,6 +460,7 @@ export async function sendChatMessage(
           content: result.content || null,
           tool_calls: result.tool_calls,
         });
+        callbacks.onConversationUpdate?.(updatedMessages);
 
         // Execute each tool call via the registry
         for (const toolCall of result.tool_calls) {
@@ -473,6 +479,7 @@ export async function sendChatMessage(
               tool_call_id: toolCall.id,
               name: toolName,
             });
+            callbacks.onConversationUpdate?.(updatedMessages);
 
             // Parse result to detect errors from the registry (it catches handler
             // exceptions and returns error JSON strings rather than throwing).
@@ -504,6 +511,7 @@ export async function sendChatMessage(
               tool_call_id: toolCall.id,
               name: toolName,
             });
+            callbacks.onConversationUpdate?.(updatedMessages);
           }
         }
 
@@ -526,6 +534,7 @@ export async function sendChatMessage(
         role: 'assistant',
         content: textContent,
       });
+      callbacks.onConversationUpdate?.(updatedMessages);
 
       // Check for refusal when no tool calls were made
       if (textContent && detectRefusal(textContent)) {

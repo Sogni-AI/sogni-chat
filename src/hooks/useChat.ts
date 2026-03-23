@@ -960,6 +960,15 @@ export function useChat(): UseChatResult {
                 setUIMessages((prev) => applyGalleryIdsToMessages(prev, galleryImageIds, galleryVideoIds, galleryAudioIds));
               },
 
+              onConversationUpdate: (messages: ChatMessage[]) => {
+                // Keep conversationRef in sync during the tool loop so mid-loop
+                // saves (triggered by image/video results) persist the complete
+                // conversation history — not just the pre-loop snapshot.
+                if (!thisRequest.aborted && isActiveSession()) {
+                  conversationRef.current = messages;
+                }
+              },
+
               onContextTrimmed: () => {
                 // Silently trimmed
               },

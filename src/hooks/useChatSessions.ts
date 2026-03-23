@@ -149,7 +149,42 @@ export function useChatSessions(): UseChatSessionsReturn {
       // 4. Determine which session to restore
       const restoreId = migratedId || sessionStorage.getItem(ACTIVE_SESSION_KEY);
       if (restoreId) {
-        const session = await getSession(restoreId);
+        let session = await getSession(restoreId);
+
+        // Recover from emergency sessionStorage backup written by beforeunload.
+        // If the backup has more messages or results than IndexedDB, the last
+        // async save was interrupted by page unload — merge the backup.
+        if (session) {
+          try {
+            const backupRaw = sessionStorage.getItem('sogni_session_backup');
+            if (backupRaw) {
+              sessionStorage.removeItem('sogni_session_backup');
+              const backup = JSON.parse(backupRaw);
+              if (backup.id === session.id) {
+                const backupHasMore =
+                  backup.uiMessages.length > session.uiMessages.length ||
+                  backup.allResultUrls.length > session.allResultUrls.length;
+                if (backupHasMore) {
+                  console.log(`[CHAT SESSIONS] Recovering from emergency backup: ${backup.uiMessages.length} msgs (was ${session.uiMessages.length}), ${backup.allResultUrls.length} urls (was ${session.allResultUrls.length})`);
+                  session = {
+                    ...session,
+                    uiMessages: backup.uiMessages,
+                    conversation: backup.conversation,
+                    allResultUrls: backup.allResultUrls,
+                    audioResultUrls: backup.audioResultUrls || session.audioResultUrls,
+                    analysisSuggestions: backup.analysisSuggestions || session.analysisSuggestions,
+                    sessionModel: backup.sessionModel || session.sessionModel,
+                    updatedAt: backup.timestamp || session.updatedAt,
+                  };
+                  await saveSession(session);
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('[CHAT SESSIONS] Failed to process emergency backup:', err);
+          }
+        }
+
         if (session && mounted) {
           const msgsWithImages = session.uiMessages.filter((m: any) => m.imageResults?.length);
           const msgsWithVideos = session.uiMessages.filter((m: any) => m.videoResults?.length);
