@@ -96,15 +96,6 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
     setReady(false);
   }, [src]);
 
-  // Fallback: iOS Safari/Chrome ignores preload="auto", so onLoadedData may
-  // never fire. After a timeout, show the video with native controls instead
-  // of leaving the user staring at a spinner forever.
-  useEffect(() => {
-    if (ready) return;
-    const id = setTimeout(() => setReady(true), 3000);
-    return () => clearTimeout(id);
-  }, [ready, src]);
-
   /** Programmatic auto-play: only plays if no fullscreen viewer is open
    *  and no other inline video is already playing. This prevents the
    *  chaotic multi-video-play when a batch of videos finish loading. */
@@ -130,43 +121,16 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
 
   return (
     <div style={{ position: 'relative' }}>
-      {/* Video always in DOM — display:none prevents loading on iOS Safari,
-          causing onLoadedData to never fire and the spinner to stay forever.
-          We use opacity:0 so the element stays in the render tree and the
-          browser fetches video data even before the first frame is decoded. */}
-      <video
-        ref={videoRef}
-        src={src}
-        controls
-        controlsList="nodownload"
-        loop
-        playsInline
-        preload="auto"
-        onLoadedData={handleLoadedData}
-        onError={onError}
-        style={{
-          borderRadius: 'var(--radius-md)',
-          opacity: ready ? 1 : 0,
-          ...(ready
-            ? (fillWidth
-                ? { width: '100%', height: 'auto' }
-                : { maxWidth: '100%', maxHeight: '400px' })
-            : (fillWidth || !placeholderSize
-                ? { width: '100%', aspectRatio: aspectRatio || '16 / 9' }
-                : { width: placeholderSize.width, height: placeholderSize.height, maxWidth: '100%' })
-          ),
-        }}
-      >
-        Your browser does not support video playback.
-      </video>
-      {/* Loading overlay — covers the video until the first frame is decoded.
-          Clicking forces the video to show with native controls. */}
+      {/* Loading placeholder — shown until the first video frame is decoded */}
       {!ready && (
         <div
           onClick={handlePlaceholderClick}
           style={{
-            position: 'absolute',
-            inset: 0,
+            ...(placeholderSize
+              ? { width: placeholderSize.width, height: placeholderSize.height }
+              : { width: '100%', aspectRatio: aspectRatio || '16 / 9' }
+            ),
+            maxWidth: '100%',
             borderRadius: 'var(--radius-md)',
             background: 'rgba(var(--rgb-primary), 0.06)',
             display: 'flex',
@@ -187,6 +151,28 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
           />
         </div>
       )}
+      <video
+        ref={videoRef}
+        src={src}
+        autoPlay
+        controls
+        controlsList="nodownload"
+        loop
+        playsInline
+        preload="auto"
+        onLoadedData={handleLoadedData}
+        onError={onError}
+        style={{
+          display: ready ? 'block' : 'none',
+          borderRadius: 'var(--radius-md)',
+          ...(fillWidth
+            ? { width: '100%', height: 'auto' }
+            : { maxWidth: '100%', maxHeight: '400px' }
+          ),
+        }}
+      >
+        Your browser does not support video playback.
+      </video>
     </div>
   );
 }
@@ -206,13 +192,6 @@ function VideoThumbnailCard({ src, aspectRatio, onClick, onError }: {
   useEffect(() => {
     setReady(false);
   }, [src]);
-
-  // Fallback: iOS ignores preload="auto" — show after timeout
-  useEffect(() => {
-    if (ready) return;
-    const id = setTimeout(() => setReady(true), 3000);
-    return () => clearTimeout(id);
-  }, [ready, src]);
 
   return (
     <button
@@ -264,6 +243,7 @@ function VideoThumbnailCard({ src, aspectRatio, onClick, onError }: {
       {/* Silent, paused video element to capture the first frame as a poster */}
       <video
         src={src}
+        autoPlay
         muted
         playsInline
         preload="auto"
@@ -275,8 +255,7 @@ function VideoThumbnailCard({ src, aspectRatio, onClick, onError }: {
           width: '100%',
           height: '100%',
           objectFit: 'cover',
-          // display:none prevents loading on iOS Safari — use opacity instead
-          opacity: ready ? 1 : 0,
+          display: ready ? 'block' : 'none',
           pointerEvents: 'none',
         }}
       />

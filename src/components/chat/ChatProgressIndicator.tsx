@@ -20,13 +20,6 @@ function ProgressVideo({ src, aspectRatio }: { src: string; aspectRatio?: string
   // Reset loading state when src changes (e.g. retry with different URL)
   useEffect(() => { setReady(false); }, [src]);
 
-  // Fallback: iOS ignores preload="auto" — show after timeout
-  useEffect(() => {
-    if (ready) return;
-    const id = setTimeout(() => setReady(true), 3000);
-    return () => clearTimeout(id);
-  }, [ready, src]);
-
   // Register in the global activeVideos set and wire up play coordination
   useEffect(() => {
     const el = videoRef.current;
@@ -71,29 +64,12 @@ function ProgressVideo({ src, aspectRatio }: { src: string; aspectRatio?: string
   }, []);
 
   return (
-    <div style={{ position: 'relative' }}>
-      {/* Video always in DOM — display:none prevents loading on iOS Safari */}
-      <video
-        ref={videoRef}
-        src={src}
-        loop
-        muted
-        controls
-        playsInline
-        preload="auto"
-        onLoadedData={handleLoadedData}
-        style={{
-          width: '100%',
-          height: 'auto',
-          opacity: ready ? 1 : 0,
-          ...(!ready && { aspectRatio: aspectRatio || '16 / 9' }),
-        }}
-      />
+    <>
       {!ready && (
         <div
           style={{
-            position: 'absolute',
-            inset: 0,
+            aspectRatio: aspectRatio || '16 / 9',
+            width: '100%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -112,7 +88,23 @@ function ProgressVideo({ src, aspectRatio }: { src: string; aspectRatio?: string
           />
         </div>
       )}
-    </div>
+      <video
+        ref={videoRef}
+        src={src}
+        autoPlay
+        loop
+        muted
+        controls
+        playsInline
+        preload="auto"
+        onLoadedData={handleLoadedData}
+        style={{
+          width: '100%',
+          height: 'auto',
+          display: ready ? 'block' : 'none',
+        }}
+      />
+    </>
   );
 }
 
