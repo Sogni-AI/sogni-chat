@@ -689,6 +689,12 @@ export function useChat(): UseChatResult {
                     ...currentToolResultUrls,
                     ...progress.resultUrls.filter(u => !currentToolResultUrls.includes(u)),
                   ];
+                  // Merge into allResultUrlsRef progressively so getSessionState()
+                  // captures partial batch results if the page refreshes mid-generation
+                  const combined = [...new Set([...allResultUrlsRef.current, ...currentToolResultUrls])];
+                  if (combined.length > allResultUrlsRef.current.length) {
+                    allResultUrlsRef.current = combined;
+                  }
                 }
                 if (progress.videoResultUrls) {
                   const before = currentToolVideoUrls.length;
@@ -723,6 +729,11 @@ export function useChat(): UseChatResult {
                         },
                       };
                     }
+                    // Persist image results progressively so auto-save captures them
+                    // even if the batch isn't complete yet (survives page refresh)
+                    const imageResults = currentToolResultUrls.length > 0
+                      ? [...new Set(currentToolResultUrls)]
+                      : msg.imageResults;
                     // Persist video results progressively so auto-save captures them
                     // even if the batch isn't complete yet (survives page refresh)
                     const videoResults = currentToolVideoUrls.length > 0
@@ -732,6 +743,9 @@ export function useChat(): UseChatResult {
                     const galleryVideoIds = progress.type === 'started'
                       ? undefined
                       : msg.galleryVideoIds;
+                    const galleryImageIds = progress.type === 'started'
+                      ? undefined
+                      : msg.galleryImageIds;
                     // Merge with previous toolProgress so fields from different event types
                     // (e.g. progress from jobStep, etaSeconds from jobETA) don't overwrite each other
                     const prev = msg.toolProgress;
@@ -754,7 +768,7 @@ export function useChat(): UseChatResult {
                             : prev?.resultUrls,
                           perJobProgress,
                         };
-                    return { ...msg, toolProgress: merged, videoResults, galleryVideoIds };
+                    return { ...msg, toolProgress: merged, imageResults, videoResults, galleryImageIds, galleryVideoIds };
                   }),
                 );
               },
@@ -828,9 +842,9 @@ export function useChat(): UseChatResult {
                       || undefined;
                     return {
                       ...msg,
-                      imageResults: !isAudioTool && uniqueUrls.length > 0 ? uniqueUrls : undefined,
-                      videoResults: uniqueVideoUrls.length > 0 ? uniqueVideoUrls : undefined,
-                      audioResults: isAudioTool && uniqueUrls.length > 0 ? uniqueUrls : undefined,
+                      imageResults: !isAudioTool && uniqueUrls.length > 0 ? uniqueUrls : msg.imageResults,
+                      videoResults: uniqueVideoUrls.length > 0 ? uniqueVideoUrls : msg.videoResults,
+                      audioResults: isAudioTool && uniqueUrls.length > 0 ? uniqueUrls : msg.audioResults,
                       toolProgress: null,
                       sourceImageUrl: srcUrl || undefined,
                       videoAspectRatio: vidAR || undefined,
@@ -1066,11 +1080,12 @@ export function useChat(): UseChatResult {
     setUIMessages((prev) => {
       const updated = prev.map((msg) => {
         if (msg.toolProgress) {
-          // Extract completed result URLs from per-job progress
+          // Extract completed result URLs from per-job progress (dedup to prevent
+          // duplicates between perJobProgress and toolProgress.resultUrls)
           const completedUrls: string[] = [];
           if (msg.toolProgress.perJobProgress) {
             for (const job of Object.values(msg.toolProgress.perJobProgress)) {
-              if (job.resultUrl) completedUrls.push(job.resultUrl);
+              if (job.resultUrl && !completedUrls.includes(job.resultUrl)) completedUrls.push(job.resultUrl);
             }
           }
           // Also check toolProgress.resultUrls as a fallback
@@ -1105,9 +1120,9 @@ export function useChat(): UseChatResult {
 
             return {
               ...msg,
-              imageResults: !isVideoTool && !isAudioTool ? completedUrls : undefined,
-              videoResults: isVideoTool ? completedUrls : undefined,
-              audioResults: isAudioTool ? completedUrls : undefined,
+              imageResults: !isVideoTool && !isAudioTool ? completedUrls : msg.imageResults,
+              videoResults: isVideoTool ? completedUrls : msg.videoResults,
+              audioResults: isAudioTool ? completedUrls : msg.audioResults,
               toolProgress: null,
               isStreaming: false,
               wasCancelled: true,
@@ -1353,11 +1368,11 @@ export function useChat(): UseChatResult {
 
         if (sessionId === sessionIdRef.current) {
           if (isImage) {
-            allResultUrlsRef.current = [...allResultUrlsRef.current, ...resultUrls];
-            setAllResultUrls((prev) => [...prev, ...resultUrls]);
+            allResultUrlsRef.current = [...new Set([...allResultUrlsRef.current, ...resultUrls])];
+            setAllResultUrls((prev) => [...new Set([...prev, ...resultUrls])]);
           }
           if (isAudio) {
-            audioResultUrlsRef.current = [...audioResultUrlsRef.current, ...resultUrls];
+            audioResultUrlsRef.current = [...new Set([...audioResultUrlsRef.current, ...resultUrls])];
           }
           setUIMessages((prev) => [...prev, recoveryMsg]);
         } else {
@@ -1410,11 +1425,11 @@ export function useChat(): UseChatResult {
               const isVideo = modelType === 'video';
               const isAudio = modelType === 'music';
               if (isImage) {
-                allResultUrlsRef.current = [...allResultUrlsRef.current, ...urls];
-                setAllResultUrls((prev) => [...prev, ...urls]);
+                allResultUrlsRef.current = [...new Set([...allResultUrlsRef.current, ...urls])];
+                setAllResultUrls((prev) => [...new Set([...prev, ...urls])]);
               }
               if (isAudio) {
-                audioResultUrlsRef.current = [...audioResultUrlsRef.current, ...urls];
+                audioResultUrlsRef.current = [...new Set([...audioResultUrlsRef.current, ...urls])];
               }
               setUIMessages((prev) =>
                 prev.map((msg) =>
