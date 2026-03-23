@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import changelog from "./vite-plugin-changelog.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import { readFileSync } from "fs";
@@ -9,7 +10,7 @@ const pkg = JSON.parse(readFileSync(path.resolve(__dirname, "package.json"), "ut
 const backendPort = process.env.BACKEND_PORT || 3006;
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), changelog()],
   base: '/',
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),

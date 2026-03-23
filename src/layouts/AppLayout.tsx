@@ -11,6 +11,7 @@ import { trackPageView } from '@/services/analyticsService';
 import { SogniTV } from '@/components/shared/SogniTV';
 import { captureReferralFromURL } from '@/utils/referralTracking';
 import { DEFAULT_VARIANT_ID } from '@/config/modelVariants';
+import { getAppVersion } from '@/config/env';
 import { getSavedContentFilter, saveContentFilter } from '@/config/contentFilterPreset';
 import DisableContentFilterPopup from '@/components/content-filter/DisableContentFilterPopup';
 import { useState, useEffect, useRef, createContext, useContext, useCallback } from 'react';
@@ -263,7 +264,7 @@ export function AppLayout() {
         zIndex: 9999,
         userSelect: 'none',
       }}>
-        ALPHA V0.0.1
+        ALPHA V{getAppVersion()}
       </div>
     </LayoutContext.Provider>
   );

@@ -1,6 +1,6 @@
 {
   "name": "sogni-chat",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "AI-powered chat studio using the Sogni Client SDK",
@@ -33,13 +33,13 @@
     "preview": "vite preview",
     "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings 16",
     "validate:useeffect": "node scripts/validate-useeffect.js",
-    "precommit": "npm run validate:useeffect",
     "server:install": "cd server && npm install",
     "server:dev": "cd server && npm run dev",
     "server:start": "cd server && npm start",
     "deploy:production": "bash scripts/deploy-production.sh",
     "deploy:staging": "bash scripts/deploy-staging.sh",
-    "prepare": "npm run server:install"
+    "release": "bash scripts/release.sh",
+    "prepare": "husky && npm run server:install"
   },
   "dependencies": {
     "@sogni-ai/sogni-client": "^4.1.0-alpha.4",
@@ -53,6 +53,8 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
     "@eslint/js": "^9.0.0",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
@@ -60,10 +62,12 @@
     "@typescript-eslint/parser": "^8.50.0",
     "@vitejs/plugin-react": "^4.4.1",
     "autoprefixer": "^10.4.16",
+    "changelogen": "^0.6.2",
     "eslint": "^9.0.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.0.0",
     "globals": "^15.0.0",
+    "husky": "^9.1.7",
     "postcss": "^8.4.33",
     "sharp": "^0.34.5",
     "tailwindcss": "^3.4.1",

@@ -14,8 +14,10 @@ import { formatTokenAmount, getTokenLabel } from '@/services/walletService';
 import type { TokenType } from '@/types/wallet';
 import { PackPurchaseModal } from '@/components/billing/PackPurchaseModal';
 import BillingHistoryModal from '@/components/billing/BillingHistoryModal';
+import ChangelogModal from '@/components/changelog/ChangelogModal';
 import { MemoryViewer } from '@/components/personas/MemoryViewer';
 import { useMemories } from '@/hooks/useMemories';
+import { useChangelog } from '@/hooks/useChangelog';
 
 export function AuthStatus() {
   const { isAuthenticated, isLoading, user, authMode, logout } = useSogniAuth();
@@ -28,6 +30,7 @@ export function AuthStatus() {
   const [showBillingModal, setShowBillingModal] = useState(false);
   const [showMemoryViewer, setShowMemoryViewer] = useState(false);
   const { memories, deleteMemory, upsertByKey } = useMemories();
+  const { changelog, hasNew, isModalOpen: showChangelog, openChangelog, closeChangelog } = useChangelog();
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -115,8 +118,19 @@ export function AuthStatus() {
           onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
         >
-          <span className="text-sm" style={{ color: '#b4b4b4' }}>
+          <span className="text-sm" style={{ color: '#b4b4b4', position: 'relative' }}>
             {user?.username}
+            {hasNew && (
+              <span style={{
+                position: 'absolute',
+                top: '-2px',
+                right: '-8px',
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: '#22C55E',
+              }} />
+            )}
           </span>
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" style={{
             transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
@@ -353,6 +367,43 @@ export function AuthStatus() {
               )}
             </button>
 
+            {/* What's New */}
+            <button
+              onClick={() => { openChangelog(); setOpen(false); }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                width: '100%',
+                padding: '10px 14px',
+                background: 'none',
+                border: 'none',
+                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                cursor: 'pointer',
+                fontSize: '0.8125rem',
+                fontWeight: 500,
+                color: '#d4d4d4',
+                textAlign: 'left',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#b4b4b4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+              </svg>
+              <span>What's New</span>
+              {hasNew && (
+                <span style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: '#22C55E',
+                  marginLeft: 'auto',
+                  flexShrink: 0,
+                }} />
+              )}
+            </button>
+
             {/* Safe Content Filter toggle */}
             <button
               onClick={() => {
@@ -445,6 +496,12 @@ export function AuthStatus() {
       <BillingHistoryModal
         isOpen={showBillingModal}
         onClose={() => setShowBillingModal(false)}
+      />
+
+      <ChangelogModal
+        isOpen={showChangelog}
+        onClose={closeChangelog}
+        entries={changelog}
       />
 
       {showMemoryViewer && (

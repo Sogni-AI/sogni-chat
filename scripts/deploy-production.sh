@@ -16,6 +16,13 @@ echo "=========================================="
 echo "  Sogni Creative Agent - Production Deploy"
 echo "=========================================="
 
+# Warn if HEAD is not tagged (reminder to run npm run release first)
+if ! git describe --exact-match HEAD >/dev/null 2>&1; then
+  echo ""
+  echo "WARNING: HEAD is not tagged. Consider running 'npm run release' first."
+  echo ""
+fi
+
 # Verify local env files exist
 if [ ! -f ".env.production" ]; then
   echo "ERROR: .env.production not found"
