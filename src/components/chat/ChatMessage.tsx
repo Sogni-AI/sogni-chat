@@ -53,7 +53,7 @@ interface ChatMessageProps {
   onRetry?: (message: UIChatMessage, modelKey?: string) => void;
 }
 
-export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImageClick, onVideoClick: _onVideoClick, onAudioClick: _onAudioClick, onProgressMediaClick, onCancelTool, onAcceptModelSwitch, onDeclineModelSwitch, downloadSlug, onBranchChat, onRetry }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImageClick, onVideoClick, onAudioClick: _onAudioClick, onProgressMediaClick, onCancelTool, onAcceptModelSwitch, onDeclineModelSwitch, downloadSlug, onBranchChat, onRetry }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
   const isSystem = message.role === 'system';
@@ -382,7 +382,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
            the player has its own loading spinner and gallery blobs are local */}
       {message.videoResults && message.videoResults.length > 0 && !message.toolProgress && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
-          <ChatVideoResults urls={message.videoResults} galleryVideoIds={message.galleryVideoIds} videoAspectRatio={message.videoAspectRatio} autoPlay={!message.isFromHistory} onActiveIndexChange={handleVideoIndexChange} />
+          <ChatVideoResults urls={message.videoResults} galleryVideoIds={message.galleryVideoIds} videoAspectRatio={message.videoAspectRatio} autoPlay={!message.isFromHistory} onActiveIndexChange={handleVideoIndexChange} onVideoClick={onVideoClick} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.25rem' }}>
             <MediaActionsMenu
               message={message}

@@ -3,11 +3,11 @@
  * Shows a blurred version of the original photo as background with
  * progress info overlaid. Individual results replace the blur as they arrive.
  */
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { ToolExecutionProgress } from '@/tools/types';
 import { formatCredits } from '@/services/creditsService';
 import { useTokenPrice } from '@/hooks/useTokenPrice';
-import { activeVideos, pauseOtherVideos } from './videoCoordination';
+import { activeVideos, pauseOtherVideos, isFullscreenOpen, markAutoPlay, consumeAutoPlay } from './videoCoordination';
 import { PersonaReferenceIndicator } from '@/components/personas/PersonaReferenceIndicator';
 
 /** Inline video player for progress grid — hidden until first frame is ready.
@@ -28,6 +28,15 @@ function ProgressVideo({ src, aspectRatio }: { src: string; aspectRatio?: string
     activeVideos.add(el);
 
     const handlePlay = () => {
+      if (consumeAutoPlay(el)) {
+        // Auto-play: don't interrupt a video the user is already watching.
+        for (const v of activeVideos) {
+          if (v !== el && !v.paused) {
+            el.pause();
+            return;
+          }
+        }
+      }
       pauseOtherVideos(el);
       if (el.muted) el.muted = false;
     };
@@ -37,6 +46,21 @@ function ProgressVideo({ src, aspectRatio }: { src: string; aspectRatio?: string
       el.removeEventListener('play', handlePlay);
       activeVideos.delete(el);
     };
+  }, []);
+
+  /** Programmatic auto-play: only plays if no fullscreen viewer is open
+   *  and no other inline video is already playing. */
+  const handleLoadedData = useCallback(() => {
+    setReady(true);
+    const el = videoRef.current;
+    if (!el) return;
+    // Suppress auto-play when the fullscreen viewer is open or another video is already playing
+    if (isFullscreenOpen()) return;
+    for (const v of activeVideos) {
+      if (v !== el && !v.paused) return;
+    }
+    markAutoPlay(el);
+    el.play().catch(() => { /* browser may block autoplay — that's fine */ });
   }, []);
 
   return (
@@ -67,12 +91,11 @@ function ProgressVideo({ src, aspectRatio }: { src: string; aspectRatio?: string
       <video
         ref={videoRef}
         src={src}
-        autoPlay
         loop
         muted
         controls
         playsInline
-        onLoadedData={() => setReady(true)}
+        onLoadedData={handleLoadedData}
         style={{
           width: '100%',
           height: 'auto',

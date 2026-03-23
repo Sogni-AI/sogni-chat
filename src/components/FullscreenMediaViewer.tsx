@@ -6,12 +6,68 @@
  */
 
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { pauseAllVideos, setFullscreenOpen } from '@/components/chat/videoCoordination';
 
 export interface MediaItem {
   type: 'image' | 'video' | 'audio';
   url: string;
   /** CSS aspect-ratio string for videos, e.g. "9 / 16" */
   aspectRatio?: string;
+}
+
+/** Mute toggle button shown over videos in the fullscreen viewer.
+ *  Rendered inside a flex row alongside the close button — no absolute positioning needed. */
+function MuteToggle({
+  isMuted,
+  onToggle,
+}: {
+  isMuted: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-label={isMuted ? 'Unmute video' : 'Mute video'}
+      style={{
+        background: 'rgba(0, 0, 0, 0.5)',
+        border: '1px solid rgba(255, 255, 255, 0.15)',
+        borderRadius: '50%',
+        width: 40,
+        height: 40,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        color: 'rgba(255, 255, 255, 0.8)',
+        transition: 'background 150ms, color 150ms',
+        padding: 0,
+        flexShrink: 0,
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = 'rgba(0, 0, 0, 0.7)';
+        e.currentTarget.style.color = '#ffffff';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'rgba(0, 0, 0, 0.5)';
+        e.currentTarget.style.color = 'rgba(255, 255, 255, 0.8)';
+      }}
+    >
+      {isMuted ? (
+        /* Muted icon: speaker with X */
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+          <line x1="23" y1="9" x2="17" y2="15" />
+          <line x1="17" y1="9" x2="23" y2="15" />
+        </svg>
+      ) : (
+        /* Unmuted icon: speaker with sound waves */
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+        </svg>
+      )}
+    </button>
+  );
 }
 
 interface FullscreenMediaViewerProps {
@@ -32,8 +88,10 @@ export const FullscreenMediaViewer = memo(function FullscreenMediaViewer({
 }: FullscreenMediaViewerProps) {
   const [index, setIndex] = useState(currentIndex);
   const [visible, setVisible] = useState(false);
+  const [isMuted, setIsMuted] = useState(false); // Videos play unmuted when explicitly opened for preview
   const touchStartX = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   // Sync external index changes
   useEffect(() => setIndex(currentIndex), [currentIndex]);
@@ -54,6 +112,16 @@ export const FullscreenMediaViewer = memo(function FullscreenMediaViewer({
     };
   }, []);
 
+  // Pause all inline chat videos when the fullscreen viewer opens,
+  // and mark fullscreen as open so new videos don't auto-play behind it.
+  useEffect(() => {
+    pauseAllVideos();
+    setFullscreenOpen(true);
+    return () => {
+      setFullscreenOpen(false);
+    };
+  }, []);
+
   const navigate = useCallback(
     (newIndex: number) => {
       setIndex(newIndex);
@@ -70,6 +138,15 @@ export const FullscreenMediaViewer = memo(function FullscreenMediaViewer({
     if (index < items.length - 1) navigate(index + 1);
   }, [index, items.length, navigate]);
 
+  // Toggle mute on the video element and update state
+  const toggleMute = useCallback(() => {
+    const el = videoRef.current;
+    if (el) {
+      el.muted = !el.muted;
+      setIsMuted(el.muted);
+    }
+  }, []);
+
   // Keyboard navigation
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -85,10 +162,13 @@ export const FullscreenMediaViewer = memo(function FullscreenMediaViewer({
         e.preventDefault();
         if (index < items.length - 1) navigate(index + 1);
       }
+      if (e.key === 'm' || e.key === 'M') {
+        toggleMute();
+      }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [onClose, navigate, index, items.length]);
+  }, [onClose, navigate, index, items.length, toggleMute]);
 
   // Touch/swipe gesture handlers
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -162,39 +242,65 @@ export const FullscreenMediaViewer = memo(function FullscreenMediaViewer({
             fontFamily: 'var(--font-primary)',
             textShadow: '0 1px 4px rgba(0, 0, 0, 0.6)',
             userSelect: 'none',
+            zIndex: 3,
           }}
         >
           {index + 1} / {items.length}
         </div>
       )}
 
-      {/* Close button (top-right) */}
-      <button
-        onClick={onClose}
-        aria-label="Close"
+      {/* Top-right controls row: mute toggle + close button in a flex container
+           so they never overlap regardless of video orientation */}
+      <div
         style={{
           position: 'absolute',
           top: 16,
           right: 16,
-          background: 'none',
-          border: 'none',
-          color: 'rgba(255, 255, 255, 0.8)',
-          fontSize: '1.75rem',
-          lineHeight: 1,
-          cursor: 'pointer',
-          padding: 8,
-          zIndex: 2,
-          transition: 'color 150ms',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.color = '#ffffff';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.color = 'rgba(255, 255, 255, 0.8)';
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          zIndex: 3,
         }}
       >
-        &times;
-      </button>
+        {/* Mute toggle (only for videos) */}
+        {item.type === 'video' && (
+          <MuteToggle isMuted={isMuted} onToggle={toggleMute} />
+        )}
+
+        {/* Close button — sized to match mute button for visual consistency */}
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          style={{
+            background: 'rgba(0, 0, 0, 0.5)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            borderRadius: '50%',
+            width: 40,
+            height: 40,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            color: 'rgba(255, 255, 255, 0.8)',
+            transition: 'background 150ms, color 150ms',
+            padding: 0,
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(0, 0, 0, 0.7)';
+            e.currentTarget.style.color = '#ffffff';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(0, 0, 0, 0.5)';
+            e.currentTarget.style.color = 'rgba(255, 255, 255, 0.8)';
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
 
       {/* Media content */}
       <div onClick={stopPropagation} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -216,20 +322,26 @@ export const FullscreenMediaViewer = memo(function FullscreenMediaViewer({
 
         {item.type === 'video' && (
           <video
+            ref={videoRef}
             key={item.url}
             src={item.url}
             autoPlay
             loop
             controls
             playsInline
-            muted
+            muted={isMuted}
             style={{
               maxHeight: '85vh',
               maxWidth: '90vw',
               objectFit: 'contain',
               borderRadius: 'var(--radius-lg, 0.75rem)',
               display: 'block',
-              ...(item.aspectRatio ? { aspectRatio: item.aspectRatio } : {}),
+              // Note: aspectRatio is intentionally NOT set on the video element.
+              // Setting it creates a CSS box that can differ from the video's
+              // intrinsic dimensions, causing the browser to render a second
+              // set of native controls in the empty gap (especially visible
+              // with portrait 9:16 videos). The video's own intrinsic ratio
+              // combined with objectFit:contain handles sizing correctly.
             }}
           />
         )}

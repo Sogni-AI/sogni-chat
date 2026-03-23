@@ -1,12 +1,18 @@
 /**
  * Inline video results displayed within chat messages.
- * Shows video players with click-to-play and auto-pause coordination.
+ *
+ * Single video: full inline player with controls, auto-play, and pause coordination.
+ * Multiple videos (grid): thumbnail cards showing first frame with a play-button
+ * overlay. Tapping a card opens the fullscreen media viewer instead of playing
+ * inline — this prevents layout overflow (especially with 9:16 portrait batches)
+ * and gives each video a clear, large tap target.
+ *
  * Prefers gallery blob URLs (persistent) over remote URLs (may expire).
  * Shows an "expired" state if the video fails to load.
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useGalleryBlobUrls } from '@/hooks/useGalleryBlobUrls';
-import { activeVideos, pauseOtherVideos } from './videoCoordination';
+import { activeVideos, pauseOtherVideos, isFullscreenOpen, markAutoPlay, consumeAutoPlay } from './videoCoordination';
 import { isMobile } from '@/utils/mobileDownload';
 
 /** Individual video player that pauses all other chat videos when it starts playing.
@@ -36,6 +42,14 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
     return { width: w, height: h };
   }, [aspectRatio, fillWidth]);
 
+  /** Check whether another registered chat video is currently playing */
+  const isAnotherVideoPlaying = useCallback((el: HTMLVideoElement) => {
+    for (const v of activeVideos) {
+      if (v !== el && !v.paused) return true;
+    }
+    return false;
+  }, []);
+
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
@@ -43,6 +57,16 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
     activeVideos.add(el);
 
     const handlePlay = () => {
+      if (consumeAutoPlay(el)) {
+        // Auto-play: don't interrupt a video the user is already watching.
+        // If another video is playing, pause self instead of stealing focus.
+        for (const v of activeVideos) {
+          if (v !== el && !v.paused) {
+            el.pause();
+            return;
+          }
+        }
+      }
       pauseOtherVideos(el);
       if (el.muted) el.muted = false;
       onPlayRef.current?.();
@@ -71,6 +95,21 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
   useEffect(() => {
     setReady(false);
   }, [src]);
+
+  /** Programmatic auto-play: only plays if no fullscreen viewer is open
+   *  and no other inline video is already playing. This prevents the
+   *  chaotic multi-video-play when a batch of videos finish loading. */
+  const handleLoadedData = useCallback(() => {
+    setReady(true);
+    const el = videoRef.current;
+    if (!el || !autoPlay) return;
+    // Suppress auto-play when the fullscreen viewer is open or another video is already playing
+    if (isFullscreenOpen() || isAnotherVideoPlaying(el)) {
+      return;
+    }
+    markAutoPlay(el);
+    el.play().catch(() => { /* browser may block autoplay — that's fine */ });
+  }, [autoPlay, isAnotherVideoPlaying]);
 
   return (
     <div style={{ position: 'relative' }}>
@@ -105,14 +144,13 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
       <video
         ref={videoRef}
         src={src}
-        autoPlay={autoPlay}
         controls
         controlsList="nodownload"
         loop
         playsInline={!isMobile()}
         preload={(autoPlay || isLocalBlob) ? 'auto' : 'metadata'}
         onLoadedMetadata={() => { if (!autoPlay) setReady(true); }}
-        onLoadedData={() => setReady(true)}
+        onLoadedData={handleLoadedData}
         onError={onError}
         style={{
           display: ready ? 'block' : 'none',
@@ -129,6 +167,136 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
   );
 }
 
+/** Thumbnail card for grid mode — shows the first frame of a video with a
+ *  play-button overlay. Clicking opens the fullscreen media viewer. */
+function VideoThumbnailCard({ src, aspectRatio, onClick, onError, isLocalBlob = false }: {
+  src: string;
+  aspectRatio?: string;
+  onClick: () => void;
+  onError: () => void;
+  isLocalBlob?: boolean;
+}) {
+  const [ready, setReady] = useState(false);
+  const [hovered, setHovered] = useState(false);
+
+  // Reset ready state when src changes
+  useEffect(() => {
+    setReady(false);
+  }, [src]);
+
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      aria-label="Play video"
+      style={{
+        position: 'relative',
+        display: 'block',
+        width: '100%',
+        aspectRatio: aspectRatio || '16 / 9',
+        borderRadius: 'var(--radius-md)',
+        overflow: 'hidden',
+        cursor: 'pointer',
+        border: '2px solid transparent',
+        borderColor: hovered ? 'var(--color-accent)' : 'transparent',
+        padding: 0,
+        background: 'rgba(var(--rgb-primary), 0.06)',
+        transition: 'border-color 0.2s, transform 0.2s',
+        transform: hovered ? 'scale(1.02)' : 'scale(1)',
+      }}
+    >
+      {/* Loading spinner — shown until the first video frame is decoded */}
+      {!ready && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1,
+          }}
+        >
+          <div
+            className="animate-spin"
+            style={{
+              width: '1.5rem',
+              height: '1.5rem',
+              border: '2.5px solid var(--color-border)',
+              borderTopColor: 'var(--color-accent)',
+              borderRadius: '50%',
+            }}
+          />
+        </div>
+      )}
+
+      {/* Silent, paused video element to capture the first frame as a poster */}
+      <video
+        src={src}
+        muted
+        playsInline
+        preload={isLocalBlob ? 'auto' : 'metadata'}
+        onLoadedData={() => setReady(true)}
+        onError={onError}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          display: ready ? 'block' : 'none',
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* Play button overlay */}
+      {ready && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: hovered
+              ? 'rgba(0, 0, 0, 0.25)'
+              : 'rgba(0, 0, 0, 0.15)',
+            transition: 'background 0.2s',
+            zIndex: 2,
+          }}
+        >
+          <div
+            style={{
+              width: '2.75rem',
+              height: '2.75rem',
+              borderRadius: '50%',
+              background: 'rgba(0, 0, 0, 0.55)',
+              backdropFilter: 'blur(4px)',
+              WebkitBackdropFilter: 'blur(4px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'transform 0.2s',
+              transform: hovered ? 'scale(1.1)' : 'scale(1)',
+            }}
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="white"
+              style={{ marginLeft: '2px' }}
+            >
+              <polygon points="6,3 20,12 6,21" />
+            </svg>
+          </div>
+        </div>
+      )}
+    </button>
+  );
+}
+
 interface ChatVideoResultsProps {
   urls: string[];
   /** Gallery video IDs for persistent blob-based rendering (parallel to urls) */
@@ -139,6 +307,8 @@ interface ChatVideoResultsProps {
   autoPlay?: boolean;
   /** Called when a different video starts playing (for menu sync) */
   onActiveIndexChange?: (index: number) => void;
+  /** Called when a grid thumbnail is clicked — opens fullscreen viewer */
+  onVideoClick?: (url: string, index: number) => void;
 }
 
 export const ChatVideoResults = memo(function ChatVideoResults({
@@ -147,6 +317,7 @@ export const ChatVideoResults = memo(function ChatVideoResults({
   videoAspectRatio,
   autoPlay = true,
   onActiveIndexChange,
+  onVideoClick,
 }: ChatVideoResultsProps) {
   // Resolve gallery IDs to blob URLs — persistent local copies that never expire
   const galleryBlobUrls = useGalleryBlobUrls(galleryVideoIds);
@@ -162,7 +333,7 @@ export const ChatVideoResults = memo(function ChatVideoResults({
       role="group"
       aria-label={`${urls.length} video result${urls.length !== 1 ? 's' : ''}`}
       style={isGrid ? {
-        display: 'inline-grid',
+        display: 'grid',
         gridTemplateColumns: `repeat(${urls.length <= 2 ? urls.length : 2}, minmax(0, 1fr))`,
         gap: '0.5rem',
         width: '100%',
@@ -218,14 +389,26 @@ export const ChatVideoResults = memo(function ChatVideoResults({
                 Video expired
               </span>
             </div>
+          ) : isGrid ? (
+            /* Grid mode — thumbnail card with play overlay, click opens fullscreen viewer */
+            <VideoThumbnailCard
+              src={displayUrl}
+              aspectRatio={videoAspectRatio}
+              onClick={() => {
+                onActiveIndexChange?.(index);
+                onVideoClick?.(displayUrl, index);
+              }}
+              onError={() => handleError(index)}
+              isLocalBlob={!!blobUrl}
+            />
           ) : (
-            /* Video player */
+            /* Single video — full inline player */
             <ChatVideoPlayer
               src={displayUrl}
               onError={() => handleError(index)}
               onPlay={() => onActiveIndexChange?.(index)}
               aspectRatio={videoAspectRatio}
-              fillWidth={isGrid}
+              fillWidth={false}
               autoPlay={autoPlay}
               isLocalBlob={!!blobUrl}
             />
@@ -245,6 +428,8 @@ export const ChatVideoResults = memo(function ChatVideoResults({
                 padding: '0.125rem 0.375rem',
                 borderRadius: '0.25rem',
                 lineHeight: '1.2',
+                zIndex: 3,
+                pointerEvents: 'none',
               }}
             >
               #{index + 1}
