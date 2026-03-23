@@ -96,6 +96,15 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
     setReady(false);
   }, [src]);
 
+  // Fallback: iOS Safari/Chrome ignores preload="auto", so onLoadedData may
+  // never fire. After a timeout, show the video with native controls instead
+  // of leaving the user staring at a spinner forever.
+  useEffect(() => {
+    if (ready) return;
+    const id = setTimeout(() => setReady(true), 3000);
+    return () => clearTimeout(id);
+  }, [ready, src]);
+
   /** Programmatic auto-play: only plays if no fullscreen viewer is open
    *  and no other inline video is already playing. This prevents the
    *  chaotic multi-video-play when a batch of videos finish loading. */
@@ -197,6 +206,13 @@ function VideoThumbnailCard({ src, aspectRatio, onClick, onError }: {
   useEffect(() => {
     setReady(false);
   }, [src]);
+
+  // Fallback: iOS ignores preload="auto" — show after timeout
+  useEffect(() => {
+    if (ready) return;
+    const id = setTimeout(() => setReady(true), 3000);
+    return () => clearTimeout(id);
+  }, [ready, src]);
 
   return (
     <button

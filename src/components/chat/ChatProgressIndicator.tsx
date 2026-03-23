@@ -20,6 +20,13 @@ function ProgressVideo({ src, aspectRatio }: { src: string; aspectRatio?: string
   // Reset loading state when src changes (e.g. retry with different URL)
   useEffect(() => { setReady(false); }, [src]);
 
+  // Fallback: iOS ignores preload="auto" — show after timeout
+  useEffect(() => {
+    if (ready) return;
+    const id = setTimeout(() => setReady(true), 3000);
+    return () => clearTimeout(id);
+  }, [ready, src]);
+
   // Register in the global activeVideos set and wire up play coordination
   useEffect(() => {
     const el = videoRef.current;
