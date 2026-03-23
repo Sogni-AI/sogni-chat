@@ -160,7 +160,11 @@ export function useChatSessions(): UseChatSessionsReturn {
             if (backupRaw) {
               sessionStorage.removeItem('sogni_session_backup');
               const backup = JSON.parse(backupRaw);
-              if (backup.id === session.id) {
+              if (
+                backup.id === session.id &&
+                Array.isArray(backup.uiMessages) &&
+                Array.isArray(backup.allResultUrls)
+              ) {
                 const backupHasMore =
                   backup.uiMessages.length > session.uiMessages.length ||
                   backup.allResultUrls.length > session.allResultUrls.length;
