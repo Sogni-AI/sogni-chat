@@ -13,11 +13,11 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useGalleryBlobUrls } from '@/hooks/useGalleryBlobUrls';
 import { activeVideos, pauseOtherVideos, isFullscreenOpen, markAutoPlay, consumeAutoPlay } from './videoCoordination';
-import { isMobile } from '@/utils/mobileDownload';
 
 /** Individual video player that pauses all other chat videos when it starts playing.
- *  Hides the native player until the first frame is ready to prevent the
- *  ugly black unstyled rectangle that flashes while the video is loading. */
+ *  Shows a poster-frame overlay until the video is ready, then reveals the
+ *  native player. The overlay is always clickable so users can force-play
+ *  even if the ready signal hasn't fired yet. */
 function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPlay = true, isLocalBlob = false }: { src: string; onError: () => void; onPlay?: () => void; aspectRatio?: string; fillWidth?: boolean; autoPlay?: boolean; isLocalBlob?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const onPlayRef = useRef(onPlay);
@@ -96,6 +96,13 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
     setReady(false);
   }, [src]);
 
+  /** Mark the video as ready to display — called from multiple events as a
+   *  belt-and-suspenders approach since browser support for loadeddata vs
+   *  loadedmetadata varies, especially on mobile Safari. */
+  const markReady = useCallback(() => {
+    setReady(true);
+  }, []);
+
   /** Programmatic auto-play: only plays if no fullscreen viewer is open
    *  and no other inline video is already playing. This prevents the
    *  chaotic multi-video-play when a batch of videos finish loading. */
@@ -111,11 +118,21 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
     el.play().catch(() => { /* browser may block autoplay — that's fine */ });
   }, [autoPlay, isAnotherVideoPlaying]);
 
+  /** Force the video to show and attempt play — used when user clicks the loading placeholder */
+  const handlePlaceholderClick = useCallback(() => {
+    setReady(true);
+    const el = videoRef.current;
+    if (!el) return;
+    el.play().catch(() => { /* browser may block — that's fine, controls are visible */ });
+  }, []);
+
   return (
     <div style={{ position: 'relative' }}>
-      {/* Loading placeholder — shown until the first video frame is decoded */}
+      {/* Loading placeholder — shown until the video is ready to display.
+          Clicking it forces the video to show with native controls. */}
       {!ready && (
         <div
+          onClick={handlePlaceholderClick}
           style={{
             ...(placeholderSize
               ? { width: placeholderSize.width, height: placeholderSize.height }
@@ -127,6 +144,7 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            cursor: 'pointer',
           }}
         >
           <div
@@ -147,9 +165,9 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
         controls
         controlsList="nodownload"
         loop
-        playsInline={!isMobile()}
+        playsInline
         preload={(autoPlay || isLocalBlob) ? 'auto' : 'metadata'}
-        onLoadedMetadata={() => { if (!autoPlay) setReady(true); }}
+        onLoadedMetadata={markReady}
         onLoadedData={handleLoadedData}
         onError={onError}
         style={{
@@ -184,6 +202,8 @@ function VideoThumbnailCard({ src, aspectRatio, onClick, onError, isLocalBlob = 
     setReady(false);
   }, [src]);
 
+  const markReady = useCallback(() => setReady(true), []);
+
   return (
     <button
       onClick={onClick}
@@ -206,7 +226,7 @@ function VideoThumbnailCard({ src, aspectRatio, onClick, onError, isLocalBlob = 
         transform: hovered ? 'scale(1.02)' : 'scale(1)',
       }}
     >
-      {/* Loading spinner — shown until the first video frame is decoded */}
+      {/* Loading spinner — shown until the video metadata/frame is available */}
       {!ready && (
         <div
           style={{
@@ -237,7 +257,8 @@ function VideoThumbnailCard({ src, aspectRatio, onClick, onError, isLocalBlob = 
         muted
         playsInline
         preload={isLocalBlob ? 'auto' : 'metadata'}
-        onLoadedData={() => setReady(true)}
+        onLoadedMetadata={markReady}
+        onLoadedData={markReady}
         onError={onError}
         style={{
           position: 'absolute',
@@ -250,49 +271,47 @@ function VideoThumbnailCard({ src, aspectRatio, onClick, onError, isLocalBlob = 
         }}
       />
 
-      {/* Play button overlay */}
-      {ready && (
+      {/* Play button overlay — always shown so the card is tappable even while loading */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: hovered
+            ? 'rgba(0, 0, 0, 0.25)'
+            : ready ? 'rgba(0, 0, 0, 0.15)' : 'transparent',
+          transition: 'background 0.2s',
+          zIndex: 2,
+        }}
+      >
         <div
           style={{
-            position: 'absolute',
-            inset: 0,
+            width: '2.75rem',
+            height: '2.75rem',
+            borderRadius: '50%',
+            background: 'rgba(0, 0, 0, 0.55)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: hovered
-              ? 'rgba(0, 0, 0, 0.25)'
-              : 'rgba(0, 0, 0, 0.15)',
-            transition: 'background 0.2s',
-            zIndex: 2,
+            transition: 'transform 0.2s',
+            transform: hovered ? 'scale(1.1)' : 'scale(1)',
           }}
         >
-          <div
-            style={{
-              width: '2.75rem',
-              height: '2.75rem',
-              borderRadius: '50%',
-              background: 'rgba(0, 0, 0, 0.55)',
-              backdropFilter: 'blur(4px)',
-              WebkitBackdropFilter: 'blur(4px)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'transform 0.2s',
-              transform: hovered ? 'scale(1.1)' : 'scale(1)',
-            }}
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="white"
+            style={{ marginLeft: '2px' }}
           >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="white"
-              style={{ marginLeft: '2px' }}
-            >
-              <polygon points="6,3 20,12 6,21" />
-            </svg>
-          </div>
+            <polygon points="6,3 20,12 6,21" />
+          </svg>
         </div>
-      )}
+      </div>
     </button>
   );
 }
