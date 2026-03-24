@@ -17,6 +17,7 @@ import type { ChatSession, UIChatMessage } from '@/types/chat';
 import { CHAT_MODEL_ABLITERATED } from '@/config/chat';
 import { sogniTVController } from '@/services/sogniTVController';
 import { getVariantById } from '@/config/modelVariants';
+import { shouldEnableThinking } from '@/utils/thinkingClassifier';
 import { projectSessionMap } from '@/services/projectSessionMap';
 import { updateSessionMessages } from '@/utils/chatHistoryDB';
 
@@ -554,7 +555,8 @@ export function useChat(): UseChatResult {
         const variant = context.modelVariantId ? getVariantById(context.modelVariantId) : undefined;
         const effectiveModel = sessionModelRef.current
           || (variant ? variant.modelId : undefined);
-        const effectiveThink = variant?.think;
+        // In Auto mode (think === undefined), classify the user message to decide.
+        const effectiveThink = variant?.think ?? (shouldEnableThinking(content) ? true : false);
         const chatModelLabel = `Sogni Agent · ${variant?.menuLabel || 'Auto'}`;
 
         // Each request tracks its own streaming message ID
@@ -1673,7 +1675,8 @@ export function useChat(): UseChatResult {
 
       const variant = context.modelVariantId ? getVariantById(context.modelVariantId) : undefined;
       const effectiveModel = sessionModelRef.current || (variant ? variant.modelId : undefined);
-      const effectiveThink = variant?.think;
+      // Retries are direct tool re-executions — no complex reasoning needed.
+      const effectiveThink = variant?.think ?? false;
 
       const toolAbortController = new AbortController();
       const controllersSet = toolAbortControllersRef.current;

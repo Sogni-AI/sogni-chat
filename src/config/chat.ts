@@ -118,7 +118,7 @@ export const CHAT_DEFAULT_PARAMS = {
   top_p: 0.9,
   max_tokens: 4096,
   // think is intentionally omitted — model variant controls it via context.think override.
-  // Auto (undefined) = server decides (thinking enabled), Instant = false, Thinking = true.
+  // Auto: client classifies the user message (see thinkingClassifier.ts), Instant = false, Thinking = true.
   // Worker SSE bridge separates reasoning_content from tool_calls, so thinking + tools coexist.
 } as const;
 
