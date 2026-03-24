@@ -98,20 +98,25 @@ export async function updateSessionMessages(
         resolve(null);
         return;
       }
-      const updatedMessages = updater(session.uiMessages);
-      const allImageUrls = updatedMessages.flatMap(m => m.imageResults || []);
-      const allResultUrls = [...new Set([...session.allResultUrls, ...allImageUrls])];
-      const allAudioUrls = updatedMessages.flatMap(m => m.audioResults || []);
-      const audioResultUrls = [...new Set([...(session.audioResultUrls || []), ...allAudioUrls])];
-      const updated: ChatSession = {
-        ...session,
-        uiMessages: updatedMessages,
-        allResultUrls,
-        audioResultUrls,
-        updatedAt: Date.now(),
-      };
-      store.put(updated);
-      tx.oncomplete = () => resolve(updated);
+      try {
+        const updatedMessages = updater(session.uiMessages);
+        const allImageUrls = updatedMessages.flatMap(m => m.imageResults || []);
+        const allResultUrls = [...new Set([...session.allResultUrls, ...allImageUrls])];
+        const allAudioUrls = updatedMessages.flatMap(m => m.audioResults || []);
+        const audioResultUrls = [...new Set([...(session.audioResultUrls || []), ...allAudioUrls])];
+        const updated: ChatSession = {
+          ...session,
+          uiMessages: updatedMessages,
+          allResultUrls,
+          audioResultUrls,
+          updatedAt: Date.now(),
+        };
+        store.put(updated);
+        tx.oncomplete = () => resolve(updated);
+      } catch (err) {
+        tx.abort();
+        reject(err);
+      }
     };
     getReq.onerror = () => {
       console.error('[CHAT HISTORY DB] Failed to read session for update:', getReq.error);
