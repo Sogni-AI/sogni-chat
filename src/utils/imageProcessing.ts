@@ -24,19 +24,16 @@ export async function resizeImageForVision(
   maxDimension: number = 1024,
   quality: number = 0.92,
 ): Promise<string> {
-  // Check dimensions first to decide if resize is actually needed
   const { img, width, height } = await loadImage(imageUrl);
+
   const needsResize = width > maxDimension || height > maxDimension;
-
-  if (!needsResize) {
-    // Already within limits — convert to data URI without expensive canvas re-encode
-    return blobUrlToDataUri(imageUrl);
-  }
-
-  const scale = maxDimension / Math.max(width, height);
+  const scale = needsResize ? maxDimension / Math.max(width, height) : 1;
   const tw = Math.round(width * scale);
   const th = Math.round(height * scale);
 
+  // Always re-encode through canvas to guarantee JPEG output.
+  // Formats like WebP/HEIF/AVIF aren't supported by vLLM and would
+  // cause a 400 error if passed through as-is.
   const canvas = document.createElement('canvas');
   canvas.width = tw;
   canvas.height = th;
@@ -44,7 +41,9 @@ export async function resizeImageForVision(
   if (!ctx) throw new Error('Cannot create canvas context');
   ctx.drawImage(img, 0, 0, tw, th);
 
-  console.log(`[IMAGE] Resized for vision: ${width}x${height} -> ${tw}x${th}`);
+  if (needsResize) {
+    console.log(`[IMAGE] Resized for vision: ${width}x${height} -> ${tw}x${th}`);
+  }
   return canvas.toDataURL('image/jpeg', quality);
 }
 
@@ -59,17 +58,6 @@ function loadImage(url: string): Promise<{ img: HTMLImageElement; width: number;
   });
 }
 
-/** Convert a blob/http URL to a data URI via fetch (no canvas re-encode) */
-async function blobUrlToDataUri(url: string): Promise<string> {
-  const response = await fetch(url);
-  const blob = await response.blob();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error('Failed to convert blob to data URI'));
-    reader.readAsDataURL(blob);
-  });
-}
 
 export function validateImageFile(file: File): { valid: boolean; error?: string } {
   const maxSize = 10 * 1024 * 1024; // 10MB
