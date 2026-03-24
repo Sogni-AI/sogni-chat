@@ -118,6 +118,10 @@ export async function concatenateVideos(
 
 Add `mp4box` to `package.json` dependencies.
 
+### Gallery Persistence for Locally-Produced Blobs
+
+The existing `saveVideoToGallery()` accepts a remote `videoUrl` and downloads the blob internally via `fetch()`. Since `concatenateVideos()` produces a `Blob` directly (no remote URL), the implementation must extend `SaveVideoParams` with an optional `videoBlob?: Blob` parameter. When `videoBlob` is provided, the function skips the download step and uses the blob directly. This avoids an unnecessary fetch round-trip through an object URL.
+
 ---
 
 ## 2. ToolPipeline Abstraction
@@ -401,7 +405,7 @@ Each clip interpolates between consecutive angle images using `frameRole: 'both'
 
 #### Step 3: Stitch (custom execution, no tool call)
 
-- `customExecute`: calls `concatenateVideos(state.videoUrls)` directly, then saves the resulting Blob via `saveVideoToGallery()` for IndexedDB persistence (same pattern as `animate_photo`). Creates an object URL from the Blob for immediate playback.
+- `customExecute`: calls `concatenateVideos(state.videoUrls)` directly, then saves the resulting Blob via `saveVideoToGallery({ videoBlob })` for IndexedDB persistence. Creates an object URL from the Blob for immediate playback. After `saveVideoToGallery` resolves, calls `callbacks.onGallerySaved([], [galleryImageId])` so the UI message gets the gallery ID for session-restore persistence (same fire-and-forget pattern as `animate_photo` handler line 367).
 - Progress: single slot showing "Stitching final video" with concatenation progress
 - `collectResults`: sets `state.data.stitchedUrl` (the object URL for playback)
 
