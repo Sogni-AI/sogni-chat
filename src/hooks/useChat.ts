@@ -1325,6 +1325,10 @@ export function useChat(): UseChatResult {
     // Background jobs' finally blocks will call delete() on the old set reference
     // they captured at creation time — harmless since we've moved on.
     toolAbortControllersRef.current = new Set();
+    // Clear stale session ID listeners: any in-flight request from the old
+    // session that registered a listener (because it started with
+    // capturedSessionId === null) must NOT latch the new session's ID.
+    sessionIdListenersRef.current.clear();
     // Clear queued requests (they belong to the old session)
     queuedRequestsRef.current = [];
     // Reset active request count for the new session's UI state
@@ -1349,9 +1353,13 @@ export function useChat(): UseChatResult {
   }, []);
 
   const setSessionId = useCallback((id: string | null) => {
+    const prev = sessionIdRef.current;
     sessionIdRef.current = id;
-    // Notify in-flight requests that started before a session ID was assigned
-    if (sessionIdListenersRef.current.size > 0) {
+    // Only notify listeners on null→non-null transitions (session creation).
+    // Session switches (non-null→non-null or non-null→null) must NOT fire
+    // listeners, otherwise an in-flight request from a new-chat could latch
+    // the switched-to session's ID instead of its own.
+    if (prev === null && id !== null && sessionIdListenersRef.current.size > 0) {
       sessionIdListenersRef.current.forEach(fn => fn(id));
     }
   }, []);
