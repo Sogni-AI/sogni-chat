@@ -208,11 +208,14 @@ function makeWelcomeMessage(ctx: WelcomeContext | boolean): UIChatMessage {
 /** Strip transient fields before persisting.
  *  NOTE: uploadedImageUrl / uploadedImageUrls are intentionally kept — their
  *  stale blob URLs act as markers so the ChatPanel refresh logic can replace
- *  them with fresh blob URLs generated from the persisted uploadedFiles data. */
+ *  them with fresh blob URLs generated from the persisted uploadedFiles data.
+ *  NOTE: toolProgress is intentionally KEPT — it's needed to restore the
+ *  progress indicator when the user switches back to a session with a running
+ *  background job. Stale toolProgress (from page refresh) is stripped at
+ *  restore time in ChatPage. */
 function cleanForStorage(messages: UIChatMessage[]): UIChatMessage[] {
   return messages.map((msg) => ({
     ...msg,
-    toolProgress: undefined,
     isStreaming: undefined,
     streamingStatus: undefined,
     chatModelLabel: undefined,
@@ -690,10 +693,14 @@ export function useChat(): UseChatResult {
                     ...progress.resultUrls.filter(u => !currentToolResultUrls.includes(u)),
                   ];
                   // Merge into allResultUrlsRef progressively so getSessionState()
-                  // captures partial batch results if the page refreshes mid-generation
-                  const combined = [...new Set([...allResultUrlsRef.current, ...currentToolResultUrls])];
-                  if (combined.length > allResultUrlsRef.current.length) {
-                    allResultUrlsRef.current = combined;
+                  // captures partial batch results if the page refreshes mid-generation.
+                  // Only write for the active session — background jobs must not
+                  // contaminate the current session's allResultUrls ref.
+                  if (isActiveSession()) {
+                    const combined = [...new Set([...allResultUrlsRef.current, ...currentToolResultUrls])];
+                    if (combined.length > allResultUrlsRef.current.length) {
+                      allResultUrlsRef.current = combined;
+                    }
                   }
                 }
                 if (progress.videoResultUrls) {

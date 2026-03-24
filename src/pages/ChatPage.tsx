@@ -155,8 +155,12 @@ export default function ChatPage() {
   const [resultUrls, setResultUrls] = useState<string[]>([]);
   const [chatLoading, setChatLoading] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  // Background job tracking: which sessions have running jobs, which have unread results
+  // Background job tracking: which sessions have running jobs, which have unread results.
+  // State is used for sidebar rendering; ref mirrors it for use in callbacks
+  // (avoids stale closures and unnecessary re-renders of memoized children).
   const [activeJobSessionIds, setActiveJobSessionIds] = useState<Set<string>>(new Set());
+  const activeJobSessionIdsRef = useRef<Set<string>>(activeJobSessionIds);
+  activeJobSessionIdsRef.current = activeJobSessionIds;
   const [unreadSessionIds, setUnreadSessionIds] = useState<Set<string>>(new Set());
   const [uploadIntent, setUploadIntent] = useState<'edit' | 'video' | 'restore' | null>(null);
   const [qualityTier, setQualityTierState] = useState<QualityTier>(getSavedQualityTier);
@@ -250,11 +254,18 @@ export default function ChatPage() {
   useEffect(() => {
     if (!pendingRestore) return;
     isRestoringRef.current = true;
-    const videoMsgCount = pendingRestore.uiMessages.filter(m => m.videoResults?.length).length;
-    const videoUrlCount = pendingRestore.uiMessages.reduce((n, m) => n + (m.videoResults?.length || 0), 0);
-    const galleryVideoIdCount = pendingRestore.uiMessages.filter(m => m.galleryVideoIds?.length).length;
-    console.log(`[CHAT PAGE] Restoring session: ${pendingRestore.uiMessages.length} msgs, ${videoMsgCount} with videos (${videoUrlCount} urls), ${galleryVideoIdCount} with gallery video IDs, uploadedFiles=${pendingRestore.uploadedFiles?.length || 0}`);
-    loadFromSession(pendingRestore);
+    // Strip stale toolProgress on page refresh — background jobs are lost when
+    // the page reloads, so any persisted progress is stale and would show a
+    // frozen preloader indefinitely.
+    const cleanedMessages = pendingRestore.uiMessages.map(m =>
+      m.toolProgress ? { ...m, toolProgress: undefined } : m,
+    );
+    const restoredSession = { ...pendingRestore, uiMessages: cleanedMessages };
+    const videoMsgCount = cleanedMessages.filter(m => m.videoResults?.length).length;
+    const videoUrlCount = cleanedMessages.reduce((n, m) => n + (m.videoResults?.length || 0), 0);
+    const galleryVideoIdCount = cleanedMessages.filter(m => m.galleryVideoIds?.length).length;
+    console.log(`[CHAT PAGE] Restoring session: ${cleanedMessages.length} msgs, ${videoMsgCount} with videos (${videoUrlCount} urls), ${galleryVideoIdCount} with gallery video IDs, uploadedFiles=${pendingRestore.uploadedFiles?.length || 0}`);
+    loadFromSession(restoredSession);
     // Sync model selector with session's model override
     if (pendingRestore.sessionModel === CHAT_MODEL_ABLITERATED) {
       setSelectedModelVariant('unrestricted');
@@ -364,6 +375,28 @@ export default function ChatPage() {
       saveActiveSession();
     }
   }, [resultCount, videoResultCount, galleryIdCount, activeSessionId, saveActiveSession]);
+
+  // ── Clean up activeJobSessionIds for the active session when its job completes ──
+  // Background completion removes via the handler, but active-path completion
+  // (user is viewing the session) only clears toolProgress on the message.
+  // This effect detects that transition and cleans up the sidebar indicator.
+  const hasActiveToolProgress = useMemo(
+    () => chat.messages.some(m => m.toolProgress),
+    [chat.messages],
+  );
+  const prevHasToolProgressRef = useRef(false);
+  useEffect(() => {
+    const wasActive = prevHasToolProgressRef.current;
+    prevHasToolProgressRef.current = hasActiveToolProgress;
+    if (wasActive && !hasActiveToolProgress && activeSessionId) {
+      setActiveJobSessionIds((prev) => {
+        if (!prev.has(activeSessionId)) return prev;
+        const next = new Set(prev);
+        next.delete(activeSessionId);
+        return next;
+      });
+    }
+  }, [hasActiveToolProgress, activeSessionId]);
 
   // ── Debounced save for text/message changes when chat is idle ──
   // NOTE: No cleanup returned — pending saves must NOT be cancelled when
@@ -501,21 +534,34 @@ export default function ChatPage() {
 
       // Persist results to IndexedDB for the background session
       const { updateSessionMessages } = await import('@/utils/chatHistoryDB');
+      const isVideoTool = result.toolName === 'animate_photo'
+        || result.toolName === 'generate_video'
+        || result.toolName === 'sound_to_video'
+        || result.toolName === 'video_to_video';
+      const isAudioTool = result.toolName === 'generate_music';
       await updateSessionMessages(sessionId, (messages) => {
         return messages.map((msg) => {
           if (msg.id !== result.streamingMsgId) return msg;
           const srcUrl = msg.toolProgress?.sourceImageUrl;
           const vidAR = msg.toolProgress?.videoAspectRatio;
+          const mdlName = msg.toolProgress?.modelName;
+          const refPersonas = msg.toolProgress?.referencedPersonas;
           return {
             ...msg,
-            imageResults: result.resultUrls.length > 0 ? result.resultUrls : msg.imageResults,
+            imageResults: !isVideoTool && !isAudioTool && result.resultUrls.length > 0
+              ? result.resultUrls : msg.imageResults,
             videoResults: result.videoResultUrls && result.videoResultUrls.length > 0
               ? result.videoResultUrls
               : msg.videoResults,
+            audioResults: isAudioTool && result.resultUrls.length > 0
+              ? result.resultUrls : msg.audioResults,
             toolProgress: null,
             isStreaming: false,
             sourceImageUrl: srcUrl || msg.sourceImageUrl,
             videoAspectRatio: vidAR || msg.videoAspectRatio,
+            modelName: mdlName || msg.modelName,
+            lastCompletedTool: result.toolName,
+            referencedPersonas: refPersonas || msg.referencedPersonas,
             content: result.assistantContent || msg.content,
           };
         });
@@ -660,7 +706,9 @@ export default function ChatPage() {
       if (activeSessionIdRef.current) await saveActiveSession();
 
       // Track background jobs before resetting
-      if (chatRef.current.isLoading || chatRef.current.isSending) {
+      const hasRunningTool = chatRef.current.isLoading || chatRef.current.isSending
+        || chatRef.current.messages.some(m => m.toolProgress);
+      if (hasRunningTool) {
         const currentId = activeSessionIdRef.current;
         if (currentId) setActiveJobSessionIds((prev) => new Set(prev).add(currentId));
       }
@@ -689,7 +737,9 @@ export default function ChatPage() {
     if (activeSessionIdRef.current) await saveActiveSession();
 
     // Track background jobs before resetting
-    if (chatRef.current.isLoading || chatRef.current.isSending) {
+    const hasRunningTool = chatRef.current.isLoading || chatRef.current.isSending
+      || chatRef.current.messages.some(m => m.toolProgress);
+    if (hasRunningTool) {
       const currentId = activeSessionIdRef.current;
       if (currentId) setActiveJobSessionIds((prev) => new Set(prev).add(currentId));
     }
@@ -716,8 +766,13 @@ export default function ChatPage() {
   const handleSelectSession = useCallback(async (id: string) => {
     if (id === activeSessionIdRef.current) return;
 
-    // If current session has running jobs, track it as a background job session
-    if (chatRef.current.isLoading || chatRef.current.isSending) {
+    // If current session has running jobs, track it as a background job session.
+    // Check both the loading flag (set during sendMessage) and toolProgress on
+    // messages — when the user switches back to a restored session, isLoading is
+    // false but toolProgress is live if the background job is still running.
+    const hasRunningTool = chatRef.current.isLoading || chatRef.current.isSending
+      || chatRef.current.messages.some(m => m.toolProgress);
+    if (hasRunningTool) {
       const currentId = activeSessionIdRef.current;
       if (currentId) {
         setActiveJobSessionIds((prev) => new Set(prev).add(currentId));
@@ -729,11 +784,19 @@ export default function ChatPage() {
 
     isRestoringRef.current = true;
 
-    const session = await switchSession(id);
-    if (!session) {
+    const rawSession = await switchSession(id);
+    if (!rawSession) {
       isRestoringRef.current = false;
       return;
     }
+
+    // If this session has a running background job, keep the persisted
+    // toolProgress so the preloader reappears.  Otherwise strip it — it's
+    // stale from a previous page load where the job was lost.
+    const hasActiveJob = activeJobSessionIdsRef.current.has(id);
+    const session = hasActiveJob
+      ? rawSession
+      : { ...rawSession, uiMessages: rawSession.uiMessages.map(m => m.toolProgress ? { ...m, toolProgress: undefined } : m) };
 
     // Restore chat state
     chat.loadFromSession(session);
@@ -844,7 +907,9 @@ export default function ChatPage() {
   /** Branch conversation at a specific message into a new chat session */
   const handleBranchChat = useCallback(async (message: UIChatMessage) => {
     // Track background jobs if current session has running tools
-    if (chatRef.current.isLoading || chatRef.current.isSending) {
+    const hasRunningTool = chatRef.current.isLoading || chatRef.current.isSending
+      || chatRef.current.messages.some(m => m.toolProgress);
+    if (hasRunningTool) {
       const currentId = activeSessionIdRef.current;
       if (currentId) {
         setActiveJobSessionIds((prev) => new Set(prev).add(currentId));

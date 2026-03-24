@@ -76,7 +76,10 @@ export async function saveSession(session: ChatSession): Promise<void> {
 }
 
 /**
- * Load a session, apply an updater to its messages, and save back.
+ * Load a session, apply an updater to its messages, and save back atomically.
+ * Uses a single readwrite transaction so concurrent calls on the same session
+ * are serialized by IndexedDB — the second call reads AFTER the first commits,
+ * preventing the read-modify-write race that could lose results or gallery IDs.
  * Used for persisting background job results to non-active sessions.
  * Returns the updated session, or null if session not found.
  */
@@ -84,22 +87,41 @@ export async function updateSessionMessages(
   sessionId: string,
   updater: (messages: UIChatMessage[]) => UIChatMessage[],
 ): Promise<ChatSession | null> {
-  const session = await getSession(sessionId);
-  if (!session) return null;
-  const updatedMessages = updater(session.uiMessages);
-  const allImageUrls = updatedMessages.flatMap(m => m.imageResults || []);
-  const allResultUrls = [...new Set([...session.allResultUrls, ...allImageUrls])];
-  const allAudioUrls = updatedMessages.flatMap(m => m.audioResults || []);
-  const audioResultUrls = [...new Set([...(session.audioResultUrls || []), ...allAudioUrls])];
-  const updated: ChatSession = {
-    ...session,
-    uiMessages: updatedMessages,
-    allResultUrls,
-    audioResultUrls,
-    updatedAt: Date.now(),
-  };
-  await saveSession(updated);
-  return updated;
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(SESSIONS_STORE, 'readwrite');
+    const store = tx.objectStore(SESSIONS_STORE);
+    const getReq = store.get(sessionId);
+    getReq.onsuccess = () => {
+      const session: ChatSession | undefined = getReq.result;
+      if (!session) {
+        resolve(null);
+        return;
+      }
+      const updatedMessages = updater(session.uiMessages);
+      const allImageUrls = updatedMessages.flatMap(m => m.imageResults || []);
+      const allResultUrls = [...new Set([...session.allResultUrls, ...allImageUrls])];
+      const allAudioUrls = updatedMessages.flatMap(m => m.audioResults || []);
+      const audioResultUrls = [...new Set([...(session.audioResultUrls || []), ...allAudioUrls])];
+      const updated: ChatSession = {
+        ...session,
+        uiMessages: updatedMessages,
+        allResultUrls,
+        audioResultUrls,
+        updatedAt: Date.now(),
+      };
+      store.put(updated);
+      tx.oncomplete = () => resolve(updated);
+    };
+    getReq.onerror = () => {
+      console.error('[CHAT HISTORY DB] Failed to read session for update:', getReq.error);
+      reject(new Error('Failed to update session messages'));
+    };
+    tx.onerror = () => {
+      console.error('[CHAT HISTORY DB] Transaction failed during update:', tx.error);
+      reject(new Error('Failed to update session messages'));
+    };
+  });
 }
 
 /** Get all sessions as lightweight summaries, sorted by updatedAt descending.
