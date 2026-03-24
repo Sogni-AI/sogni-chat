@@ -714,6 +714,9 @@ export default function ChatPage() {
       }
 
       isRestoringRef.current = true;
+      // Update session ID ref synchronously so background jobs for the old
+      // session detect they are no longer active (see handleSelectSession).
+      setSessionId(null);
       clearMediaFiles();
       setResultUrls([]);
       gallerySavedRef.current = false;
@@ -729,7 +732,7 @@ export default function ChatPage() {
 
       await addMediaFile(file);
     },
-    [addMediaFile, saveActiveSession, clearMediaFiles, chat, setActiveSessionId, sessions.length],
+    [addMediaFile, saveActiveSession, clearMediaFiles, chat, setActiveSessionId, setSessionId, sessions.length],
   );
 
   const handleNewPhoto = useCallback(async () => {
@@ -745,6 +748,9 @@ export default function ChatPage() {
     }
 
     isRestoringRef.current = true;
+    // Update session ID ref synchronously so background jobs for the old
+    // session detect they are no longer active (see handleSelectSession).
+    setSessionId(null);
     clearMediaFiles();
     setResultUrls([]);
     setUploadIntent(null);
@@ -761,7 +767,7 @@ export default function ChatPage() {
     // No IndexedDB load here (unlike session switching), so 2s is too long
     // — it blocks session creation when the user sends a message immediately.
     setTimeout(() => { isRestoringRef.current = false; }, 100);
-  }, [clearMediaFiles, chat, saveActiveSession, setActiveSessionId, sessions.length]);
+  }, [clearMediaFiles, chat, saveActiveSession, setActiveSessionId, setSessionId, sessions.length]);
 
   const handleSelectSession = useCallback(async (id: string) => {
     if (id === activeSessionIdRef.current) return;
@@ -797,6 +803,14 @@ export default function ChatPage() {
     const session = hasActiveJob
       ? rawSession
       : { ...rawSession, uiMessages: rawSession.uiMessages.map(m => m.toolProgress ? { ...m, toolProgress: undefined } : m) };
+
+    // Update session ID ref SYNCHRONOUSLY before loading — the ref must reflect
+    // the new session before loadFromSession replaces messages.  Otherwise
+    // background jobs for the OLD session see isActiveSession() === true (the
+    // ref still matches their capturedSessionId), take the active-path in
+    // onToolComplete, and silently lose results because the message IDs no
+    // longer exist in the React state.
+    setSessionId(id);
 
     // Restore chat state
     chat.loadFromSession(session);
@@ -835,7 +849,7 @@ export default function ChatPage() {
     });
 
     setTimeout(() => { isRestoringRef.current = false; }, 2000);
-  }, [saveActiveSession, switchSession, chat, loadFiles, setSelectedModelVariant]);
+  }, [saveActiveSession, switchSession, chat, loadFiles, setSelectedModelVariant, setSessionId]);
 
   const handleDeleteSession = useCallback(async (id: string) => {
     const isActive = id === activeSessionIdRef.current;
@@ -1018,6 +1032,9 @@ export default function ChatPage() {
     // and ref could momentarily disagree.
     setActiveSessionId(newId);
     activeSessionIdRef.current = newId;
+    // Update session ID ref synchronously so background jobs for the old
+    // session detect they are no longer active (see handleSelectSession).
+    setSessionId(newId);
 
     // Load the clean session into useChat — must happen in the same
     // synchronous block as the ID updates so React batches everything
@@ -1044,7 +1061,7 @@ export default function ChatPage() {
     console.log(`[BRANCH] Created clean session ${newId}: 0 msgs, ${branchedFiles.length} files, ${branchedResultUrls.length} result URLs`);
 
     setTimeout(() => { isRestoringRef.current = false; }, 2000);
-  }, [chat, createNewSession, saveCurrentSession, setActiveSessionId, saveActiveSession, setSelectedModelVariant, loadFiles]);
+  }, [chat, createNewSession, saveCurrentSession, setActiveSessionId, saveActiveSession, setSelectedModelVariant, setSessionId, loadFiles]);
 
   /** Retry a tool execution with an optional model override */
   const handleRetry = useCallback(async (message: UIChatMessage, modelKey?: string) => {
