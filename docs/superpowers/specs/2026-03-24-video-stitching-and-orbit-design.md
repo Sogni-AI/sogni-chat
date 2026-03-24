@@ -210,12 +210,13 @@ executePipeline(config, context, callbacks)
   │
   ├─ Update stepLabel → "{step.label}"
   │
-  ├─ for i in 0..step.count:
+  ├─ if step.customExecute:
+  │     results = await step.customExecute(state, context, callbacks)
+  │     (count is ignored — customExecute controls its own iteration)
+  │
+  ├─ else for i in 0..step.count:
   │   │
   │   ├─ args = step.buildArgs(state, i)
-  │   │
-  │   ├─ if step.customExecute:
-  │   │     result = await step.customExecute(state, context, callbacks)
   │   │
   │   ├─ else:
   │   │     result = await toolRegistry.execute(step.toolName, args, context, wrappedCallbacks)
@@ -249,10 +250,12 @@ The pipeline intercepts sub-tool callbacks via `wrappedCallbacks` and re-maps th
 
 - **Steps are sequential** — one step must fully complete before the next begins (angles must exist before transitions can reference them)
 - **Invocations within a step are sequential** — one SDK job at a time to avoid overwhelming the backend
+- **Timeout chain** — the pipeline's parent tool (e.g., `orbit_video`) is invoked via `toolRegistry.execute()` with its own timeout. Sub-tool calls also go through `toolRegistry.execute()`, which replaces `context.signal` with a per-tool timeout signal (restored in `finally`). This works correctly for sequential calls. The parent tool's timeout resets whenever `onToolProgress` fires via `activityCallbacks`. Since `wrappedCallbacks` re-emit sub-tool progress to the parent's callbacks, the parent's inactivity timer stays alive as long as sub-tools are making progress. The parent tool must have a generous `TIMEOUT_OVERRIDES` entry (see Section 5).
 - **Pipeline does NOT replace toolRegistry.execute()** — it wraps it
 - **Pipeline state is a plain object** — easy to inspect and debug, no class hierarchy
 - **Each step's collectResults is responsible for mapping outputs to state** — no magic inference
 - **customExecute enables non-tool steps** — e.g., the stitch step calls concatenateVideos() directly instead of going through the registry
+- **customExecute bypasses the count loop** — when `customExecute` is provided, `count` is ignored and `customExecute` is called exactly once (it returns its own `StepResult[]`)
 
 ---
 
@@ -290,12 +293,12 @@ A standalone tool for general-purpose video concatenation. Does NOT use the pipe
 
 ### Handler Flow
 
-1. Resolve `videoIndices` against `context.videoResultUrls`
+1. Resolve `videoIndices` against `context.videoResultUrls`. Defensively coerce array items to numbers (`(args.videoIndices as unknown[]).map(Number)`) since the registry's `validateArgs` does not recurse into array items — the LLM may send strings. Reject any `NaN` values.
 2. Validate: at least 2 valid video URLs exist at the given indices
 3. Report `onToolProgress({ type: 'started', stepLabel: 'Stitching videos', toolName: 'stitch_video' })`
 4. Call `concatenateVideos(resolvedUrls, onProgress)` — progress mapped to `onToolProgress`
-5. Convert resulting Blob to a URL (blob URL or upload)
-6. Call `onToolComplete('stitch_video', [], [stitchedUrl])`
+5. Save the resulting Blob to the gallery via `saveVideoToGallery()` (same as `animate_photo`). This persists the video to IndexedDB and returns a `galleryImageId`. Create an object URL from the Blob for immediate playback, and call `onGallerySaved` so the message gets the gallery ID for session-restore persistence.
+6. Call `onToolComplete('stitch_video', [], [blobUrl])`
 7. Return `JSON.stringify({ success: true, resultCount: 1, mediaType: 'video' })`
 
 ### Error Cases
@@ -366,7 +369,7 @@ Fixed azimuth sequence at the specified elevation and distance:
 | 2 | 180° | `"back view {elevation} {distance}"` |
 | 3 | 270° | `"left side view {elevation} {distance}"` |
 
-- `buildArgs`: returns `{ description: angleString, sourceImageIndex }` for each invocation
+- `buildArgs`: returns `{ description: angleString, sourceImageIndex }` for each invocation. The description string is constructed by concatenating the azimuth value, elevation, and distance with single spaces: e.g., `"front view eye-level shot medium shot"`. Defaults are applied before building: `elevation ?? 'eye-level shot'`, `distance ?? 'medium shot'`.
 - `collectResults`: pushes 4 image URLs into `state.imageUrls`
 - Progress grid: 4 slots showing angle images as they complete
 
@@ -381,17 +384,26 @@ Each clip interpolates between consecutive angle images using `frameRole: 'both'
 | 2 | Back (index 2) | Left (index 3) | 180° → 270° |
 | 3 | Left (index 3) | Front (index 0) | 270° → 360° (loop) |
 
-- `buildArgs`: returns `{ prompt, frameRole: 'both', sourceImageIndex: i, endImageIndex: (i+1)%4, duration: 3 }`
+- `buildArgs`: uses offset-adjusted indices to reference the correct angle images in `context.resultUrls`:
+  ```typescript
+  buildArgs: (state, i) => ({
+    prompt,
+    frameRole: 'both',
+    sourceImageIndex: state.data.angleStartIndex + i,
+    endImageIndex: state.data.angleStartIndex + ((i + 1) % 4),
+    duration: 3,
+  })
+  ```
 - `collectResults`: pushes 4 video URLs into `state.videoUrls`
 - Progress grid: 4 slots showing video clips as they complete
 
-**Note:** The `sourceImageIndex` and `endImageIndex` here reference the angle images generated in Step 1, which the pipeline makes available via updated context `resultUrls`.
+**Critical: Index offset handling.** `context.resultUrls` is session-global — it contains all image results from the entire conversation, not just this tool's outputs. Step 1's `collectResults` must record `state.data.angleStartIndex = context.resultUrls.length` (captured *before* Step 1 runs) so Step 2's `buildArgs` can compute the correct absolute indices. The pipeline captures this offset in `initialState.data.angleStartIndex` before execution begins.
 
 #### Step 3: Stitch (custom execution, no tool call)
 
-- `customExecute`: calls `concatenateVideos(state.videoUrls)` directly
+- `customExecute`: calls `concatenateVideos(state.videoUrls)` directly, then saves the resulting Blob via `saveVideoToGallery()` for IndexedDB persistence (same pattern as `animate_photo`). Creates an object URL from the Blob for immediate playback.
 - Progress: single slot showing "Stitching final video" with concatenation progress
-- `collectResults`: sets `state.data.stitchedUrl`
+- `collectResults`: sets `state.data.stitchedUrl` (the object URL for playback)
 
 ### Final Result Presentation
 
@@ -418,7 +430,13 @@ This gives the user all results (option C): 4 angle images as image results, sti
 
 ### `src/hooks/useChat.ts`
 
-- Populate `videoResultUrls` on the context object. The data already exists in `currentToolVideoUrls` — just pass it through.
+Adding `videoResultUrls` to the execution context requires a new persistent ref, analogous to the existing `allResultUrlsRef` for images:
+
+1. **Create `allVideoUrlsRef`** — a `useRef<string[]>([])` that accumulates video result URLs across the entire session, parallel to how `allResultUrlsRef` tracks image URLs
+2. **Accumulate on tool completion** — when `onToolComplete` fires with video URLs, append them to `allVideoUrlsRef.current` (analogous to lines 892-896 for image URLs)
+3. **Expose via getter** — add `get videoResultUrls() { return allVideoUrlsRef.current; }` to the execution context object
+4. **Hydrate on session restore** — when loading a session from IndexedDB, iterate persisted messages and populate `allVideoUrlsRef` from each message's `videoResults` field (analogous to how `allResultUrlsRef` is hydrated from `imageResults`)
+5. **Reset on session switch** — clear `allVideoUrlsRef.current = []` when changing sessions
 
 ### `src/tools/index.ts`
 
@@ -430,6 +448,12 @@ This gives the user all results (option C): 4 angle images as image results, sti
   - `orbit_video: 'Creating orbit video'`
   - `stitch_video: 'Stitching videos'`
 
+### `src/tools/registry.ts`
+
+- Add timeout overrides for the new tools:
+  - `orbit_video: 1_800_000` (30 minutes — 4 angle generations + 4 video generations + stitching)
+  - `stitch_video: 600_000` (10 minutes — large video concatenation can be slow)
+
 ### `package.json`
 
 - Add `mp4box` dependency
@@ -439,7 +463,6 @@ This gives the user all results (option C): 4 angle images as image results, sti
 - `chatService.ts` — tool calling loop unchanged
 - `ChatVideoResults.tsx` — already handles multiple video URLs
 - `ChatMessage.tsx` — already renders video results
-- `registry.ts` — no API changes
 
 ---
 
@@ -450,8 +473,10 @@ This gives the user all results (option C): 4 angle images as image results, sti
 `orbit_video` estimates total cost before starting:
 
 ```
-totalCost = 4 × angleCost + 4 × videoCost(3 seconds)
+totalCost = 4 × angleCost(effectiveTier) + 4 × videoCost(3 seconds)
 ```
+
+**Important:** The angle cost estimate must use the effective quality tier, not the raw `context.qualityTier`. The `change_angle` handler forces `pro` → `hq` (SV3D is incompatible with Flux.2 pro tier). The orbit handler must apply the same fallback: `const effectiveTier = context.qualityTier === 'pro' ? 'hq' : (context.qualityTier || 'fast')`.
 
 Single pre-flight check at the start. Individual steps still register per-job billing for accurate tracking.
 
