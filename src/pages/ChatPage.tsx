@@ -663,13 +663,18 @@ export default function ChatPage() {
       setActiveSessionId(newId);
       // Update ref immediately so saveActiveSession can use it before next render
       activeSessionIdRef.current = newId;
+      // Also update useChat's sessionIdRef immediately — any in-flight request
+      // that started before a session ID existed will latch this value via the
+      // session ID listener, ensuring background completion routes to the
+      // correct session even after the user switches away.
+      setSessionId(newId);
       sessionDirtyRef.current = true;
       // Save to IndexedDB right away — don't wait for the debounce timer.
       // Without this, refreshing before the first debounced save loses the session
       // (sessionStorage has the ID but IndexedDB has no data).
       saveActiveSession();
     }
-  }, [sessionsInitialized, pendingRestore, activeSessionId, chat.messages, createNewSession, setActiveSessionId, saveActiveSession]);
+  }, [sessionsInitialized, pendingRestore, activeSessionId, chat.messages, createNewSession, setActiveSessionId, setSessionId, saveActiveSession]);
 
   const handleResultsChange = useCallback((urls: string[]) => {
     setResultUrls(urls);

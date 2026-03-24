@@ -308,6 +308,10 @@ export function useChat(): UseChatResult {
   // Session ID tracking: when callbacks detect a mismatch, they skip React state
   // updates but still let SDK jobs run to completion in the background.
   const sessionIdRef = useRef<string | null>(null);
+  // Listeners notified when sessionIdRef changes — used by in-flight requests
+  // that started before a session ID was assigned (capturedSessionId === null)
+  // to latch the correct session ID for background completion routing.
+  const sessionIdListenersRef = useRef<Set<(id: string | null) => void>>(new Set());
 
   // Callbacks for background job completion (set by ChatPage)
   const onBackgroundCompleteRef = useRef<((
@@ -520,6 +524,27 @@ export function useChat(): UseChatResult {
           capturedSessionId === null
             ? abortRef.current === thisRequest
             : sessionIdRef.current === capturedSessionId;
+
+        // Latch the session ID for background completion routing.
+        // When capturedSessionId is null (first message in a new chat), the
+        // session ID is assigned reactively via a useEffect AFTER sendMessage
+        // starts. We register a one-shot listener so that when setSessionId
+        // fires, we latch the correct ID.  Without this, the fallback
+        // `capturedSessionId || sessionIdRef.current` would read whatever
+        // session is current at completion time — wrong after a switch.
+        const resolvedSessionId: { current: string | null } = { current: capturedSessionId };
+        let sessionIdCleanup: (() => void) | null = null;
+        if (capturedSessionId === null) {
+          const listener = (id: string | null) => {
+            if (resolvedSessionId.current === null && id !== null) {
+              resolvedSessionId.current = id;
+              // One-shot: remove after latching
+              sessionIdListenersRef.current.delete(listener);
+            }
+          };
+          sessionIdListenersRef.current.add(listener);
+          sessionIdCleanup = () => sessionIdListenersRef.current.delete(listener);
+        }
 
         activeRequestCountRef.current++;
         setIsSending(true);
@@ -797,9 +822,9 @@ export function useChat(): UseChatResult {
                     : currentToolVideoUrls.length > 0
                       ? [...new Set(currentToolVideoUrls)]
                       : undefined;
-                  // Use capturedSessionId, or fall back to current ref (session ID
-                  // may have been assigned after tool started but before it completed)
-                  const effectiveSessionId = capturedSessionId || sessionIdRef.current;
+                  // Use the latched session ID (resolvedSessionId captures the
+                  // correct value even if the user has since switched sessions).
+                  const effectiveSessionId = resolvedSessionId.current;
                   if (effectiveSessionId) {
                     onBackgroundCompleteRef.current?.(effectiveSessionId, {
                       toolName,
@@ -971,7 +996,7 @@ export function useChat(): UseChatResult {
               onGallerySaved: (galleryImageIds: string[], galleryVideoIds: string[], galleryAudioIds?: string[]) => {
                 if (thisRequest.aborted) return;
                 if (!isActiveSession()) {
-                  const effectiveGallerySessionId = capturedSessionId || sessionIdRef.current;
+                  const effectiveGallerySessionId = resolvedSessionId.current;
                   if (effectiveGallerySessionId) {
                     onBackgroundGallerySavedRef.current?.(effectiveGallerySessionId, galleryImageIds, galleryVideoIds, galleryAudioIds);
                   }
@@ -1041,6 +1066,9 @@ export function useChat(): UseChatResult {
               setIsSending(false);
             }
           }
+
+          // Clean up the session ID listener if it's still registered
+          if (sessionIdCleanup) sessionIdCleanup();
 
           const next = queuedRequestsRef.current.shift();
           if (next) next();
@@ -1322,6 +1350,10 @@ export function useChat(): UseChatResult {
 
   const setSessionId = useCallback((id: string | null) => {
     sessionIdRef.current = id;
+    // Notify in-flight requests that started before a session ID was assigned
+    if (sessionIdListenersRef.current.size > 0) {
+      sessionIdListenersRef.current.forEach(fn => fn(id));
+    }
   }, []);
 
   const getSessionId = useCallback(() => sessionIdRef.current, []);
@@ -1588,6 +1620,20 @@ export function useChat(): UseChatResult {
           ? !toolAbortController.signal.aborted
           : sessionIdRef.current === capturedSessionId;
 
+      // Latch session ID for background completion (mirrors sendMessage pattern)
+      const resolvedSessionId: { current: string | null } = { current: capturedSessionId };
+      let sessionIdCleanup: (() => void) | null = null;
+      if (capturedSessionId === null) {
+        const listener = (id: string | null) => {
+          if (resolvedSessionId.current === null && id !== null) {
+            resolvedSessionId.current = id;
+            sessionIdListenersRef.current.delete(listener);
+          }
+        };
+        sessionIdListenersRef.current.add(listener);
+        sessionIdCleanup = () => sessionIdListenersRef.current.delete(listener);
+      }
+
       activeRequestCountRef.current++;
       setError(null);
       setIsLoading(true);
@@ -1756,7 +1802,7 @@ export function useChat(): UseChatResult {
 
           if (!isActiveSession()) {
             // Background completion — notify parent to persist to IndexedDB
-            const effectiveSessionId = capturedSessionId || sessionIdRef.current;
+            const effectiveSessionId = resolvedSessionId.current;
             if (effectiveSessionId) {
               onBackgroundCompleteRef.current?.(effectiveSessionId, {
                 toolName: completedToolName,
@@ -1812,7 +1858,7 @@ export function useChat(): UseChatResult {
             setUIMessages(prev => applyGalleryIdsToMessages(prev, galleryImageIds, galleryVideoIds, galleryAudioIds));
           } else {
             // Background: notify parent for IndexedDB persistence
-            const effectiveSessionId = capturedSessionId || sessionIdRef.current;
+            const effectiveSessionId = resolvedSessionId.current;
             if (effectiveSessionId) {
               onBackgroundGallerySavedRef.current?.(effectiveSessionId, galleryImageIds, galleryVideoIds, galleryAudioIds);
             }
@@ -1855,6 +1901,9 @@ export function useChat(): UseChatResult {
             setIsSending(false);
           }
         }
+        // Clean up the session ID listener if it's still registered
+        if (sessionIdCleanup) sessionIdCleanup();
+
         // Dequeue next queued request (matches sendMessage pattern)
         const next = queuedRequestsRef.current.shift();
         if (next) next();
