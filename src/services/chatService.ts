@@ -52,7 +52,7 @@ export interface ChatStreamCallbacks {
 // Constants
 // ---------------------------------------------------------------------------
 
-const MAX_TOOL_ROUNDS = 5;
+const MAX_TOOL_ROUNDS = 6;
 
 /** Token overhead for a vision image (matches IMAGE_TOKENS_HIGH in tokenEstimation.ts) */
 const VISION_IMAGE_TOKENS = 1_300;
