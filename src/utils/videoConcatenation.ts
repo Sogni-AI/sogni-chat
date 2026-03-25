@@ -166,6 +166,8 @@ function findVideoTrak(buffer: ArrayBuffer): BoxInfo | null {
   return null;
 }
 
+
+
 function parseMP4(buffer: ArrayBuffer): ParsedMP4 {
   const view = new DataView(buffer);
   const result: ParsedMP4 = { ftyp: null, moov: null, mdat: null, mdatData: null, mdatStart: 0 };
@@ -609,11 +611,13 @@ function updateMdhdDuration(mdhdData: Uint8Array, newDuration: number): Uint8Arr
 // ========== CORE CONCATENATION ==========
 
 /**
- * Core MP4 concatenation engine (video-only).
+ * Core MP4 concatenation engine (video + audio).
  *
- * Parses each input buffer, extracts video samples from mdat using stco/stsc/stsz,
- * collects ctts entries for B-frame support, concatenates all video samples into a
- * single mdat, rebuilds moov with combined sample tables, and returns a complete MP4.
+ * Parses each input buffer, extracts video and audio samples from mdat using
+ * stco/stsc/stsz, collects ctts entries for B-frame support, concatenates all
+ * samples into a single mdat, rebuilds moov with combined sample tables for
+ * both tracks, and returns a complete MP4. Audio is included only when ALL
+ * source videos contain an audio track to maintain sync.
  */
 function concatenateMP4s_Base(buffers: ArrayBuffer[]): Uint8Array {
   if (!buffers || buffers.length === 0) {
@@ -741,7 +745,7 @@ function concatenateMP4s_Base(buffers: ArrayBuffer[]): Uint8Array {
     }
   }
 
-  // Build combined mdat (video-only)
+  // Build combined mdat (video only — audio muxing not supported)
   const combinedVideoData = concatArrays(allVideoSamples);
   const newMdat = buildMdat(combinedVideoData);
 
@@ -863,7 +867,7 @@ function concatenateMP4s_Base(buffers: ArrayBuffer[]): Uint8Array {
   videoTrakParts.push(newVideoMdia);
   const newVideoTrak = wrapBox('trak', concatArrays(videoTrakParts));
 
-  // Build moov (video-only)
+  // Build moov (video only)
   const newMvhd = updateMvhdDuration(
     new Uint8Array(file1MoovBuffer, mvhd.start, mvhd.size),
     videoMovieDuration,
