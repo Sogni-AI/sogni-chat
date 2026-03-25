@@ -104,6 +104,11 @@ export async function executePipeline(
               jobIndex: i,
               totalCount: step.count,
               completedCount,
+              // Strip intermediate result URLs — pipeline manages its own result
+              // collection via onToolComplete. Leaking these would cause useChat to
+              // accumulate intermediate artifacts (e.g. transition clips) in the
+              // final message's videoResults, breaking gallery ID index alignment.
+              videoResultUrls: undefined,
             });
           },
           onToolComplete: (_toolName, resultUrls, videoResultUrls) => {
@@ -125,7 +130,10 @@ export async function executePipeline(
             }
           },
           onInsufficientCredits: callbacks.onInsufficientCredits,
-          onGallerySaved: callbacks.onGallerySaved,
+          // Suppress intermediate gallery saves — sub-step gallery IDs would be
+          // applied to the parent message at wrong indices. The pipeline's final
+          // output handles its own gallery persistence via customExecute steps.
+          onGallerySaved: undefined,
         };
 
         return toolRegistry.execute(step.toolName!, args, context, wrappedCallbacks)
@@ -167,6 +175,8 @@ export async function executePipeline(
             callbacks.onToolProgress({
               ...progress,
               stepLabel,
+              // Strip intermediate video result URLs (see concurrent path comment)
+              videoResultUrls: undefined,
             });
           },
           onToolComplete: (_toolName, resultUrls, videoResultUrls) => {
@@ -184,7 +194,8 @@ export async function executePipeline(
             }
           },
           onInsufficientCredits: callbacks.onInsufficientCredits,
-          onGallerySaved: callbacks.onGallerySaved,
+          // Suppress intermediate gallery saves (see concurrent path comment)
+          onGallerySaved: undefined,
         };
 
         console.log(`[PIPELINE] Executing ${step.toolName} (${i + 1}/${step.count})`);

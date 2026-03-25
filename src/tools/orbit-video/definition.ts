@@ -27,7 +27,11 @@ export const definition: ToolDefinition = {
           type: 'string',
           description:
             'Motion/animation description for transition clips. Describes how the ' +
-            'camera moves between angles. Default uses constant-speed linear motion.',
+            'camera moves between angles. Default uses constant-speed linear motion. ' +
+            'Can include speech/narration or foley/sound effects descriptions ' +
+            '(e.g. "footsteps on gravel, wind blowing") which carry across clips with ' +
+            'audio continuity when stitched. Foley and ambient SFX are recommended for ' +
+            'realism. Music is automatically suppressed — use generate_music separately for soundtrack.',
         },
         sourceImageIndex: {
           type: 'number',

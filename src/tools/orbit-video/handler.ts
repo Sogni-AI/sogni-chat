@@ -39,7 +39,7 @@ const TRANSITION_COUNT = 4;
 
 const DEFAULT_ELEVATION = 'eye-level shot';
 const DEFAULT_DISTANCE = 'medium shot';
-const DEFAULT_PROMPT = 'constant speed linear camera pan, steady uniform motion throughout, no acceleration or deceleration';
+const DEFAULT_PROMPT = 'constant speed linear camera pan, steady uniform motion throughout, no acceleration or deceleration. Foley and ambient sound effects only, no music, no soundtrack.';
 const ORBIT_VIDEO_DURATION = 2.5; // seconds per transition clip
 const ORBIT_VIDEO_MODEL = 'ltx23' as const;
 
@@ -50,7 +50,13 @@ export async function execute(
 ): Promise<string> {
   const elevation = (args.elevation as string) || DEFAULT_ELEVATION;
   const distance = (args.distance as string) || DEFAULT_DISTANCE;
-  const prompt = (args.prompt as string) || DEFAULT_PROMPT;
+  // Suppress per-clip music generation — each clip gets independent audio from
+  // LTX 2.3, which creates discontinuous music when stitched. Speech/narration
+  // is fine since it's sequential, but music needs to be generated separately.
+  const rawPrompt = (args.prompt as string) || DEFAULT_PROMPT;
+  const prompt = /no music|no soundtrack/i.test(rawPrompt)
+    ? rawPrompt
+    : `${rawPrompt} Foley and ambient sound effects only, no music, no soundtrack.`;
   const rawSourceIndex = args.sourceImageIndex as number | undefined;
 
   // ---------------------------------------------------------------------------
@@ -266,26 +272,31 @@ export async function execute(
 
           const blobUrl = URL.createObjectURL(blob);
 
-          // Save to gallery (fire-and-forget)
-          saveVideoToGallery({ videoBlob: blob })
-            .then(({ galleryImageId }) => {
-              stepCallbacks.onGallerySaved?.([], [galleryImageId]);
-            })
-            .catch((err) => {
-              console.error('[ORBIT] Failed to save orbit video to gallery:', err);
-            });
+          // Save to gallery synchronously so the gallery ID is available for
+          // onGallerySaved after onToolComplete (ensures correct index alignment).
+          let galleryVideoId: string | undefined;
+          try {
+            const { galleryImageId } = await saveVideoToGallery({ videoBlob: blob });
+            galleryVideoId = galleryImageId;
+          } catch (err) {
+            console.error('[ORBIT] Failed to save orbit video to gallery:', err);
+          }
 
           return [{
-            rawResult: JSON.stringify({ success: true }),
+            rawResult: JSON.stringify({ success: true, galleryVideoId }),
             imageUrls: [],
             videoUrls: [blobUrl],
           }];
         },
         collectResults: (state, results) => {
           const stitchedUrls = results.flatMap(r => r.videoUrls).filter(Boolean);
+          let galleryVideoId: string | undefined;
+          try {
+            galleryVideoId = JSON.parse(results[0]?.rawResult || '{}').galleryVideoId;
+          } catch { /* ignore */ }
           return {
             ...state,
-            data: { ...state.data, finalVideoUrl: stitchedUrls[0] },
+            data: { ...state.data, finalVideoUrl: stitchedUrls[0], stitchedGalleryId: galleryVideoId },
           };
         },
       },
@@ -309,6 +320,13 @@ export async function execute(
     // Only emit the final stitched video — individual transition clips are
     // intermediate artifacts and would be confusing in the result grid.
     callbacks.onToolComplete('orbit_video', finalState.imageUrls, [finalVideoUrl]);
+
+    // Apply gallery ID after onToolComplete so the message has videoResults
+    // when applyGalleryIdsToMessages scans for the target message.
+    const stitchedGalleryId = finalState.data.stitchedGalleryId as string | undefined;
+    if (stitchedGalleryId) {
+      callbacks.onGallerySaved?.([], [stitchedGalleryId]);
+    }
 
     return JSON.stringify({
       success: true,

@@ -66,16 +66,23 @@ export async function execute(
 
     const blobUrl = URL.createObjectURL(blob);
 
-    // Save to gallery (fire-and-forget)
-    saveVideoToGallery({ videoBlob: blob })
-      .then(({ galleryImageId }) => {
-        callbacks.onGallerySaved?.([], [galleryImageId]);
-      })
-      .catch((err) => {
-        console.error('[STITCH] Failed to save stitched video to gallery:', err);
-      });
+    // Save to gallery before onToolComplete so the gallery ID is available
+    // for onGallerySaved — ensures the stitched video persists across refresh.
+    let galleryVideoId: string | undefined;
+    try {
+      const { galleryImageId } = await saveVideoToGallery({ videoBlob: blob });
+      galleryVideoId = galleryImageId;
+    } catch (err) {
+      console.error('[STITCH] Failed to save stitched video to gallery:', err);
+    }
 
     callbacks.onToolComplete('stitch_video', [], [blobUrl]);
+
+    // Apply gallery ID after onToolComplete so the message has videoResults
+    // when applyGalleryIdsToMessages scans for the target message.
+    if (galleryVideoId) {
+      callbacks.onGallerySaved?.([], [galleryVideoId]);
+    }
 
     return JSON.stringify({
       success: true,
