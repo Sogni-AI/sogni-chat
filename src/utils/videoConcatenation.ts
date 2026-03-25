@@ -10,11 +10,12 @@
  * - Edit lists (edts) for iOS/QuickTime compatibility
  * - Proper chunk offset (stco) recalculation
  * - Sync sample (stss / keyframe) tracking
- * - Audio track concatenation (when all source videos contain audio)
+ *
+ * Also handles:
+ * - Audio track concatenation when ALL source videos contain audio
  *
  * Does NOT handle (can be added later):
  * - Frame extraction
- * - MP3→M4A transcoding
  */
 
 // ========== TYPES ==========
@@ -135,7 +136,7 @@ function findNestedBoxInRange(
 
 /**
  * Find video trak in moov (handler type 'vide')
- * CRITICAL: Must use this instead of findNestedBox for videos that may have audio tracks
+ * Uses handler type detection to skip non-video traks (e.g., metadata, timecode)
  */
 function findVideoTrak(buffer: ArrayBuffer): BoxInfo | null {
   const view = new DataView(buffer);
@@ -166,7 +167,38 @@ function findVideoTrak(buffer: ArrayBuffer): BoxInfo | null {
   return null;
 }
 
+/**
+ * Find audio trak in moov (handler type 'soun')
+ * Uses handler type detection to locate the sound track.
+ */
+function findAudioTrak(buffer: ArrayBuffer): BoxInfo | null {
+  const view = new DataView(buffer);
+  let offset = 8; // Skip moov header
 
+  while (offset < buffer.byteLength - 8) {
+    const size = view.getUint32(offset);
+    const type = getBoxType(view, offset + 4);
+
+    if (size === 0 || offset + size > buffer.byteLength) break;
+
+    if (type === 'trak') {
+      // Check if this is an audio track by looking at hdlr
+      const hdlr = findNestedBoxInRange(buffer, offset + 8, offset + size, ['mdia', 'hdlr']);
+      if (hdlr) {
+        const hdlrView = new DataView(buffer, hdlr.start, hdlr.size);
+        // Handler type is at offset 16 (after header + version/flags + pre_defined)
+        const handlerType = getBoxType(hdlrView, 16);
+        if (handlerType === 'soun') {
+          return { start: offset, size, end: offset + size, contentStart: offset + 8 };
+        }
+      }
+    }
+
+    offset += size;
+  }
+
+  return null;
+}
 
 function parseMP4(buffer: ArrayBuffer): ParsedMP4 {
   const view = new DataView(buffer);
@@ -611,13 +643,12 @@ function updateMdhdDuration(mdhdData: Uint8Array, newDuration: number): Uint8Arr
 // ========== CORE CONCATENATION ==========
 
 /**
- * Core MP4 concatenation engine (video + audio).
+ * Core MP4 concatenation engine (video track only).
  *
- * Parses each input buffer, extracts video and audio samples from mdat using
+ * Parses each input buffer, extracts video samples from mdat using
  * stco/stsc/stsz, collects ctts entries for B-frame support, concatenates all
- * samples into a single mdat, rebuilds moov with combined sample tables for
- * both tracks, and returns a complete MP4. Audio is included only when ALL
- * source videos contain an audio track to maintain sync.
+ * samples into a single mdat, rebuilds moov with combined sample tables,
+ * and returns a complete MP4.
  */
 function concatenateMP4s_Base(buffers: ArrayBuffer[]): Uint8Array {
   if (!buffers || buffers.length === 0) {
@@ -745,17 +776,143 @@ function concatenateMP4s_Base(buffers: ArrayBuffer[]): Uint8Array {
     }
   }
 
-  // Build combined mdat (video only — audio muxing not supported)
+  // ========== Audio detection ==========
+  // Check if ALL source files have audio tracks (handler type 'soun').
+  // We only include audio in the output when every source has it.
+  const firstAudioTrak = findAudioTrak(file1MoovBuffer);
+  let allFilesHaveAudio = !!firstAudioTrak;
+  if (allFilesHaveAudio) {
+    for (let fileIdx = 1; fileIdx < parsedFiles.length; fileIdx++) {
+      const moovBuf = toArrayBuffer(parsedFiles[fileIdx].moov!);
+      if (!findAudioTrak(moovBuf)) {
+        allFilesHaveAudio = false;
+        break;
+      }
+    }
+  }
+
+  // ========== Audio timing extraction (from first file) ==========
+  let audioTimescale = 44100;
+  let audioSampleDelta = 1024;
+
+  if (allFilesHaveAudio && firstAudioTrak) {
+    const audioMdiaBox = findBox(file1MoovBuffer, firstAudioTrak.contentStart, firstAudioTrak.end, 'mdia');
+    if (audioMdiaBox) {
+      const audioMdhdBox = findBox(file1MoovBuffer, audioMdiaBox.contentStart, audioMdiaBox.end, 'mdhd');
+      if (audioMdhdBox) {
+        const aMdhdView = new DataView(file1MoovBuffer, audioMdhdBox.start, audioMdhdBox.size);
+        audioTimescale = aMdhdView.getUint8(8) === 0 ? aMdhdView.getUint32(20) : aMdhdView.getUint32(28);
+      }
+      const audioMinfBox = findBox(file1MoovBuffer, audioMdiaBox.contentStart, audioMdiaBox.end, 'minf');
+      if (audioMinfBox) {
+        const audioStblBox = findBox(file1MoovBuffer, audioMinfBox.contentStart, audioMinfBox.end, 'stbl');
+        if (audioStblBox) {
+          const audioSttsBox = findBox(file1MoovBuffer, audioStblBox.contentStart, audioStblBox.end, 'stts');
+          if (audioSttsBox) {
+            const aSttsView = new DataView(file1MoovBuffer, audioSttsBox.start, audioSttsBox.size);
+            if (aSttsView.getUint32(12) > 0) {
+              audioSampleDelta = aSttsView.getUint32(20);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // ========== Audio sample extraction ==========
+  const allAudioSizes: number[] = [];
+  const allAudioSamples: Uint8Array[] = [];
+
+  if (allFilesHaveAudio) {
+    for (let fileIdx = 0; fileIdx < parsedFiles.length; fileIdx++) {
+      const p = parsedFiles[fileIdx];
+      const moovBuf = toArrayBuffer(p.moov!);
+      const origBuf = new Uint8Array(buffers[fileIdx]);
+
+      const aTrak = findAudioTrak(moovBuf);
+      if (!aTrak) continue;
+
+      const aStbl = findNestedBoxInRange(moovBuf, aTrak.contentStart, aTrak.end, ['mdia', 'minf', 'stbl']);
+      if (!aStbl) continue;
+      const aStsz = findBox(moovBuf, aStbl.contentStart, aStbl.end, 'stsz');
+      const aStco = findBox(moovBuf, aStbl.contentStart, aStbl.end, 'stco');
+      const aStsc = findBox(moovBuf, aStbl.contentStart, aStbl.end, 'stsc');
+      if (!aStsz || !aStco) continue;
+
+      const aStszView = new DataView(moovBuf, aStsz.start, aStsz.size);
+      const aStcoView = new DataView(moovBuf, aStco.start, aStco.size);
+      const aSampleCount = aStszView.getUint32(16);
+      const aChunkCount = aStcoView.getUint32(12);
+
+      // Handle uniform stsz (offset 12 = uniformSize; when != 0 all samples share that size)
+      const aUniformSize = aStszView.getUint32(12);
+      const aSampleSizes: number[] = [];
+      if (aUniformSize !== 0) {
+        for (let i = 0; i < aSampleCount; i++) aSampleSizes.push(aUniformSize);
+      } else {
+        for (let i = 0; i < aSampleCount; i++) aSampleSizes.push(aStszView.getUint32(20 + i * 4));
+      }
+
+      const aChunkOffsets: number[] = [];
+      for (let i = 0; i < aChunkCount; i++) aChunkOffsets.push(aStcoView.getUint32(16 + i * 4));
+
+      const aStscEntries: { firstChunk: number; samplesPerChunk: number }[] = [];
+      if (aStsc) {
+        const aStscView = new DataView(moovBuf, aStsc.start, aStsc.size);
+        const entryCount = aStscView.getUint32(12);
+        for (let i = 0; i < entryCount; i++) {
+          aStscEntries.push({
+            firstChunk: aStscView.getUint32(16 + i * 12),
+            samplesPerChunk: aStscView.getUint32(20 + i * 12),
+          });
+        }
+      }
+
+      let aSampleIdx = 0;
+      for (let chunkIdx = 0; chunkIdx < aChunkCount && aSampleIdx < aSampleCount; chunkIdx++) {
+        let samplesInChunk = 1;
+        for (const entry of aStscEntries) {
+          if (entry.firstChunk <= chunkIdx + 1) samplesInChunk = entry.samplesPerChunk;
+        }
+        let byteOffset = aChunkOffsets[chunkIdx];
+        for (let s = 0; s < samplesInChunk && aSampleIdx < aSampleCount; s++) {
+          const sampleSize = aSampleSizes[aSampleIdx];
+          if (byteOffset + sampleSize <= origBuf.length) {
+            allAudioSamples.push(origBuf.slice(byteOffset, byteOffset + sampleSize));
+            allAudioSizes.push(sampleSize);
+          }
+          byteOffset += sampleSize;
+          aSampleIdx++;
+        }
+      }
+    }
+  }
+
+  const hasAudio = allAudioSizes.length > 0;
+
+  // ========== Build combined mdat ==========
   const combinedVideoData = concatArrays(allVideoSamples);
-  const newMdat = buildMdat(combinedVideoData);
+  let newMdat: Uint8Array;
+  if (hasAudio) {
+    const combinedAudioData = concatArrays(allAudioSamples);
+    newMdat = buildMdat(concatArrays([combinedVideoData, combinedAudioData]));
+  } else {
+    newMdat = buildMdat(combinedVideoData);
+  }
 
   // Calculate durations
   const videoMediaDuration = allVideoSizes.length * firstTables.sampleDelta;
   const videoMovieDuration = Math.round(videoMediaDuration * movieTimescale / videoTimescale);
 
+  // Audio durations (used for audio trak and overall movie duration)
+  const audioMediaDuration = hasAudio ? allAudioSizes.length * audioSampleDelta : 0;
+  const audioMovieDuration = hasAudio ? Math.round(audioMediaDuration * movieTimescale / audioTimescale) : 0;
+
   // Single chunk for simplicity
   const ftypSize = firstParsed.ftyp!.byteLength;
   const videoChunkOffsets = [ftypSize + 8]; // After ftyp + mdat header
+  // Audio data starts after video data in the combined mdat
+  const audioChunkOffset = ftypSize + 8 + combinedVideoData.byteLength;
 
   // Build ctts box from collected entries
   const buildCttsFromEntries = (entries: CttsEntry[]): Uint8Array | null => {
@@ -867,12 +1024,88 @@ function concatenateMP4s_Base(buffers: ArrayBuffer[]): Uint8Array {
   videoTrakParts.push(newVideoMdia);
   const newVideoTrak = wrapBox('trak', concatArrays(videoTrakParts));
 
-  // Build moov (video only)
+  // ========== Build audio trak (when all sources have audio) ==========
+  let newAudioTrak: Uint8Array | null = null;
+  if (hasAudio && firstAudioTrak) {
+    const audioMdia = findBox(file1MoovBuffer, firstAudioTrak.contentStart, firstAudioTrak.end, 'mdia');
+    if (audioMdia) {
+      const audioMdhd = findBox(file1MoovBuffer, audioMdia.contentStart, audioMdia.end, 'mdhd');
+      const audioHdlr = findBox(file1MoovBuffer, audioMdia.contentStart, audioMdia.end, 'hdlr');
+      const audioMinf = findBox(file1MoovBuffer, audioMdia.contentStart, audioMdia.end, 'minf');
+
+      if (audioMdhd && audioMinf) {
+        const smhd = findBox(file1MoovBuffer, audioMinf.contentStart, audioMinf.end, 'smhd');
+        const audioDinf = findBox(file1MoovBuffer, audioMinf.contentStart, audioMinf.end, 'dinf');
+        const audioStblBox = findBox(file1MoovBuffer, audioMinf.contentStart, audioMinf.end, 'stbl');
+
+        if (audioStblBox) {
+          const audioStsd = findBox(file1MoovBuffer, audioStblBox.contentStart, audioStblBox.end, 'stsd');
+
+          if (audioStsd) {
+            // Build new audio sample tables
+            const newAudioStsz = buildStsz(allAudioSizes);
+            const newAudioStco = buildStco([audioChunkOffset]);
+            const newAudioStsc = buildStsc([{
+              firstChunk: 1,
+              samplesPerChunk: allAudioSizes.length,
+              sampleDescriptionIndex: 1,
+            }]);
+            const newAudioStts = buildStts(allAudioSizes.length, audioSampleDelta);
+
+            // Build audio stbl
+            const audioStsdBytes = new Uint8Array(file1MoovBuffer, audioStsd.start, audioStsd.size);
+            const newAudioStbl = wrapBox('stbl', concatArrays([
+              audioStsdBytes, newAudioStts, newAudioStsc, newAudioStsz, newAudioStco,
+            ]));
+
+            // Build audio minf
+            const audioMinfParts: Uint8Array[] = [];
+            if (smhd) audioMinfParts.push(new Uint8Array(file1MoovBuffer, smhd.start, smhd.size));
+            if (audioDinf) audioMinfParts.push(new Uint8Array(file1MoovBuffer, audioDinf.start, audioDinf.size));
+            audioMinfParts.push(newAudioStbl);
+            const newAudioMinf = wrapBox('minf', concatArrays(audioMinfParts));
+
+            // Build audio mdia
+            const audioHdlrBytes = audioHdlr
+              ? new Uint8Array(file1MoovBuffer, audioHdlr.start, audioHdlr.size)
+              : new Uint8Array(0);
+            const newAudioMdhd = updateMdhdDuration(
+              new Uint8Array(file1MoovBuffer, audioMdhd.start, audioMdhd.size),
+              audioMediaDuration,
+            );
+            const newAudioMdia = wrapBox('mdia', concatArrays([newAudioMdhd, audioHdlrBytes, newAudioMinf]));
+
+            // Build audio tkhd
+            const audioTkhd = findBox(file1MoovBuffer, firstAudioTrak.contentStart, firstAudioTrak.end, 'tkhd');
+            if (audioTkhd) {
+              const newAudioTkhd = updateTkhdDuration(
+                new Uint8Array(file1MoovBuffer, audioTkhd.start, audioTkhd.size),
+                audioMovieDuration,
+              );
+              newAudioTrak = wrapBox('trak', concatArrays([newAudioTkhd, newAudioMdia]));
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // ========== Build moov ==========
+  // Use the longer of video/audio for the overall movie duration
+  const overallMovieDuration = hasAudio
+    ? Math.max(videoMovieDuration, audioMovieDuration)
+    : videoMovieDuration;
+
   const newMvhd = updateMvhdDuration(
     new Uint8Array(file1MoovBuffer, mvhd.start, mvhd.size),
-    videoMovieDuration,
+    overallMovieDuration,
   );
-  const newMoov = wrapBox('moov', concatArrays([newMvhd, newVideoTrak]));
+
+  const moovParts: Uint8Array[] = [newMvhd, newVideoTrak];
+  if (newAudioTrak) {
+    moovParts.push(newAudioTrak);
+  }
+  const newMoov = wrapBox('moov', concatArrays(moovParts));
 
   return concatArrays([firstParsed.ftyp!, newMdat, newMoov]);
 }
