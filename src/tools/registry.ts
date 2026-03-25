@@ -20,6 +20,8 @@ class ToolRegistry {
     generate_video: 600_000,
     animate_photo: 600_000,
     extract_metadata: 60_000,
+    orbit_video: 1_800_000,   // 30 min — 4 angles + 4 videos + stitch
+    stitch_video: 600_000,    // 10 min — large concatenation can be slow
   };
 
   /** Register a tool handler */

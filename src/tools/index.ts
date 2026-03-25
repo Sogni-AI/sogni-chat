@@ -34,6 +34,10 @@ import './extract-metadata';
 import './resolve-personas';
 import './manage-memory';
 
+// Video stitching & orbit
+import './stitch-video';
+import './orbit-video';
+
 export { toolRegistry } from './registry';
 export type {
   ToolHandler,

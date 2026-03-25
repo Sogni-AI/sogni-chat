@@ -254,8 +254,10 @@ export async function saveRestorationToGallery(
 // ============================================================================
 
 export interface SaveVideoParams {
-  /** Video URL to download */
-  videoUrl: string;
+  /** Video URL to download (optional if videoBlob provided) */
+  videoUrl?: string;
+  /** Pre-fetched video blob (skips download — used by concatenateVideos output) */
+  videoBlob?: Blob;
   /** Existing project ID to attach to (creates new project if omitted) */
   projectId?: string;
   /** Source image data (needed if creating a new project) */
@@ -282,6 +284,7 @@ export async function saveVideoToGallery(
 ): Promise<{ projectId: string; galleryImageId: string }> {
   const {
     videoUrl,
+    videoBlob: providedBlob,
     projectId: existingProjectId,
     sourceImageBlob,
     sourceWidth,
@@ -292,18 +295,25 @@ export async function saveVideoToGallery(
 
   const now = Date.now();
 
-  // Download video blob
+  // Download video blob (or use provided blob)
   let videoBlob: Blob;
-  try {
-    const response = await fetch(videoUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to download video: ${response.status}`);
+  if (providedBlob) {
+    videoBlob = providedBlob;
+    console.log(`[GALLERY SERVICE] Using provided video blob: ${(videoBlob.size / 1024 / 1024).toFixed(1)}MB`);
+  } else if (videoUrl) {
+    try {
+      const response = await fetch(videoUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to download video: ${response.status}`);
+      }
+      videoBlob = await response.blob();
+      console.log(`[GALLERY SERVICE] Video downloaded: ${(videoBlob.size / 1024 / 1024).toFixed(1)}MB`);
+    } catch (error) {
+      console.error('[GALLERY SERVICE] Failed to download video:', error);
+      throw error;
     }
-    videoBlob = await response.blob();
-    console.log(`[GALLERY SERVICE] Video downloaded: ${(videoBlob.size / 1024 / 1024).toFixed(1)}MB`);
-  } catch (error) {
-    console.error('[GALLERY SERVICE] Failed to download video:', error);
-    throw error;
+  } else {
+    throw new Error('Either videoUrl or videoBlob must be provided');
   }
 
   // Determine project ID — use existing or create new

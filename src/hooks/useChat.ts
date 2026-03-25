@@ -74,6 +74,7 @@ export interface UseChatResult {
     conversation: ChatMessage[];
     allResultUrls: string[];
     audioResultUrls: string[];
+    allVideoUrls: string[];
     analysisSuggestions: Suggestion[];
     sessionModel?: string;
   };
@@ -286,6 +287,8 @@ export function useChat(): UseChatResult {
   const allResultUrlsRef = useRef<string[]>([]);
   // Track audio result URLs separately (from generate_music) so sound_to_video can find them
   const audioResultUrlsRef = useRef<string[]>([]);
+  // Track video result URLs separately so stitch_video/orbit_video can find them
+  const allVideoUrlsRef = useRef<string[]>([]);
   // Abort handle for cancellation (Fix #8)
   const abortRef = useRef<{ aborted: boolean }>({ aborted: false });
   // AbortControllers for active tool executions (so cancel button actually aborts SDK operations)
@@ -592,6 +595,7 @@ export function useChat(): UseChatResult {
           uploadedFiles: context.uploadedFiles || [],
           get resultUrls() { return allResultUrlsRef.current; },
           get audioResultUrls() { return audioResultUrlsRef.current; },
+          get videoResultUrls() { return allVideoUrlsRef.current; },
           balances: context.balances,
           qualityTier: context.qualityTier,
           safeContentFilter: context.safeContentFilter,
@@ -901,6 +905,13 @@ export function useChat(): UseChatResult {
                 if (isAudioTool && uniqueUrls.length > 0) {
                   audioResultUrlsRef.current = [
                     ...new Set([...audioResultUrlsRef.current, ...uniqueUrls]),
+                  ];
+                }
+
+                // Track video result URLs separately so stitch_video/orbit_video can find generated videos
+                if (currentToolVideoUrls.length > 0) {
+                  allVideoUrlsRef.current = [
+                    ...new Set([...allVideoUrlsRef.current, ...currentToolVideoUrls]),
                   ];
                 }
 
@@ -1264,6 +1275,7 @@ export function useChat(): UseChatResult {
     setAnalysisSuggestions([]);
     allResultUrlsRef.current = [];
     audioResultUrlsRef.current = [];
+    allVideoUrlsRef.current = [];
     analysisSuggestionsRef.current = [];
     conversationRef.current = [];
     sessionModelRef.current = undefined;
@@ -1301,6 +1313,7 @@ export function useChat(): UseChatResult {
       conversation: conversationRef.current,
       allResultUrls: allResultUrlsRef.current,
       audioResultUrls: audioResultUrlsRef.current,
+      allVideoUrls: allVideoUrlsRef.current,
       analysisSuggestions: analysisSuggestionsRef.current,
       sessionModel: sessionModelRef.current,
     };
@@ -1345,6 +1358,7 @@ export function useChat(): UseChatResult {
     conversationRef.current = session.conversation;
     allResultUrlsRef.current = session.allResultUrls;
     audioResultUrlsRef.current = session.audioResultUrls || [];
+    allVideoUrlsRef.current = session.allVideoUrls || [];
     analysisSuggestionsRef.current = session.analysisSuggestions;
     sessionModelRef.current = session.sessionModel;
   }, []);
@@ -1423,6 +1437,9 @@ export function useChat(): UseChatResult {
           if (isAudio) {
             audioResultUrlsRef.current = [...new Set([...audioResultUrlsRef.current, ...resultUrls])];
           }
+          if (isVideo) {
+            allVideoUrlsRef.current = [...new Set([...allVideoUrlsRef.current, ...resultUrls])];
+          }
           setUIMessages((prev) => [...prev, recoveryMsg]);
         } else {
           updateSessionMessages(sessionId, (msgs) => [...msgs, recoveryMsg]);
@@ -1479,6 +1496,9 @@ export function useChat(): UseChatResult {
               }
               if (isAudio) {
                 audioResultUrlsRef.current = [...new Set([...audioResultUrlsRef.current, ...urls])];
+              }
+              if (isVideo) {
+                allVideoUrlsRef.current = [...new Set([...allVideoUrlsRef.current, ...urls])];
               }
               setUIMessages((prev) =>
                 prev.map((msg) =>
@@ -1691,6 +1711,7 @@ export function useChat(): UseChatResult {
         uploadedFiles: context.uploadedFiles || [],
         get resultUrls() { return allResultUrlsRef.current; },
         get audioResultUrls() { return audioResultUrlsRef.current; },
+        get videoResultUrls() { return allVideoUrlsRef.current; },
         balances: context.balances,
         qualityTier: isQualityOverride ? (modelKeyOverride as 'fast' | 'hq' | 'pro') : context.qualityTier,
         safeContentFilter: context.safeContentFilter,
@@ -1862,6 +1883,11 @@ export function useChat(): UseChatResult {
           }
           if (isAudioTool && retryResultUrls.length > 0) {
             audioResultUrlsRef.current = [...new Set([...audioResultUrlsRef.current, ...retryResultUrls])];
+          }
+          if (retryVideoUrls.length > 0) {
+            allVideoUrlsRef.current = [
+              ...new Set([...allVideoUrlsRef.current, ...retryVideoUrls]),
+            ];
           }
         },
         onGallerySaved: (galleryImageIds, galleryVideoIds, galleryAudioIds) => {

@@ -130,6 +130,8 @@ const TOOL_LABELS: Record<string, string> = {
   sound_to_video: 'Creating video from audio',
   video_to_video: 'Transforming video',
   generate_music: 'Generating music',
+  orbit_video: 'Creating orbit video',
+  stitch_video: 'Stitching videos',
 };
 
 export const ChatProgressIndicator = memo(function ChatProgressIndicator({

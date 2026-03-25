@@ -176,6 +176,7 @@ export function useChatSessions(): UseChatSessionsReturn {
                     conversation: backup.conversation,
                     allResultUrls: backup.allResultUrls,
                     audioResultUrls: backup.audioResultUrls || session.audioResultUrls,
+                    allVideoUrls: backup.allVideoUrls || session.allVideoUrls,
                     analysisSuggestions: backup.analysisSuggestions || session.analysisSuggestions,
                     sessionModel: backup.sessionModel || session.sessionModel,
                     updatedAt: backup.timestamp || session.updatedAt,

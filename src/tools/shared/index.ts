@@ -31,3 +31,5 @@ export { sanitizeBatchPrompt } from './promptSanitizer';
 export { needsCreativeRefinement, refineVideoPrompt } from './videoPromptRefinement';
 export { getModelOptions, getAlternativeModels, getModelArgKey, isQualityTierTool } from './modelRegistry';
 export type { ModelOption } from './modelRegistry';
+export { executePipeline } from './pipeline';
+export type { PipelineConfig, PipelineStep, PipelineState, StepResult } from './pipeline';

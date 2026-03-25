@@ -313,6 +313,7 @@ export default function ChatPage() {
       conversation: state.conversation,
       allResultUrls: state.allResultUrls,
       audioResultUrls: state.audioResultUrls,
+      allVideoUrls: state.allVideoUrls,
       analysisSuggestions: state.analysisSuggestions,
       sessionModel: state.sessionModel,
       // Filter out persona reference photos injected by resolve_personas — they're
@@ -459,6 +460,7 @@ export default function ChatPage() {
               conversation: state.conversation,
               allResultUrls: state.allResultUrls,
               audioResultUrls: state.audioResultUrls,
+              allVideoUrls: state.allVideoUrls,
               analysisSuggestions: state.analysisSuggestions,
               sessionModel: state.sessionModel,
               timestamp: Date.now(),
