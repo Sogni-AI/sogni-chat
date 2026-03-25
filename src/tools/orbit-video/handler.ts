@@ -166,6 +166,7 @@ export async function execute(
         label: 'Generating angle views',
         toolName: 'change_angle',
         count: AZIMUTHS.length,
+        concurrent: true,
         buildArgs: (_state, index) => ({
           description: `${AZIMUTHS[index]} ${elevation} ${distance}`,
           // Use the original source image for each angle (not the previous angle result).
@@ -191,6 +192,7 @@ export async function execute(
         label: 'Generating transitions',
         toolName: 'animate_photo',
         count: AZIMUTHS.length,
+        concurrent: true,
         buildArgs: (state, index) => {
           const angleImageUrls = state.data.angleImageUrls as string[];
           const nextIndex = (index + 1) % AZIMUTHS.length;

@@ -25,6 +25,8 @@ export interface PipelineStep {
   label: string;
   toolName: ToolName | null;
   count: number;
+  /** Run all invocations concurrently via Promise.all (default: false — sequential). */
+  concurrent?: boolean;
   buildArgs: (state: PipelineState, index: number) => Record<string, unknown>;
   customExecute?: (
     state: PipelineState,
@@ -64,7 +66,66 @@ export async function executePipeline(
       });
       const results = await step.customExecute(state, context, callbacks);
       stepResults.push(...results);
+    } else if (step.concurrent) {
+      // ---------------------------------------------------------------
+      // Concurrent execution — all invocations launched via Promise.all
+      // ---------------------------------------------------------------
+      console.log(`[PIPELINE] Running ${step.count} concurrent invocations of ${step.toolName}`);
+
+      // Pre-allocate result slots so concurrent callbacks write to the correct index
+      const slotResults: StepResult[] = new Array(step.count).fill(null).map(() => ({
+        rawResult: '',
+        imageUrls: [],
+        videoUrls: [],
+      }));
+
+      const promises = Array.from({ length: step.count }, (_, i) => {
+        const args = step.buildArgs(state, i);
+        const stepLabel = `${step.label} ${i + 1}/${step.count}`;
+
+        const wrappedCallbacks: ToolCallbacks = {
+          onToolProgress: (progress) => {
+            callbacks.onToolProgress({
+              ...progress,
+              stepLabel,
+            });
+          },
+          onToolComplete: (_toolName, resultUrls, videoResultUrls) => {
+            slotResults[i] = {
+              ...slotResults[i],
+              imageUrls: resultUrls || [],
+              videoUrls: videoResultUrls || [],
+            };
+          },
+          onInsufficientCredits: callbacks.onInsufficientCredits,
+          onGallerySaved: callbacks.onGallerySaved,
+        };
+
+        return toolRegistry.execute(step.toolName!, args, context, wrappedCallbacks)
+          .then((rawResult) => {
+            slotResults[i].rawResult = rawResult;
+
+            // Check for fatal errors
+            try {
+              const parsed = JSON.parse(rawResult);
+              if (parsed.error) {
+                console.error(`[PIPELINE] Sub-tool error in "${step.label}" invocation ${i}:`, parsed.error);
+                if (parsed.error === 'insufficient_credits' || parsed.error === 'no_image') {
+                  throw new Error(parsed.error);
+                }
+              }
+            } catch (e) {
+              if (!(e instanceof SyntaxError)) throw e;
+            }
+          });
+      });
+
+      await Promise.all(promises);
+      stepResults.push(...slotResults);
     } else {
+      // ---------------------------------------------------------------
+      // Sequential execution — one invocation at a time
+      // ---------------------------------------------------------------
       for (let i = 0; i < step.count; i++) {
         if (context.signal?.aborted) {
           console.log(`[PIPELINE] Aborted during step "${step.label}" at invocation ${i}`);
