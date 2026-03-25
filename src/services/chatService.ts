@@ -254,7 +254,9 @@ export async function sendChatMessage(
       const rawBudget = getInputBudget(context.sogniClient);
       const budget = visionDataUris.length > 0 ? rawBudget - VISION_IMAGE_TOKENS * visionDataUris.length : rawBudget;
       const trimResult = trimConversation(updatedMessages, systemMessage, budget);
-      const messagesForApi = trimResult.trimmedCount > 0 ? trimResult.messages : updatedMessages;
+      // Always use trimResult.messages — even when trimmedCount is 0, observation
+      // masking may have compressed old tool results to save tokens.
+      const messagesForApi = trimResult.messages;
       if (trimResult.trimmedCount > 0) {
         console.log(`[CHAT SERVICE] Trimmed ${trimResult.trimmedCount} messages for API (full history preserved for persistence)`);
         callbacks.onContextTrimmed?.(trimResult.trimmedCount);
@@ -470,7 +472,24 @@ export async function sendChatMessage(
           callbacks.onToolCall(toolName, args);
 
           try {
-            const toolResult = await toolRegistry.execute(toolName, args, context, toolCallbacks);
+            // Capture result count before execution so we can inject the
+            // starting index into the tool result for context window awareness.
+            const resultCountBefore = context.resultUrls.length;
+
+            let toolResult = await toolRegistry.execute(toolName, args, context, toolCallbacks);
+
+            // Inject startIndex into tool result so the context window's
+            // observation masking and enriched summary can preserve index
+            // offsets. This lets the LLM reference old results by index
+            // even after context trimming.
+            const newResults = context.resultUrls.length - resultCountBefore;
+            if (newResults > 0) {
+              try {
+                const resultObj = JSON.parse(toolResult);
+                resultObj.startIndex = resultCountBefore;
+                toolResult = JSON.stringify(resultObj);
+              } catch { /* leave as-is if not JSON */ }
+            }
 
             // Add tool result to conversation
             updatedMessages.push({
