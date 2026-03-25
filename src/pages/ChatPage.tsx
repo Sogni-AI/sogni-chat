@@ -539,7 +539,9 @@ export default function ChatPage() {
       const isVideoTool = result.toolName === 'animate_photo'
         || result.toolName === 'generate_video'
         || result.toolName === 'sound_to_video'
-        || result.toolName === 'video_to_video';
+        || result.toolName === 'video_to_video'
+        || result.toolName === 'stitch_video'
+        || result.toolName === 'orbit_video';
       const isAudioTool = result.toolName === 'generate_music';
       await updateSessionMessages(sessionId, (messages) => {
         return messages.map((msg) => {

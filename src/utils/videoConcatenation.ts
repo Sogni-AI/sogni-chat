@@ -10,9 +10,9 @@
  * - Edit lists (edts) for iOS/QuickTime compatibility
  * - Proper chunk offset (stco) recalculation
  * - Sync sample (stss / keyframe) tracking
+ * - Audio track concatenation (when all source videos contain audio)
  *
  * Does NOT handle (can be added later):
- * - Audio track extraction/muxing
  * - Frame extraction
  * - MP3→M4A transcoding
  */
@@ -699,8 +699,14 @@ function concatenateMP4s_Base(buffers: ArrayBuffer[]): Uint8Array {
     const sampleCount = stszView.getUint32(16);
     const chunkCount = stcoView.getUint32(12);
 
+    const uniformSize = stszView.getUint32(12);
     const sampleSizes: number[] = [];
-    for (let i = 0; i < sampleCount; i++) sampleSizes.push(stszView.getUint32(20 + i * 4));
+    if (uniformSize !== 0) {
+      // All samples share the same size — no per-sample table follows
+      for (let i = 0; i < sampleCount; i++) sampleSizes.push(uniformSize);
+    } else {
+      for (let i = 0; i < sampleCount; i++) sampleSizes.push(stszView.getUint32(20 + i * 4));
+    }
     const chunkOffsets: number[] = [];
     for (let i = 0; i < chunkCount; i++) chunkOffsets.push(stcoView.getUint32(16 + i * 4));
 

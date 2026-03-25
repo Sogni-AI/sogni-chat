@@ -756,13 +756,14 @@ export function useChat(): UseChatResult {
                       : msg.toolProgress?.perJobProgress;
                     if (progress.jobIndex !== undefined) {
                       const prevJob = perJobProgress?.[progress.jobIndex];
+                      const isVideoResult = !!progress.videoResultUrls?.[0];
                       const resultUrl = progress.videoResultUrls?.[0] || progress.resultUrls?.[0];
                       perJobProgress = {
                         ...perJobProgress,
                         [progress.jobIndex]: {
                           progress: progress.progress ?? prevJob?.progress,
                           etaSeconds: progress.etaSeconds ?? prevJob?.etaSeconds,
-                          ...(resultUrl ? { resultUrl } : prevJob?.resultUrl ? { resultUrl: prevJob.resultUrl } : {}),
+                          ...(resultUrl ? { resultUrl, isVideo: isVideoResult } : prevJob?.resultUrl ? { resultUrl: prevJob.resultUrl, isVideo: prevJob.isVideo } : {}),
                           ...(progress.error ? { error: progress.error } : prevJob?.error ? { error: prevJob.error } : {}),
                         },
                       };
@@ -1148,7 +1149,9 @@ export function useChat(): UseChatResult {
             const isVideoTool = toolName === 'animate_photo'
               || toolName === 'generate_video'
               || toolName === 'sound_to_video'
-              || toolName === 'video_to_video';
+              || toolName === 'video_to_video'
+              || toolName === 'stitch_video'
+              || toolName === 'orbit_video';
             const isAudioTool = toolName === 'generate_music';
 
             // Preserve metadata from toolProgress (same as onToolComplete)
@@ -1789,13 +1792,14 @@ export function useChat(): UseChatResult {
               : prevProgress?.perJobProgress;
             if (progress.jobIndex !== undefined) {
               const prevJob = perJobProgress?.[progress.jobIndex];
+              const isVideoResult = !!progress.videoResultUrls?.[0];
               const resultUrl = progress.videoResultUrls?.[0] || progress.resultUrls?.[0];
               perJobProgress = {
                 ...perJobProgress,
                 [progress.jobIndex]: {
                   progress: progress.progress ?? prevJob?.progress,
                   etaSeconds: progress.etaSeconds ?? prevJob?.etaSeconds,
-                  ...(resultUrl ? { resultUrl } : prevJob?.resultUrl ? { resultUrl: prevJob.resultUrl } : {}),
+                  ...(resultUrl ? { resultUrl, isVideo: isVideoResult } : prevJob?.resultUrl ? { resultUrl: prevJob.resultUrl, isVideo: prevJob.isVideo } : {}),
                   ...(progress.error ? { error: progress.error } : prevJob?.error ? { error: prevJob.error } : {}),
                 },
               };

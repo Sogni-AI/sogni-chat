@@ -366,7 +366,7 @@ export function ChatPanel({
     fullscreenBlobUrlsRef.current = [];
 
     const items: MediaItem[] = [];
-    const isVideoTool = message.toolProgress && ['animate_photo', 'generate_video', 'sound_to_video', 'video_to_video'].includes(message.toolProgress.toolName);
+    const isVideoTool = message.toolProgress && ['animate_photo', 'generate_video', 'sound_to_video', 'video_to_video', 'stitch_video', 'orbit_video'].includes(message.toolProgress.toolName);
 
     // Resolve a gallery ID to a persistent blob URL, falling back to the original remote URL
     const resolveUrl = async (url: string, galleryId?: string): Promise<string> => {

@@ -129,6 +129,8 @@ export interface ToolExecutionProgress {
     etaSeconds?: number;
     resultUrl?: string;
     error?: string;
+    /** True when resultUrl is a video (vs image). Used by pipeline steps that mix media types. */
+    isVideo?: boolean;
   }>;
 }
 

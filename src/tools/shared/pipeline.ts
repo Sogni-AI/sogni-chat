@@ -113,6 +113,16 @@ export async function executePipeline(
               imageUrls: resultUrls || [],
               videoUrls: videoResultUrls || [],
             };
+            // Push result URLs into context arrays so subsequent pipeline steps
+            // can resolve them by index (e.g., orbit Step 2 finding Step 1 images).
+            // context.resultUrls / context.videoResultUrls are array references
+            // backed by refs in useChat, so push() mutates the backing store.
+            for (const url of (resultUrls || [])) {
+              if (!context.resultUrls.includes(url)) context.resultUrls.push(url);
+            }
+            for (const url of (videoResultUrls || [])) {
+              if (!context.videoResultUrls.includes(url)) context.videoResultUrls.push(url);
+            }
           },
           onInsufficientCredits: callbacks.onInsufficientCredits,
           onGallerySaved: callbacks.onGallerySaved,
@@ -165,6 +175,13 @@ export async function executePipeline(
               imageUrls: resultUrls || [],
               videoUrls: videoResultUrls || [],
             });
+            // Push result URLs into context for subsequent steps (see concurrent path comment)
+            for (const url of (resultUrls || [])) {
+              if (!context.resultUrls.includes(url)) context.resultUrls.push(url);
+            }
+            for (const url of (videoResultUrls || [])) {
+              if (!context.videoResultUrls.includes(url)) context.videoResultUrls.push(url);
+            }
           },
           onInsufficientCredits: callbacks.onInsufficientCredits,
           onGallerySaved: callbacks.onGallerySaved,

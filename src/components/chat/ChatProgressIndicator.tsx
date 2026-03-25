@@ -166,7 +166,7 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
 
   const totalCount = progress.totalCount || 1;
   const completedResults = progress.resultUrls || [];
-  const isVideoTool = ['animate_photo', 'generate_video', 'sound_to_video', 'video_to_video'].includes(progress.toolName);
+  const isVideoTool = ['animate_photo', 'generate_video', 'sound_to_video', 'video_to_video', 'stitch_video', 'orbit_video'].includes(progress.toolName);
   const isBatch = totalCount > 1;
   // Check if any slots are still pending (no result URL and not failed)
   const slotStates = Array.from({ length: totalCount }, (_, i) => {
@@ -236,7 +236,7 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
               : jobHasProgress
                 ? `${jobPct}%`
                 : null;
-            const isCompletedVideo = !!resultUrl && isVideoTool;
+            const isCompletedVideo = !!resultUrl && (jobData?.isVideo ?? isVideoTool);
             const jobError = jobData?.error;
 
             const isCompleted = !!resultUrl;
@@ -244,7 +244,7 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
             return (
               <div
                 key={i}
-                onClick={isCompleted && onMediaClick ? () => onMediaClick(i, isVideoTool ? 'video' : 'image') : undefined}
+                onClick={isCompleted && onMediaClick ? () => onMediaClick(i, isCompletedVideo ? 'video' : 'image') : undefined}
                 style={{
                   position: 'relative',
                   borderRadius: 'var(--radius-md)',
