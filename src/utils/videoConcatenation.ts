@@ -888,7 +888,8 @@ function concatenateMP4s_Base(buffers: ArrayBuffer[]): Uint8Array {
     }
   }
 
-  const hasAudio = allAudioSizes.length > 0;
+  // Disable audio if extraction yielded nothing usable (0 samples, or broken timing)
+  const hasAudio = allAudioSizes.length > 0 && audioTimescale > 0 && audioSampleDelta > 0;
 
   // ========== Build combined mdat ==========
   const combinedVideoData = concatArrays(allVideoSamples);

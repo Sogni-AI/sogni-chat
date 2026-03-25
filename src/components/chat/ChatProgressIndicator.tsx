@@ -10,17 +10,47 @@ import { useTokenPrice } from '@/hooks/useTokenPrice';
 import { activeVideos, pauseOtherVideos, isFullscreenOpen, markAutoPlay, consumeAutoPlay } from './videoCoordination';
 import { PersonaReferenceIndicator } from '@/components/personas/PersonaReferenceIndicator';
 
-/** Inline video player for progress grid — hidden until first frame is ready.
+/** Shared style for progress video control buttons */
+const progressControlBtnStyle: React.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  padding: '0.125rem',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  opacity: 0.9,
+  outline: 'none',
+  flexShrink: 0,
+};
+
+/** Inline video player for progress grid with custom controls (play/pause, mute, fullscreen).
+ *  Replaces native controls to prevent auto-fullscreen on mobile.
  *  Participates in the global video coordination so that playing one video
  *  pauses all others and unmutes the active video (same as ChatVideoPlayer). */
 function ProgressVideo({ src, aspectRatio }: { src: string; aspectRatio?: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [ready, setReady] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const [showControls, setShowControls] = useState(true);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Reset loading state when src changes (e.g. retry with different URL)
   useEffect(() => { setReady(false); }, [src]);
 
-  // Register in the global activeVideos set and wire up play coordination
+  /** Auto-hide controls after 3s of playback */
+  const resetHideTimer = useCallback(() => {
+    setShowControls(true);
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => {
+      const el = videoRef.current;
+      if (el && !el.paused) setShowControls(false);
+    }, 3000);
+  }, []);
+
+  // Register in the global activeVideos set and wire up play coordination + state tracking
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
@@ -40,13 +70,30 @@ function ProgressVideo({ src, aspectRatio }: { src: string; aspectRatio?: string
       pauseOtherVideos(el);
       if (el.muted) el.muted = false;
     };
+
+    const handlePlayState = () => setPlaying(true);
+    const handlePauseState = () => { setPlaying(false); setShowControls(true); };
+    const handleVolumeChange = () => setIsMuted(el.muted);
+
     el.addEventListener('play', handlePlay);
+    el.addEventListener('play', handlePlayState);
+    el.addEventListener('pause', handlePauseState);
+    el.addEventListener('volumechange', handleVolumeChange);
 
     return () => {
       el.removeEventListener('play', handlePlay);
+      el.removeEventListener('play', handlePlayState);
+      el.removeEventListener('pause', handlePauseState);
+      el.removeEventListener('volumechange', handleVolumeChange);
       activeVideos.delete(el);
     };
   }, []);
+
+  // Clean up hide timer on unmount
+  useEffect(() => () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); }, []);
+
+  // Start auto-hide timer when playback begins
+  useEffect(() => { if (playing) resetHideTimer(); }, [playing, resetHideTimer]);
 
   /** Programmatic auto-play: only plays if no fullscreen viewer is open
    *  and no other inline video is already playing. */
@@ -63,8 +110,62 @@ function ProgressVideo({ src, aspectRatio }: { src: string; aspectRatio?: string
     el.play().catch(() => { /* browser may block autoplay — that's fine */ });
   }, []);
 
+  const togglePlay = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const el = videoRef.current;
+    if (!el) return;
+    if (el.paused) el.play().catch(() => {});
+    else el.pause();
+  }, []);
+
+  const toggleMute = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const el = videoRef.current;
+    if (!el) return;
+    el.muted = !el.muted;
+  }, []);
+
+  const handleFullscreen = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const container = containerRef.current;
+    const el = videoRef.current;
+    if (!container || !el) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else if (container.requestFullscreen) {
+      container.requestFullscreen().catch(() => {});
+    } else if ((el as any).webkitEnterFullscreen) {
+      (el as any).webkitEnterFullscreen();
+    }
+  }, []);
+
+  const controlsVisible = showControls || !playing;
+  const [isFs, setIsFs] = useState(false);
+
+  useEffect(() => {
+    const handleFsChange = () => setIsFs(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handleFsChange);
+    document.addEventListener('webkitfullscreenchange', handleFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+      document.removeEventListener('webkitfullscreenchange', handleFsChange);
+    };
+  }, []);
+
   return (
-    <>
+    <div
+      ref={containerRef}
+      onMouseMove={playing ? resetHideTimer : undefined}
+      onMouseLeave={() => { if (playing) { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); setShowControls(false); } }}
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        ...(isFs
+          ? { background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }
+          : {}
+        ),
+      }}
+    >
       {!ready && (
         <div
           style={{
@@ -91,20 +192,104 @@ function ProgressVideo({ src, aspectRatio }: { src: string; aspectRatio?: string
       <video
         ref={videoRef}
         src={src}
-        autoPlay
         loop
         muted
-        controls
         playsInline
         preload="auto"
         onLoadedData={handleLoadedData}
+        onClick={togglePlay}
         style={{
           width: '100%',
           height: 'auto',
           display: ready ? 'block' : 'none',
+          cursor: 'pointer',
+          ...(isFs
+            ? { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' as const }
+            : {}
+          ),
         }}
       />
-    </>
+
+      {/* Center play button overlay — shown when paused */}
+      {ready && !playing && (
+        <div
+          onClick={togglePlay}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+        >
+          <div style={{
+            width: '2.5rem',
+            height: '2.5rem',
+            borderRadius: '50%',
+            background: 'rgba(0, 0, 0, 0.55)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="white" style={{ marginLeft: '2px' }}>
+              <polygon points="6,3 20,12 6,21" />
+            </svg>
+          </div>
+        </div>
+      )}
+
+      {/* Custom controls bar — mute + fullscreen */}
+      {ready && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            gap: '0.25rem',
+            padding: '1rem 0.375rem 0.25rem',
+            background: 'linear-gradient(transparent, rgba(0,0,0,0.6))',
+            opacity: controlsVisible ? 1 : 0,
+            transition: 'opacity 0.2s',
+            pointerEvents: controlsVisible ? 'auto' : 'none',
+          }}
+        >
+          <button onClick={toggleMute} style={progressControlBtnStyle} aria-label={isMuted ? 'Unmute' : 'Mute'}>
+            {isMuted ? (
+              <svg width="12" height="12" viewBox="0 0 24 24">
+                <path d="M11 5L6 9H2v6h4l5 4V5z" fill="white"/>
+                <line x1="22" y1="9" x2="16" y2="15" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="16" y1="9" x2="22" y2="15" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 24 24">
+                <path d="M11 5L6 9H2v6h4l5 4V5z" fill="white"/>
+                <path d="M15.54 8.46a5 5 0 010 7.07" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round"/>
+              </svg>
+            )}
+          </button>
+
+          <button onClick={handleFullscreen} style={progressControlBtnStyle} aria-label={isFs ? 'Exit fullscreen' : 'Fullscreen'}>
+            {isFs ? (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 3v3a2 2 0 01-2 2H3M21 8h-3a2 2 0 01-2-2V3M3 16h3a2 2 0 012 2v3M16 21v-3a2 2 0 012-2h3"/>
+              </svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3"/>
+              </svg>
+            )}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }
 

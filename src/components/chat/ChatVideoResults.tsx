@@ -1,7 +1,10 @@
 /**
  * Inline video results displayed within chat messages.
  *
- * Single video: full inline player with controls, auto-play, and pause coordination.
+ * Single video: custom inline player with play/pause, progress bar, mute, and
+ * fullscreen controls. Does NOT use native <video controls> to prevent
+ * auto-fullscreen on mobile — playsInline keeps video in-page.
+ *
  * Multiple videos (grid): thumbnail cards showing first frame with a play-button
  * overlay. Tapping a card opens the fullscreen media viewer instead of playing
  * inline — this prevents layout overflow (especially with 9:16 portrait batches)
@@ -14,15 +17,37 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useGalleryBlobUrls } from '@/hooks/useGalleryBlobUrls';
 import { activeVideos, pauseOtherVideos, isFullscreenOpen, markAutoPlay, consumeAutoPlay } from './videoCoordination';
 
-/** Individual video player that pauses all other chat videos when it starts playing.
- *  Shows a poster-frame overlay until the video is ready, then reveals the
- *  native player. The overlay is always clickable so users can force-play
- *  even if the ready signal hasn't fired yet. */
+/** Shared style for custom video control buttons */
+const videoControlBtnStyle: React.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  padding: '0.25rem',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  opacity: 0.9,
+  outline: 'none',
+  flexShrink: 0,
+};
+
+/** Individual video player with custom controls (play/pause, progress, mute, fullscreen).
+ *  Uses playsInline to prevent auto-fullscreen on mobile. Native controls are replaced
+ *  with a lightweight overlay that coordinates with the global video playback system.
+ *  Click/tap on the video toggles play/pause. Controls auto-hide after 3s during playback
+ *  and reappear on hover (desktop) or when paused. */
 function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPlay = true }: { src: string; onError: () => void; onPlay?: () => void; aspectRatio?: string; fillWidth?: boolean; autoPlay?: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const onPlayRef = useRef(onPlay);
   onPlayRef.current = onPlay;
   const [ready, setReady] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const [currentProgress, setCurrentProgress] = useState(0);
+  const [showControls, setShowControls] = useState(true);
+  const [isFs, setIsFs] = useState(false);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Compute placeholder dimensions that fit within maxWidth × maxHeight
   // while maintaining the aspect ratio (CSS alone can't handle both constraints).
@@ -50,6 +75,17 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
     return false;
   }, []);
 
+  /** Auto-hide controls after 3s of playback; re-show on mouse move */
+  const resetHideTimer = useCallback(() => {
+    setShowControls(true);
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => {
+      const el = videoRef.current;
+      if (el && !el.paused) setShowControls(false);
+    }, 3000);
+  }, []);
+
+  // Register video element, wire coordination + UI state tracking
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
@@ -71,7 +107,19 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
       if (el.muted) el.muted = false;
       onPlayRef.current?.();
     };
+
+    const handlePlayState = () => setPlaying(true);
+    const handlePauseState = () => { setPlaying(false); setShowControls(true); };
+    const handleVolumeChange = () => setIsMuted(el.muted);
+    const handleTimeUpdate = () => {
+      if (el.duration) setCurrentProgress(el.currentTime / el.duration);
+    };
+
     el.addEventListener('play', handlePlay);
+    el.addEventListener('play', handlePlayState);
+    el.addEventListener('pause', handlePauseState);
+    el.addEventListener('volumechange', handleVolumeChange);
+    el.addEventListener('timeupdate', handleTimeUpdate);
 
     // Pause video when scrolled out of view
     const observer = new IntersectionObserver(
@@ -86,10 +134,31 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
 
     return () => {
       el.removeEventListener('play', handlePlay);
+      el.removeEventListener('play', handlePlayState);
+      el.removeEventListener('pause', handlePauseState);
+      el.removeEventListener('volumechange', handleVolumeChange);
+      el.removeEventListener('timeupdate', handleTimeUpdate);
       activeVideos.delete(el);
       observer.disconnect();
     };
   }, []);
+
+  // Track fullscreen state for container styling
+  useEffect(() => {
+    const handleFsChange = () => setIsFs(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handleFsChange);
+    document.addEventListener('webkitfullscreenchange', handleFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+      document.removeEventListener('webkitfullscreenchange', handleFsChange);
+    };
+  }, []);
+
+  // Clean up hide timer on unmount
+  useEffect(() => () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current); }, []);
+
+  // Start auto-hide timer when playback begins
+  useEffect(() => { if (playing) resetHideTimer(); }, [playing, resetHideTimer]);
 
   // Reset ready state when src changes
   useEffect(() => {
@@ -116,11 +185,72 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
     setReady(true);
     const el = videoRef.current;
     if (!el) return;
-    el.play().catch(() => { /* browser may block — that's fine, controls are visible */ });
+    el.play().catch(() => { /* browser may block — that's fine */ });
   }, []);
 
+  const togglePlay = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const el = videoRef.current;
+    if (!el) return;
+    if (el.paused) el.play().catch(() => {});
+    else el.pause();
+  }, []);
+
+  const toggleMute = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const el = videoRef.current;
+    if (!el) return;
+    el.muted = !el.muted;
+  }, []);
+
+  const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    const el = videoRef.current;
+    if (!el || !el.duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    el.currentTime = ratio * el.duration;
+    setCurrentProgress(ratio);
+  }, []);
+
+  const handleFullscreen = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const container = containerRef.current;
+    const el = videoRef.current;
+    if (!container || !el) return;
+
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else if (container.requestFullscreen) {
+      container.requestFullscreen().catch(() => {});
+    } else if ((el as any).webkitEnterFullscreen) {
+      // iOS Safari fallback — opens native fullscreen player
+      (el as any).webkitEnterFullscreen();
+    }
+  }, []);
+
+  const controlsVisible = showControls || !playing;
+
   return (
-    <div style={{ position: 'relative' }}>
+    <div
+      ref={containerRef}
+      onMouseMove={playing ? resetHideTimer : undefined}
+      onMouseLeave={() => {
+        if (playing) {
+          if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+          setShowControls(false);
+        }
+      }}
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        borderRadius: isFs ? 0 : 'var(--radius-md)',
+        ...(isFs
+          ? { background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }
+          : {}
+        ),
+      }}
+    >
       {/* Loading placeholder — shown until the first video frame is decoded */}
       {!ready && (
         <div
@@ -154,25 +284,141 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
       <video
         ref={videoRef}
         src={src}
-        autoPlay
-        controls
-        controlsList="nodownload"
         loop
+        muted
         playsInline
         preload="auto"
         onLoadedData={handleLoadedData}
         onError={onError}
+        onClick={togglePlay}
         style={{
           display: ready ? 'block' : 'none',
-          borderRadius: 'var(--radius-md)',
-          ...(fillWidth
-            ? { width: '100%', height: 'auto' }
-            : { maxWidth: '100%', maxHeight: '400px' }
+          cursor: 'pointer',
+          ...(isFs
+            ? { maxWidth: '100%', maxHeight: '100%', width: '100%', height: '100%', objectFit: 'contain' as const }
+            : fillWidth
+              ? { width: '100%', height: 'auto' }
+              : { maxWidth: '100%', maxHeight: '400px' }
           ),
         }}
       >
         Your browser does not support video playback.
       </video>
+
+      {/* Center play button overlay — shown when paused */}
+      {ready && !playing && (
+        <div
+          onClick={togglePlay}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+        >
+          <div style={{
+            width: '3rem',
+            height: '3rem',
+            borderRadius: '50%',
+            background: 'rgba(0, 0, 0, 0.55)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="white" style={{ marginLeft: '2px' }}>
+              <polygon points="6,3 20,12 6,21" />
+            </svg>
+          </div>
+        </div>
+      )}
+
+      {/* Custom controls bar — play/pause, progress, mute, fullscreen */}
+      {ready && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '1.25rem 0.5rem 0.375rem',
+            background: 'linear-gradient(transparent, rgba(0,0,0,0.7))',
+            opacity: controlsVisible ? 1 : 0,
+            transition: 'opacity 0.2s',
+            pointerEvents: controlsVisible ? 'auto' : 'none',
+          }}
+        >
+          {/* Play / Pause */}
+          <button onClick={togglePlay} style={videoControlBtnStyle} aria-label={playing ? 'Pause' : 'Play'}>
+            {playing ? (
+              <svg width="14" height="14" viewBox="0 0 24 24">
+                <rect x="5" y="3" width="4" height="18" rx="1" fill="white"/>
+                <rect x="15" y="3" width="4" height="18" rx="1" fill="white"/>
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24">
+                <polygon points="6,3 20,12 6,21" fill="white"/>
+              </svg>
+            )}
+          </button>
+
+          {/* Progress bar — click to seek */}
+          <div
+            onClick={handleSeek}
+            style={{
+              flex: 1,
+              height: '4px',
+              background: 'rgba(255,255,255,0.3)',
+              borderRadius: '2px',
+              cursor: 'pointer',
+            }}
+          >
+            <div style={{
+              height: '100%',
+              width: `${currentProgress * 100}%`,
+              background: 'var(--color-accent, #fff)',
+              borderRadius: '2px',
+              transition: 'width 0.1s linear',
+            }} />
+          </div>
+
+          {/* Mute / Unmute */}
+          <button onClick={toggleMute} style={videoControlBtnStyle} aria-label={isMuted ? 'Unmute' : 'Mute'}>
+            {isMuted ? (
+              <svg width="14" height="14" viewBox="0 0 24 24">
+                <path d="M11 5L6 9H2v6h4l5 4V5z" fill="white"/>
+                <line x1="22" y1="9" x2="16" y2="15" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="16" y1="9" x2="22" y2="15" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24">
+                <path d="M11 5L6 9H2v6h4l5 4V5z" fill="white"/>
+                <path d="M15.54 8.46a5 5 0 010 7.07" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round"/>
+              </svg>
+            )}
+          </button>
+
+          {/* Fullscreen toggle */}
+          <button onClick={handleFullscreen} style={videoControlBtnStyle} aria-label={isFs ? 'Exit fullscreen' : 'Fullscreen'}>
+            {isFs ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 3v3a2 2 0 01-2 2H3M21 8h-3a2 2 0 01-2-2V3M3 16h3a2 2 0 012 2v3M16 21v-3a2 2 0 012-2h3"/>
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3"/>
+              </svg>
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
