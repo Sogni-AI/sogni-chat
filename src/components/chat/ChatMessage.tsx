@@ -348,8 +348,11 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
         </div>
       )}
 
-      {/* Image results */}
-      {message.imageResults && message.imageResults.length > 0 && (
+      {/* Image results — hidden while toolProgress is active to avoid
+         duplicating the thumbnails already shown in ChatProgressIndicator.
+         imageResults is still populated progressively (for IndexedDB persistence),
+         but only rendered once the progress indicator is cleared. */}
+      {message.imageResults && message.imageResults.length > 0 && !message.toolProgress && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
           <LazyMedia enabled={!!message.isFromHistory} placeholderHeight={200}>
             <ChatImageResults
