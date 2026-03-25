@@ -72,25 +72,42 @@ export async function executePipeline(
       // ---------------------------------------------------------------
       console.log(`[PIPELINE] Running ${step.count} concurrent invocations of ${step.toolName}`);
 
+      // Emit a single 'started' event with totalCount so the UI creates one
+      // progress indicator with the right number of slots. Sub-tool 'started'
+      // events are suppressed to prevent resetting perJobProgress.
+      callbacks.onToolProgress({
+        type: 'started',
+        toolName: config.parentToolName,
+        totalCount: step.count,
+        stepLabel: step.label,
+      });
+
       // Pre-allocate result slots so concurrent callbacks write to the correct index
       const slotResults: StepResult[] = new Array(step.count).fill(null).map(() => ({
         rawResult: '',
         imageUrls: [],
         videoUrls: [],
       }));
+      let completedCount = 0;
 
       const promises = Array.from({ length: step.count }, (_, i) => {
         const args = step.buildArgs(state, i);
-        const stepLabel = `${step.label} ${i + 1}/${step.count}`;
 
         const wrappedCallbacks: ToolCallbacks = {
           onToolProgress: (progress) => {
+            // Suppress sub-tool 'started' events — we already emitted one above
+            if (progress.type === 'started') return;
             callbacks.onToolProgress({
               ...progress,
-              stepLabel,
+              toolName: config.parentToolName,
+              stepLabel: step.label,
+              jobIndex: i,
+              totalCount: step.count,
+              completedCount,
             });
           },
           onToolComplete: (_toolName, resultUrls, videoResultUrls) => {
+            completedCount++;
             slotResults[i] = {
               ...slotResults[i],
               imageUrls: resultUrls || [],

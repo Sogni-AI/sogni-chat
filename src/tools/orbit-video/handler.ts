@@ -27,13 +27,15 @@ import { saveVideoToGallery } from '@/services/galleryService';
 // Constants
 // ---------------------------------------------------------------------------
 
-/** The 4 azimuth directions that form a full orbit */
-const AZIMUTHS = [
-  'front view',
+/** Generated azimuths — the original image serves as "front view" */
+const GENERATED_AZIMUTHS = [
   'right side view',
   'back view',
   'left side view',
 ] as const;
+
+/** Total transition count: original→right, right→back, back→left, left→original */
+const TRANSITION_COUNT = 4;
 
 const DEFAULT_ELEVATION = 'eye-level shot';
 const DEFAULT_DISTANCE = 'medium shot';
@@ -125,8 +127,8 @@ export async function execute(
     videoCost = 0;
   }
 
-  const totalAngleCost = angleCost * AZIMUTHS.length;
-  const totalVideoCost = videoCost * AZIMUTHS.length;
+  const totalAngleCost = angleCost * GENERATED_AZIMUTHS.length;
+  const totalVideoCost = videoCost * TRANSITION_COUNT;
   const estimatedCost = totalAngleCost + totalVideoCost;
 
   if (estimatedCost > 0) {
@@ -161,17 +163,14 @@ export async function execute(
       },
     },
     steps: [
-      // Step 1: Generate 4 angle views
+      // Step 1: Generate 3 angle views (original image is the front view)
       {
         label: 'Generating angle views',
         toolName: 'change_angle',
-        count: AZIMUTHS.length,
+        count: GENERATED_AZIMUTHS.length,
         concurrent: true,
         buildArgs: (_state, index) => ({
-          description: `${AZIMUTHS[index]} ${elevation} ${distance}`,
-          // Use the original source image for each angle (not the previous angle result).
-          // sourceImageIndex of -1 means "use original upload" when imageData exists,
-          // otherwise use the effectiveSourceIndex we already resolved.
+          description: `${GENERATED_AZIMUTHS[index]} ${elevation} ${distance}`,
           sourceImageIndex: effectiveSourceIndex ?? -1,
         }),
         collectResults: (state, results) => {
@@ -187,33 +186,46 @@ export async function execute(
         },
       },
 
-      // Step 2: Generate 4 transition clips between adjacent angles (with wrap-around)
+      // Step 2: Generate 4 transition clips (front→right, right→back, back→left, left→front)
       {
         label: 'Generating transitions',
         toolName: 'animate_photo',
-        count: AZIMUTHS.length,
+        count: TRANSITION_COUNT,
         concurrent: true,
         buildArgs: (state, index) => {
           const angleImageUrls = state.data.angleImageUrls as string[];
-          const nextIndex = (index + 1) % AZIMUTHS.length;
+          // Full sequence: [original, right, back, left] — original is at effectiveSourceIndex
+          // Transition i connects sequence[i] → sequence[(i+1) % 4]
+          const sourceIndex = effectiveSourceIndex ?? -1;
 
-          // We need to map the angle image URLs back to result indices.
-          // The angle images were just added to context.resultUrls by the pipeline's
-          // sub-tool calls via onToolComplete, so they should be at the end.
-          // We use the URLs directly by finding their indices in context.resultUrls.
-          const startResultIndex = context.resultUrls.indexOf(angleImageUrls[index]);
-          const endResultIndex = context.resultUrls.indexOf(angleImageUrls[nextIndex]);
+          // Map transition index to start/end image indices in context.resultUrls
+          let startIdx: number;
+          let endIdx: number;
 
-          if (startResultIndex < 0 || endResultIndex < 0) {
-            console.warn(`[ORBIT] Could not resolve angle image indices (start=${startResultIndex}, end=${endResultIndex}). animate_photo will auto-select.`);
+          if (index === 0) {
+            // original → right
+            startIdx = sourceIndex;
+            endIdx = context.resultUrls.indexOf(angleImageUrls[0]);
+          } else if (index === TRANSITION_COUNT - 1) {
+            // left → original (wrap-around)
+            startIdx = context.resultUrls.indexOf(angleImageUrls[angleImageUrls.length - 1]);
+            endIdx = sourceIndex;
+          } else {
+            // right → back, back → left
+            startIdx = context.resultUrls.indexOf(angleImageUrls[index - 1]);
+            endIdx = context.resultUrls.indexOf(angleImageUrls[index]);
+          }
+
+          if (startIdx < -1 || endIdx < -1) {
+            console.warn(`[ORBIT] Could not resolve angle image indices for transition ${index} (start=${startIdx}, end=${endIdx})`);
           }
 
           return {
             prompt,
             videoModel: ORBIT_VIDEO_MODEL,
             duration: ORBIT_VIDEO_DURATION,
-            sourceImageIndex: startResultIndex >= 0 ? startResultIndex : undefined,
-            endImageIndex: endResultIndex >= 0 ? endResultIndex : undefined,
+            sourceImageIndex: startIdx,
+            endImageIndex: endIdx,
             frameRole: 'both',
             numberOfVariations: 1,
           };
@@ -303,7 +315,7 @@ export async function execute(
       resultCount: 1,
       mediaType: 'video',
       creditsCost: estimatedCost > 0 ? formatCredits(estimatedCost) : undefined,
-      message: `Successfully created a 360-degree orbit video with ${AZIMUTHS.length} angles and transitions.${estimatedCost > 0 ? ` Estimated cost: ~${formatCredits(estimatedCost)} credits.` : ''} The user can now see and play the orbit video.`,
+      message: `Successfully created a 360-degree orbit video with ${TRANSITION_COUNT} transitions.${estimatedCost > 0 ? ` Estimated cost: ~${formatCredits(estimatedCost)} credits.` : ''} The user can now see and play the orbit video.`,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
