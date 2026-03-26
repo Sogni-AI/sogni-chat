@@ -3,6 +3,23 @@
  */
 
 /**
+ * Convert a Uint8Array to a base64 data URL (synchronous).
+ * Used to persist uploaded image previews in chat messages so they
+ * survive page refreshes and session switches (unlike ephemeral blob: URLs).
+ */
+export function uint8ArrayToDataUrl(data: Uint8Array, mimeType: string): string {
+  const CHUNK = 0x8000; // 32 KB — avoids call-stack overflow in String.fromCharCode
+  let binary = '';
+  for (let i = 0; i < data.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(
+      null,
+      data.subarray(i, i + CHUNK) as unknown as number[],
+    );
+  }
+  return `data:${mimeType};base64,${btoa(binary)}`;
+}
+
+/**
  * Resize a Uint8Array image for vision analysis.
  * Converts to a blob URL, resizes via canvas if needed, and returns a base64 data URI.
  */

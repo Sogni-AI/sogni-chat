@@ -17,6 +17,7 @@ import { useLayout } from '@/layouts/AppLayout';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useTypingPlaceholder } from '@/hooks/useTypingPlaceholder';
 import { getVariantById } from '@/config/modelVariants';
+import { uint8ArrayToDataUrl } from '@/utils/imageProcessing';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { SuggestionChips } from './SuggestionChips';
@@ -333,11 +334,12 @@ export function ChatPanel({
           ((m.uploadedImageUrls && m.uploadedImageUrls.length > 0) || m.uploadedImageUrl),
       );
       const uploadedImageUrls: string[] = [];
-      if (!hasImageInMessages && uploadedFiles && getPreviewUrl) {
-        uploadedFiles.forEach((f, i) => {
+      if (!hasImageInMessages && uploadedFiles) {
+        // Use persistent data URLs (not ephemeral blob: URLs) so uploaded
+        // image previews survive page refresh and session switching.
+        uploadedFiles.forEach((f) => {
           if (f.type === 'image') {
-            const url = getPreviewUrl(i);
-            if (url) uploadedImageUrls.push(url);
+            uploadedImageUrls.push(uint8ArrayToDataUrl(f.data, f.mimeType));
           }
         });
       }
@@ -359,7 +361,7 @@ export function ChatPanel({
         uploadedImageUrls: uploadedImageUrls.length > 0 ? uploadedImageUrls : undefined,
       });
     },
-    [sogniClient, imageData, width, height, tokenType, balances, qualityTier, safeContentFilter, onContentFilterChange, requestDisableContentFilter, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, selectedModelVariant, getPreviewUrl, messages],
+    [sogniClient, imageData, width, height, tokenType, balances, qualityTier, safeContentFilter, onContentFilterChange, requestDisableContentFilter, uploadedFiles, onTokenSwitch, onInsufficientCredits, sendMessage, selectedModelVariant, messages],
   );
 
   const handleMediaClick = useCallback(async (message: UIChatMessage, index: number, mediaType: 'image' | 'video' | 'audio') => {
@@ -448,13 +450,13 @@ export function ChatPanel({
   const processedMessages = useMemo(() => {
     let msgs = messages;
 
-    // Build fresh image preview URLs from current uploadedFiles
-    const freshImageUrls: string[] = [];
+    // Build fresh blob URLs for the synthetic user-upload message (efficient for live display).
+    const freshBlobUrls: string[] = [];
     if (uploadedFiles && getPreviewUrl) {
       uploadedFiles.forEach((f, i) => {
         if (f.type === 'image') {
           const url = getPreviewUrl(i);
-          if (url) freshImageUrls.push(url);
+          if (url) freshBlobUrls.push(url);
         }
       });
     }
@@ -466,7 +468,7 @@ export function ChatPanel({
       (m) => m.id === 'user-upload' || (m.uploadedImageUrls && m.uploadedImageUrls.length > 0),
     );
 
-    if (!hasUploadEntry && freshImageUrls.length > 0) {
+    if (!hasUploadEntry && freshBlobUrls.length > 0) {
       // Synthesize a presentational upload entry at the start of the conversation
       // so the uploaded images appear at the top of the chat stream.
       const uploadMsg: UIChatMessage = {
@@ -474,21 +476,50 @@ export function ChatPanel({
         role: 'user',
         content: '',
         timestamp: 0,
-        uploadedImageUrls: freshImageUrls,
+        uploadedImageUrls: freshBlobUrls,
       };
       msgs = [uploadMsg, ...msgs];
     }
 
-    // Refresh blob URLs on the synthetic user-upload message and on sent
-    // messages whose stale blob URLs need replacing after a page refresh.
-    // Only refresh when the image count matches to avoid cross-contaminating
-    // messages that were sent with a different set of images.
-    if (freshImageUrls.length > 0) {
+    // Refresh the synthetic user-upload blob URLs (they're always regenerated
+    // from uploadedFiles so they stay valid for the current page session).
+    if (freshBlobUrls.length > 0) {
       msgs = msgs.map((msg) =>
-        msg.uploadedImageUrls && msg.uploadedImageUrls.length === freshImageUrls.length
-          ? { ...msg, uploadedImageUrls: freshImageUrls }
+        msg.id === 'user-upload' && msg.uploadedImageUrls
+          ? { ...msg, uploadedImageUrls: freshBlobUrls }
           : msg,
       );
+    }
+
+    // Backward compat: replace stale blob: URLs in persisted messages with
+    // persistent data URLs generated from the restored uploadedFiles data.
+    // New messages already store data URLs (see handleSend), but sessions
+    // saved before this fix still have ephemeral blob: URLs that break on
+    // page refresh.
+    if (uploadedFiles?.length) {
+      const hasStaleBlobs = msgs.some(
+        (m) => m.id !== 'user-upload' && m.uploadedImageUrls?.some(u => u.startsWith('blob:')),
+      );
+      if (hasStaleBlobs) {
+        const freshDataUrls: string[] = [];
+        uploadedFiles.forEach(f => {
+          if (f.type === 'image') {
+            freshDataUrls.push(uint8ArrayToDataUrl(f.data, f.mimeType));
+          }
+        });
+        if (freshDataUrls.length > 0) {
+          msgs = msgs.map((msg) => {
+            if (msg.id === 'user-upload' || !msg.uploadedImageUrls?.length) return msg;
+            const needsRefresh = msg.uploadedImageUrls.some(u => u.startsWith('blob:'));
+            if (!needsRefresh) return msg;
+            // Replace stale blob URLs positionally from available data URLs
+            const refreshed = msg.uploadedImageUrls.map((url, i) =>
+              url.startsWith('blob:') && i < freshDataUrls.length ? freshDataUrls[i] : url,
+            );
+            return { ...msg, uploadedImageUrls: refreshed };
+          });
+        }
+      }
     }
 
     // Legacy: inject single imageUrl for old-style user-upload messages
