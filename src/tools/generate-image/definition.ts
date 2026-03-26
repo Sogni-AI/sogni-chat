@@ -40,12 +40,12 @@ VIDEO KEYFRAMES: When generating images intended as first+last frames for video 
         width: {
           type: 'number',
           description:
-            'Output image width in pixels. Must be a multiple of 16. Default: 1024. Max: 2048.',
+            'Output image width in pixels. Must be a multiple of 16. Default: 1024. Max: 2048. IMPORTANT: When the user specifies exact pixel dimensions (e.g., "1080x1920"), set width and height explicitly rather than relying solely on aspectRatio — this ensures the requested resolution is honored.',
         },
         height: {
           type: 'number',
           description:
-            'Output image height in pixels. Must be a multiple of 16. Default: 1024. Max: 2048.',
+            'Output image height in pixels. Must be a multiple of 16. Default: 1024. Max: 2048. IMPORTANT: When the user specifies exact pixel dimensions (e.g., "1080x1920"), set width and height explicitly rather than relying solely on aspectRatio — this ensures the requested resolution is honored.',
         },
         numberOfVariations: {
           type: 'number',
