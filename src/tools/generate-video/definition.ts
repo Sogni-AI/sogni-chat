@@ -11,7 +11,7 @@ export const definition: ToolDefinition = {
   function: {
     name: 'generate_video',
     description:
-      'Generate a video from text — no source image. LTX 2.3 generates audio natively (dialogue, sounds, music) — describe audio in the prompt. For animating an existing photo, use animate_photo. Do NOT use for My Personas — instead: resolve_personas → edit_image → animate_photo. If the request is vague, ask about vision/mood/style first. If an image exists, analyze it and suggest 2-3 tailored directions. Only call once you have clear creative intent.',
+      'Generate a video from text — no source image. LTX 2.3 generates audio natively (dialogue, sounds, ambient music) — describe audio in the prompt. For syncing video to a specific song or audio track, use sound_to_video instead. For animating an existing photo, use animate_photo. Do NOT use for My Personas — instead: resolve_personas → edit_image → animate_photo. If the request is vague, ask about vision/mood/style first. If an image exists, analyze it and suggest 2-3 tailored directions. Only call once you have clear creative intent.',
     parameters: {
       type: 'object',
       properties: {

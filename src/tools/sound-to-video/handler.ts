@@ -177,20 +177,21 @@ export async function execute(
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
   const aspectRatio = args.aspectRatio as string | undefined;
   const audioSourceIndex = args.audioSourceIndex as number | undefined;
+  const audioStart = Math.max(0, (args.audioStart as number) || 0);
   const sourceImageIndex = args.sourceImageIndex as number | undefined;
 
   // Determine if any image is available (uploaded or in context)
   const hasUploadedImage = context.uploadedFiles.some((f: UploadedFile) => f.type === 'image') || !!context.imageData;
 
-  // Auto-select model: if no model was explicitly chosen and no image is available,
-  // use ltx23-a2v (audio-only to video) instead of the default wan-s2v which requires an image.
-  let modelKey = explicitModel || 'wan-s2v';
-  if (!explicitModel && !hasUploadedImage) {
-    modelKey = 'ltx23-a2v';
-    console.log('[SOUND TO VIDEO] No image available, auto-selecting ltx23-a2v (audio-only to video)');
+  // Auto-select model: default to LTX 2.3 variants.
+  // With image → ltx23-ia2v (image+audio to video), without image → ltx23-a2v (audio-only to video).
+  let modelKey = explicitModel;
+  if (!modelKey) {
+    modelKey = hasUploadedImage ? 'ltx23-ia2v' : 'ltx23-a2v';
+    console.log(`[SOUND TO VIDEO] Auto-selecting ${modelKey} (${hasUploadedImage ? 'image available' : 'no image'})`);
   }
 
-  const config = S2V_MODELS[modelKey] ?? S2V_MODELS['wan-s2v'];
+  const config = S2V_MODELS[modelKey] ?? S2V_MODELS['ltx23-a2v'];
 
   // Locate the audio: first check uploaded files, then fall back to generated audio in resultUrls
   let audioData: Uint8Array;
@@ -311,6 +312,8 @@ export async function execute(
           referenceImageMime,
           referenceAudio: audioData,
           referenceAudioMime: audioMimeType,
+          audioStart: audioStart > 0 ? audioStart : undefined,
+          audioDuration: duration,
           width,
           height,
           frames,
@@ -377,6 +380,8 @@ interface S2VParams {
   referenceImageMime: string;
   referenceAudio: Uint8Array;
   referenceAudioMime: string;
+  audioStart?: number;
+  audioDuration?: number;
   width: number;
   height: number;
   frames: number;
@@ -427,6 +432,12 @@ async function runS2VGeneration(
 
   if (params.referenceImage) {
     projectParams.referenceImage = new Blob([params.referenceImage as BlobPart], { type: params.referenceImageMime || 'image/jpeg' });
+  }
+  if (params.audioStart !== undefined) {
+    projectParams.audioStart = params.audioStart;
+  }
+  if (params.audioDuration !== undefined) {
+    projectParams.audioDuration = params.audioDuration;
   }
   if (params.guidance !== undefined) {
     projectParams.guidance = params.guidance;

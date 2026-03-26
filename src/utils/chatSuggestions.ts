@@ -46,6 +46,19 @@ export const EDIT_INTENT_SUGGESTIONS: Suggestion[] = [
   { label: 'Change the angle', prompt: 'Change the viewing angle of this photo' },
 ];
 
+/** Suggestions shown when audio is uploaded without an image */
+const AUDIO_UPLOAD_SUGGESTIONS: Suggestion[] = [
+  { label: 'Turn this into a video', prompt: 'Turn this audio into a video' },
+  { label: 'Visualize this music', prompt: 'Create an audio-reactive visualization for this music' },
+  { label: 'Generate an image first', prompt: 'Generate an image to use as a reference frame for this audio' },
+];
+
+/** Suggestions shown when both audio and image are uploaded */
+const AUDIO_IMAGE_UPLOAD_SUGGESTIONS: Suggestion[] = [
+  { label: 'Turn this into a video', prompt: 'Turn this audio into a video using this image' },
+  { label: 'Visualize with this image', prompt: 'Create an audio-reactive video using this image as the starting frame' },
+];
+
 /** Suggestions shown when no image is uploaded — short prompts that trigger LLM conversation */
 const NO_IMAGE_SUGGESTIONS: Suggestion[] = [
   { label: 'Generate an image', prompt: 'Generate an image' },
@@ -118,9 +131,10 @@ const SUGGESTIONS_BY_TOOL: Record<ChatToolName, Suggestion[]> = {
     { label: 'Generate music for it', prompt: 'Compose background music for this video' },
   ],
   generate_music: [
+    { label: 'Turn this into a video', prompt: 'Turn that song into a video' },
+    { label: 'Video with an image', prompt: 'Turn that song into a video using this image' },
     { label: 'Try a different genre', prompt: 'Try a different genre' },
-    { label: 'Sync to video', prompt: 'Create a video synced to this music' },
-    { label: 'Adjust the tempo', prompt: 'Adjust the tempo' },
+    { label: 'Add lyrics', prompt: 'Generate a version with lyrics' },
   ],
   analyze_image: [
     { label: 'Read the text', prompt: 'Extract all visible text from this image' },
@@ -299,6 +313,7 @@ export function generateSuggestions(
   analysisSuggestions?: Suggestion[],
   hasImage?: boolean,
   hasPersonas?: boolean,
+  hasAudio?: boolean,
 ): Suggestion[] {
   // Walk backwards to find the last assistant message with a completed tool
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -330,13 +345,17 @@ export function generateSuggestions(
   const midConversation = getMidConversationSuggestions(messages);
   if (midConversation) return midConversation;
 
-  // Fallback: show image-upload suggestions or text-only creation suggestions
+  // Fallback: show contextual suggestions based on what files are uploaded
   if (messages.length > 0 && messages[0].role === 'assistant') {
+    if (hasAudio && hasImage) return AUDIO_IMAGE_UPLOAD_SUGGESTIONS;
+    if (hasAudio) return AUDIO_UPLOAD_SUGGESTIONS;
     if (hasImage) return WELCOME_SUGGESTIONS;
     if (hasPersonas === false) return NO_PERSONAS_SUGGESTIONS;
     return NO_IMAGE_SUGGESTIONS;
   }
 
+  if (hasAudio && hasImage) return AUDIO_IMAGE_UPLOAD_SUGGESTIONS;
+  if (hasAudio) return AUDIO_UPLOAD_SUGGESTIONS;
   if (hasImage === false) {
     return hasPersonas === false ? NO_PERSONAS_SUGGESTIONS : NO_IMAGE_SUGGESTIONS;
   }

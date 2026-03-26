@@ -246,6 +246,8 @@ export function ChatPanel({
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
 
+  const hasAudio = !!(uploadedFiles && uploadedFiles.some(f => f.type === 'audio'));
+
   // Wrap acceptModelSwitch to also update the header model selector
   const handleAcceptModelSwitch = useCallback(() => {
     // Pick the unrestricted variant that matches the current think setting
@@ -271,9 +273,9 @@ export function ChatPanel({
         }
       }
 
-      return generateSuggestions(messages, analysisSuggestions, !!imageData, hasPersonas);
+      return generateSuggestions(messages, analysisSuggestions, !!imageData, hasPersonas, hasAudio);
     },
-    [messages, isLoading, analysisSuggestions, imageData, uploadIntent, hasPersonas],
+    [messages, isLoading, analysisSuggestions, imageData, uploadIntent, hasPersonas, hasAudio],
   );
 
   // Smart auto-scroll

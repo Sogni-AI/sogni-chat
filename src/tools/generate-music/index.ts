@@ -9,9 +9,9 @@ import { execute } from './handler';
 import type { ToolSuggestion } from '../types';
 
 const suggestions: ToolSuggestion[] = [
+  { label: 'Turn this into a video', prompt: 'Turn that song into a video' },
   { label: 'Try a different genre', prompt: 'Generate a different genre of music' },
   { label: 'Make it longer', prompt: 'Generate a longer version of this track' },
-  { label: 'Add lyrics', prompt: 'Generate a version with lyrics' },
 ];
 
 toolRegistry.register({ definition, execute, suggestions });
