@@ -323,17 +323,16 @@ export async function saveVideoToGallery(
     projectId = crypto.randomUUID();
     const sourceImageId = crypto.randomUUID();
 
-    // Save source image if provided
-    if (sourceImageBlob) {
-      await saveSourceImage({
-        id: sourceImageId,
-        blob: sourceImageBlob,
-        filename: `source-${Date.now()}.jpg`,
-        width: sourceWidth || 0,
-        height: sourceHeight || 0,
-        mimeType: 'image/jpeg',
-      });
-    }
+    // Save source image (use provided blob or create a placeholder so
+    // getProjectDetail can always resolve the sourceImageId)
+    await saveSourceImage({
+      id: sourceImageId,
+      blob: sourceImageBlob || new Blob([], { type: 'video/mp4' }),
+      filename: sourceImageBlob ? `source-${Date.now()}.jpg` : `video-placeholder-${Date.now()}.mp4`,
+      width: sourceWidth || 0,
+      height: sourceHeight || 0,
+      mimeType: sourceImageBlob ? 'image/jpeg' : 'video/mp4',
+    });
 
     const dateStr = new Date(now).toLocaleDateString('en-US', {
       month: 'short',

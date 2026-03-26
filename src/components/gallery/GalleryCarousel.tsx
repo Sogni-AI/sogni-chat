@@ -81,15 +81,17 @@ export default function GalleryCarousel({
         const newSlides: SlideItem[] = [];
         const urls: string[] = [];
 
-        // Source image
-        const srcUrl = URL.createObjectURL(result.sourceImage.blob);
-        urls.push(srcUrl);
-        newSlides.push({
-          type: 'source',
-          url: srcUrl,
-          mediaType: 'image',
-          label: 'Original',
-        });
+        // Source image (skip placeholder blobs that have no real content)
+        if (result.sourceImage.blob.size > 0) {
+          const srcUrl = URL.createObjectURL(result.sourceImage.blob);
+          urls.push(srcUrl);
+          newSlides.push({
+            type: 'source',
+            url: srcUrl,
+            mediaType: 'image',
+            label: 'Original',
+          });
+        }
 
         // Result images/videos
         for (const img of result.images) {

@@ -169,12 +169,18 @@ export function useGallery(): UseGalleryReturn {
         getSourceImage(project.sourceImageId),
       ]);
 
-      if (!sourceImage) {
-        console.error('[GALLERY] Source image not found for project:', projectId);
-        return null;
-      }
+      // Use a placeholder when the source image is missing (e.g. older
+      // stitched-video projects that were saved without a source blob).
+      const resolvedSourceImage = sourceImage || {
+        id: project.sourceImageId,
+        blob: new Blob([], { type: 'video/mp4' }),
+        filename: 'placeholder',
+        width: 0,
+        height: 0,
+        mimeType: 'video/mp4',
+      };
 
-      return { project, sourceImage, images };
+      return { project, sourceImage: resolvedSourceImage, images };
     } catch (error) {
       console.error('[GALLERY] Failed to get project detail:', error);
       return null;
