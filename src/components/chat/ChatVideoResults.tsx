@@ -251,7 +251,9 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
         borderRadius: isFs ? 0 : 'var(--radius-md)',
         ...(isFs
           ? { background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }
-          : {}
+          : placeholderSize
+            ? { width: placeholderSize.width, maxWidth: '100%' }
+            : {}
         ),
       }}
     >
