@@ -93,6 +93,14 @@ export async function executePipeline(
       const promises = Array.from({ length: step.count }, (_, i) => {
         const args = step.buildArgs(state, i);
 
+        // Create a signal-isolated context for each concurrent invocation.
+        // toolRegistry.execute() mutates context.signal (save/restore pattern)
+        // which corrupts the signal for other concurrent calls sharing the same
+        // context object. Object.create gives each invocation its own signal
+        // property while preserving access to shared getters (resultUrls, etc.)
+        // via the prototype chain.
+        const invocationContext = Object.create(context) as ToolExecutionContext;
+
         const wrappedCallbacks: ToolCallbacks = {
           onToolProgress: (progress) => {
             // Suppress sub-tool 'started' events — we already emitted one above
@@ -144,7 +152,7 @@ export async function executePipeline(
           onGallerySaved: undefined,
         };
 
-        return toolRegistry.execute(step.toolName!, args, context, wrappedCallbacks)
+        return toolRegistry.execute(step.toolName!, args, invocationContext, wrappedCallbacks)
           .then((rawResult) => {
             slotResults[i].rawResult = rawResult;
 

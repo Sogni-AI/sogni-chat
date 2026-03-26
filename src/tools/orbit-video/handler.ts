@@ -186,9 +186,6 @@ export async function execute(
     },
     steps: [
       // Step 1: Generate 3 angle views (original image is the front view)
-      // Ordering guarantee: the pipeline's concurrent path uses pre-allocated
-      // slotResults[i] indexed by invocation order, so results preserve the
-      // [right, back, left] sequence regardless of completion order.
       {
         label: 'Generating angle views',
         toolName: 'change_angle',
