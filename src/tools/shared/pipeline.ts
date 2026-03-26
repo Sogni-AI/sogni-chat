@@ -109,6 +109,12 @@ export async function executePipeline(
               // accumulate intermediate artifacts (e.g. transition clips) in the
               // final message's videoResults, breaking gallery ID index alignment.
               videoResultUrls: undefined,
+              // Strip sub-tool sourceImageUrl — each concurrent sub-tool has its own
+              // source image (e.g. orbit transitions use different angle views).
+              // Forwarding these would cause the top-level placeholder to rapidly
+              // alternate between images on every progress event. The parent tool's
+              // 'started' event sets the stable placeholder for all slots.
+              sourceImageUrl: undefined,
             });
           },
           onToolComplete: (_toolName, resultUrls, videoResultUrls) => {

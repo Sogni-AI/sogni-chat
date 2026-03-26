@@ -156,20 +156,21 @@ export async function execute(
     if (!preflight.ok) return preflight.errorJson;
   }
 
+  // Resolve source image URL before emitting 'started' so the UI has a stable placeholder
+  const sourceImageUrl = (effectiveSourceIndex !== undefined && context.resultUrls[effectiveSourceIndex]) || undefined;
+
   callbacks.onToolProgress({
     type: 'started',
     toolName: 'orbit_video',
     totalCount: 1,
     estimatedCost: estimatedCost > 0 ? estimatedCost : undefined,
+    sourceImageUrl,
     stepLabel: 'Preparing orbit',
   });
 
   // ---------------------------------------------------------------------------
   // Build pipeline
   // ---------------------------------------------------------------------------
-
-  // Store the source image URL in the initial state data so we can reference it
-  const sourceImageUrl = (effectiveSourceIndex !== undefined && context.resultUrls[effectiveSourceIndex]) || undefined;
 
   const pipelineConfig: PipelineConfig = {
     parentToolName: 'orbit_video',
