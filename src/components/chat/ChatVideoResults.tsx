@@ -102,7 +102,11 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
             return;
           }
         }
+        // Auto-play allowed — stay muted so the preview plays silently
+        pauseOtherVideos(el);
+        return;
       }
+      // User-initiated play: pause others, unmute, notify parent
       pauseOtherVideos(el);
       if (el.muted) el.muted = false;
       onPlayRef.current?.();
@@ -284,6 +288,7 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
       <video
         ref={videoRef}
         src={src}
+        autoPlay
         loop
         muted
         playsInline

@@ -66,7 +66,11 @@ function ProgressVideo({ src, aspectRatio }: { src: string; aspectRatio?: string
             return;
           }
         }
+        // Auto-play allowed — stay muted so the preview plays silently
+        pauseOtherVideos(el);
+        return;
       }
+      // User-initiated play: pause others and unmute
       pauseOtherVideos(el);
       if (el.muted) el.muted = false;
     };
@@ -192,6 +196,7 @@ function ProgressVideo({ src, aspectRatio }: { src: string; aspectRatio?: string
       <video
         ref={videoRef}
         src={src}
+        autoPlay
         loop
         muted
         playsInline
