@@ -5,11 +5,15 @@ export const definition: ToolDefinition = {
   function: {
     name: 'orbit_video',
     description:
-      'Create a 360-degree orbit video around a subject by generating multiple ' +
-      'camera angles and animating transitions between them. Produces a seamless ' +
-      'looping video that pans around the subject. Use when the user asks for a ' +
-      '"360 pan", "orbit", "rotate around", "spin around", or "turntable" view. ' +
-      'IMPORTANT: Requires a source image \u2014 either uploaded or previously generated.',
+      'Create a 360-degree orbit video around a subject. This is a SELF-CONTAINED ' +
+      'pipeline — it automatically generates angle views (via change_angle), creates ' +
+      'transition video clips, and stitches them into one seamless looping video. ' +
+      'You only need ONE source image as the front view — either an uploaded image ' +
+      'or a previously generated result. If the user uploaded an image, call this ' +
+      'tool directly without generating anything first. Do NOT pre-generate multiple ' +
+      'angles or variations — this tool handles everything internally. ' +
+      'Use when the user asks for a "360 pan", "orbit", "rotate around", "spin ' +
+      'around", or "turntable" view.',
     parameters: {
       type: 'object',
       properties: {
