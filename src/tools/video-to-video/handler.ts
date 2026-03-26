@@ -332,7 +332,9 @@ async function runV2VGeneration(
   if (sessionId) void projectSessionMap.register(project.id, sessionId);
 
   return new Promise<string[]>((resolve, reject) => {
-    const resultUrls: string[] = [];
+    // Pre-allocate slots so results land at their original jobIndex position
+    // regardless of which job finishes first (dePIN network order varies).
+    const resultUrls: (string | null)[] = new Array(params.numberOfMedia).fill(null);
     let completedCount = 0;
     let failedCount = 0;
     const totalJobs = params.numberOfMedia;
@@ -367,7 +369,7 @@ async function runV2VGeneration(
         if (failedCount === totalJobs) {
           reject(new Error(`All ${totalJobs} video-to-video jobs failed`));
         } else {
-          resolve(resultUrls.filter(Boolean));
+          resolve(resultUrls.filter((url): url is string => url !== null));
         }
       }
     };
@@ -406,7 +408,15 @@ async function runV2VGeneration(
           if (!event.jobId) return;
           const resultUrl = event.resultUrl as string | undefined;
           if (resultUrl && !event.error) {
-            resultUrls.push(resultUrl);
+            const jobIndex = jobIdToIndex.get(event.jobId as string);
+            if (jobIndex !== undefined && jobIndex >= 0 && jobIndex < resultUrls.length) {
+              resultUrls[jobIndex] = resultUrl;
+            } else {
+              const emptySlot = resultUrls.indexOf(null);
+              if (emptySlot !== -1) {
+                resultUrls[emptySlot] = resultUrl;
+              }
+            }
             completedCount++;
             onProgress({ completed: completedCount >= totalJobs, completedCount, jobIndex: jobIdToIndex.get(event.jobId as string), resultUrl, progress: 1 });
           } else {
