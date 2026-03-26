@@ -181,6 +181,7 @@ export async function execute(
         sourceImageUrl,
         sourceWidth,
         sourceHeight,
+        angleResultIndices: [] as number[],
       },
     },
     steps: [
@@ -202,15 +203,49 @@ export async function execute(
           const angleImageUrls = results
             .flatMap(r => r.imageUrls)
             .filter(Boolean);
-          // Verify we got exactly the expected count to prevent misalignment
+
+          // Hard-fail if any angle is missing — a partial orbit produces visible
+          // jump cuts that are worse than no result at all.
           if (angleImageUrls.length !== GENERATED_AZIMUTHS.length) {
-            console.warn(`[ORBIT] Expected ${GENERATED_AZIMUTHS.length} angle images but got ${angleImageUrls.length} — transitions may be misaligned`);
+            throw new Error(
+              `Orbit requires ${GENERATED_AZIMUTHS.length} angle views but only ${angleImageUrls.length} were generated. ` +
+              `Cannot produce a seamless 360° orbit video with missing angles.`,
+            );
           }
           console.log(`[ORBIT] Collected ${angleImageUrls.length} angle images (slot-ordered: right, back, left)`);
+
+          // Verify each angle URL is present in context.resultUrls (the pipeline's
+          // onToolComplete should have pushed them, but race conditions or dedup
+          // guards can cause misses). Push any missing URLs and log a warning.
+          for (let i = 0; i < angleImageUrls.length; i++) {
+            if (!context.resultUrls.includes(angleImageUrls[i])) {
+              console.warn(`[ORBIT] Angle image "${GENERATED_AZIMUTHS[i]}" URL missing from context.resultUrls — pushing manually`);
+              context.resultUrls.push(angleImageUrls[i]);
+            }
+          }
+
+          // Pre-compute context.resultUrls indices for each angle image.
+          // Full angle sequence for transitions: [source/front, right, back, left]
+          // Index 0 = source image (effectiveSourceIndex or -1 for original upload)
+          // Indices 1..3 = generated angle images in GENERATED_AZIMUTHS order
+          const sourceIdx = effectiveSourceIndex ?? -1;
+          const angleResultIndices = [
+            sourceIdx,
+            ...angleImageUrls.map((url, i) => {
+              const idx = context.resultUrls.indexOf(url);
+              if (idx === -1) {
+                // Should never happen after the push above, but guard defensively
+                console.error(`[ORBIT] BUG: Angle image "${GENERATED_AZIMUTHS[i]}" not found in context.resultUrls after manual push`);
+              }
+              return idx;
+            }),
+          ];
+          console.log(`[ORBIT] Pre-computed angleResultIndices: [${angleResultIndices.join(', ')}] (source, right, back, left)`);
+
           return {
             ...state,
             imageUrls: angleImageUrls,
-            data: { ...state.data, angleImageUrls },
+            data: { ...state.data, angleImageUrls, angleResultIndices },
           };
         },
       },
@@ -226,37 +261,22 @@ export async function execute(
         count: TRANSITION_COUNT,
         concurrent: true,
         buildArgs: (state, index) => {
-          const angleImageUrls = state.data.angleImageUrls as string[];
-          // Full sequence: [original, right, back, left] — original is at effectiveSourceIndex
-          // Transition i connects sequence[i] → sequence[(i+1) % 4]
-          const sourceIndex = effectiveSourceIndex ?? -1;
+          // angleResultIndices is a 4-element array: [source, right, back, left]
+          // representing pre-computed context.resultUrls indices for each angle.
+          // Transition i connects angleResultIndices[i] → angleResultIndices[(i+1) % 4].
+          const angleResultIndices = state.data.angleResultIndices as number[];
 
-          // Map transition index to start/end image indices in context.resultUrls.
-          // Uses indexOf() by URL value so the lookup is correct regardless of
-          // the order images were pushed into context.resultUrls.
-          let startIdx: number;
-          let endIdx: number;
+          const startIdx = angleResultIndices[index];
+          const endIdx = angleResultIndices[(index + 1) % TRANSITION_COUNT];
 
-          if (index === 0) {
-            // original → right
-            startIdx = sourceIndex;
-            endIdx = context.resultUrls.indexOf(angleImageUrls[0]);
-          } else if (index === TRANSITION_COUNT - 1) {
-            // left → original (wrap-around)
-            startIdx = context.resultUrls.indexOf(angleImageUrls[angleImageUrls.length - 1]);
-            endIdx = sourceIndex;
-          } else {
-            // right → back, back → left
-            startIdx = context.resultUrls.indexOf(angleImageUrls[index - 1]);
-            endIdx = context.resultUrls.indexOf(angleImageUrls[index]);
+          // Validate: -1 is only legitimate for the source/front image (index 0
+          // in the sequence) when the user's original upload is the source.
+          // For generated angles (indices 1-3), -1 means the URL was lost.
+          if (startIdx === -1 && index !== 0) {
+            console.error(`[ORBIT] BUG: Pre-computed startIdx is -1 for transition ${index} (${TRANSITION_LABELS[index]}) — angle image URL was not resolved`);
           }
-
-          // For middle transitions (index 1, 2), -1 from indexOf means the angle
-          // image URL was not found — animate_photo would silently fall back to the
-          // original upload, producing a wrong transition. Edge transitions (0, 3)
-          // legitimately use -1 to mean "use the original uploaded image".
-          if (index > 0 && index < TRANSITION_COUNT - 1 && (startIdx === -1 || endIdx === -1)) {
-            console.error(`[ORBIT] Failed to resolve angle image for transition ${index} (${TRANSITION_LABELS[index]}): start=${startIdx}, end=${endIdx}`);
+          if (endIdx === -1 && index !== TRANSITION_COUNT - 1) {
+            console.error(`[ORBIT] BUG: Pre-computed endIdx is -1 for transition ${index} (${TRANSITION_LABELS[index]}) — angle image URL was not resolved`);
           }
           console.log(`[ORBIT] Transition ${index} (${TRANSITION_LABELS[index]}): sourceImageIndex=${startIdx}, endImageIndex=${endIdx}`);
 

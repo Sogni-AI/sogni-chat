@@ -126,8 +126,10 @@ export async function executePipeline(
             };
             // Push result URLs into context arrays so subsequent pipeline steps
             // can resolve them by index (e.g., orbit Step 2 finding Step 1 images).
-            // context.resultUrls / context.videoResultUrls are array references
-            // backed by refs in useChat, so push() mutates the backing store.
+            // context.resultUrls is a getter backed by a ref in useChat. push()
+            // mutates the current backing array, but progress handlers may replace
+            // the ref with a new array. Orbit's collectResults verifies URLs are
+            // present before computing indices to guard against this.
             for (const url of (resultUrls || [])) {
               if (!context.resultUrls.includes(url)) context.resultUrls.push(url);
             }
