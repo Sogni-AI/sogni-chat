@@ -60,6 +60,55 @@ export function needsCreativeRefinement(prompt: string, duration: number): boole
 }
 
 // ---------------------------------------------------------------------------
+// Dialogue duration estimation
+// ---------------------------------------------------------------------------
+
+/** Words per second for cinematic dialogue delivery (slower pace with room for pauses) */
+const WORDS_PER_SECOND = 2.5;
+
+/** Seconds added per acting beat between dialogue lines */
+const BEAT_BUFFER_SECONDS = 1.0;
+
+/** Patterns that indicate an acting beat between dialogue segments */
+const BEAT_PATTERNS = /\b(pauses?|looks?\s+(?:away|down|up|back)|glances?\s+(?:away|down|up|back)|takes?\s+a\s+breath|exhales?|inhales?|swallows?|blinks?|sighs?|hesitates?|trails?\s+off|shifts?|turns?\s+(?:away|back|around)|leans?\s+(?:in|back|forward)|nods?|shakes?\s+(?:head|their\s+head)|tilts?\s+(?:head|their\s+head)|clenches?\s+(?:jaw|fist)|tightens?|narrows?\s+(?:eyes|their\s+eyes))\b/gi;
+
+interface DialogueDurationEstimate {
+  totalWords: number;
+  beatCount: number;
+  requiredSeconds: number;
+  dialogueSegments: string[];
+}
+
+/**
+ * Extract quoted dialogue from a prompt and estimate how long it takes to deliver.
+ * Returns word count, beat count, and required duration in seconds.
+ */
+export function estimateDialogueDuration(prompt: string): DialogueDurationEstimate {
+  // Extract all double-quoted strings (the standard dialogue format in video prompts)
+  const dialogueSegments: string[] = [];
+  const quoteRegex = /"([^"]{2,})"/g;
+  let match;
+  while ((match = quoteRegex.exec(prompt)) !== null) {
+    dialogueSegments.push(match[1]);
+  }
+
+  if (dialogueSegments.length === 0) {
+    return { totalWords: 0, beatCount: 0, requiredSeconds: 0, dialogueSegments: [] };
+  }
+
+  const totalWords = dialogueSegments.reduce((sum, seg) => sum + seg.split(/\s+/).filter(Boolean).length, 0);
+
+  // Count acting beats in the text between dialogue segments
+  const beatMatches = prompt.match(BEAT_PATTERNS);
+  const beatCount = beatMatches ? beatMatches.length : 0;
+
+  const requiredSeconds = (totalWords / WORDS_PER_SECOND) + (beatCount * BEAT_BUFFER_SECONDS);
+
+  return { totalWords, beatCount, requiredSeconds, dialogueSegments };
+}
+
+
+// ---------------------------------------------------------------------------
 // Refinement
 // ---------------------------------------------------------------------------
 
@@ -75,6 +124,11 @@ export function needsCreativeRefinement(prompt: string, duration: number): boole
  *
  * @param logPrefix - Console log prefix, e.g. "[GENERATE VIDEO]" or "[ANIMATE]"
  */
+export interface RefinementResult {
+  refinedPrompt: string;
+  suggestedDuration?: number;
+}
+
 export async function refineVideoPrompt(
   sogniClient: SogniClient,
   prompt: string,
@@ -86,10 +140,12 @@ export async function refineVideoPrompt(
   isI2V = false,
   /** Vision-generated scene description of the source image (I2V only). Passed so the refinement LLM can anchor character names to visible details. */
   sceneDescription = '',
-): Promise<string> {
+  /** Whether the LLM explicitly passed a duration arg (vs. handler default). Controls extend-vs-trim behavior. */
+  explicitDuration = false,
+): Promise<RefinementResult> {
   if (signal?.aborted) {
     console.log('[VIDEO REFINEMENT] Skipping refinement — signal already aborted');
-    return prompt;
+    return { refinedPrompt: prompt };
   }
 
   try {
@@ -167,6 +223,7 @@ Return ONLY the refined prompt. No explanation, no commentary, no preamble.`,
     let insideThink = false;
     let insideToolCall = false;
     for await (const chunk of stream) {
+      if (signal?.aborted) break;
       if (chunk.content) {
         const { cleaned, insideThink: stillThink, insideToolCall: stillToolCall } = stripThinkBlocks(chunk.content, insideThink, insideToolCall);
         insideThink = stillThink;
@@ -176,15 +233,128 @@ Return ONLY the refined prompt. No explanation, no commentary, no preamble.`,
     }
 
     refined = refined.trim();
-    if (refined.length > 50) {
-      console.log(`${logPrefix} Prompt refined (${refined.length} chars):`, refined);
-      return refined;
+    if (refined.length <= 50) {
+      console.warn(`${logPrefix} Refinement too short (${refined.length} chars), using original`);
+      return { refinedPrompt: prompt };
     }
 
-    console.warn(`${logPrefix} Refinement too short (${refined.length} chars), using original`);
-    return prompt;
+    console.log(`${logPrefix} Prompt refined (${refined.length} chars):`, refined);
+
+    // Post-refinement dialogue duration validation
+    return validateDialogueDuration(
+      sogniClient, refined, duration, tokenType, logPrefix, signal, explicitDuration,
+    );
   } catch (err) {
     console.error(`${logPrefix} Prompt refinement failed, using original:`, err);
-    return prompt;
+    return { refinedPrompt: prompt };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Post-refinement dialogue duration validation
+// ---------------------------------------------------------------------------
+
+/**
+ * After refinement, check if dialogue fits within the clip duration.
+ * - If dialogue fits: return as-is.
+ * - If duration is flexible (default was used): extend duration up to 20s.
+ * - If duration is explicit or dialogue exceeds 20s: trim dialogue via LLM.
+ */
+async function validateDialogueDuration(
+  sogniClient: SogniClient,
+  refinedPrompt: string,
+  duration: number,
+  tokenType: TokenType,
+  logPrefix: string,
+  signal?: AbortSignal,
+  explicitDuration = false,
+): Promise<RefinementResult> {
+  const estimate = estimateDialogueDuration(refinedPrompt);
+
+  if (estimate.totalWords === 0) {
+    console.log(`${logPrefix} No dialogue detected — no duration adjustment needed`);
+    return { refinedPrompt };
+  }
+
+  console.log(`${logPrefix} Dialogue estimated at ${estimate.requiredSeconds.toFixed(1)}s for ${duration}s clip (${estimate.totalWords} words, ${estimate.beatCount} beats)`);
+
+  // Dialogue fits within the clip duration
+  if (estimate.requiredSeconds <= duration) {
+    console.log(`${logPrefix} Dialogue fits within ${duration}s clip — no adjustment needed`);
+    return { refinedPrompt };
+  }
+
+  // Duration is flexible (LLM used default) — extend it
+  if (!explicitDuration) {
+    const suggestedDuration = Math.min(Math.ceil(estimate.requiredSeconds), 20);
+    if (suggestedDuration <= 20 && estimate.requiredSeconds <= 20) {
+      console.log(`${logPrefix} Extending duration from ${duration}s to ${suggestedDuration}s (default duration, flexible)`);
+      return { refinedPrompt, suggestedDuration };
+    }
+    // Falls through to trimming if dialogue exceeds 20s even after extension
+  }
+
+  // Duration is explicit OR dialogue exceeds 20s cap — trim dialogue via LLM
+  console.log(`${logPrefix} Trimming dialogue to fit ${explicitDuration ? duration : 20}s clip (${explicitDuration ? 'explicit duration' : 'exceeds 20s cap'})`);
+
+  const targetDuration = explicitDuration ? duration : 20;
+  const maxWords = Math.floor(targetDuration * WORDS_PER_SECOND);
+
+  try {
+    const trimMessages: ChatMessage[] = [
+      {
+        role: 'system',
+        content: `You are editing a video prompt to fit a time constraint. The dialogue in this prompt requires ~${estimate.requiredSeconds.toFixed(1)} seconds but the clip is only ${targetDuration} seconds. Condense the quoted dialogue to fit within ${targetDuration}s at 2.5 words/second (~${maxWords} words max across all dialogue). Preserve meaning, keep acting beats minimal, and maintain the prompt structure. Return ONLY the revised prompt. No explanation.`,
+      },
+      {
+        role: 'user',
+        content: refinedPrompt,
+      },
+    ];
+
+    const stream = await sogniClient.chat.completions.create({
+      model: CHAT_MODEL,
+      messages: trimMessages,
+      stream: true,
+      tokenType,
+      temperature: 0.5,
+      max_tokens: 8192,
+      think: true,
+    });
+
+    let trimmed = '';
+    let insideThink = false;
+    let insideToolCall = false;
+    for await (const chunk of stream) {
+      if (signal?.aborted) break;
+      if (chunk.content) {
+        const { cleaned, insideThink: stillThink, insideToolCall: stillToolCall } = stripThinkBlocks(chunk.content, insideThink, insideToolCall);
+        insideThink = stillThink;
+        insideToolCall = stillToolCall;
+        if (cleaned) trimmed += cleaned;
+      }
+    }
+
+    trimmed = trimmed.trim();
+    if (trimmed.length > 50) {
+      const postTrimEstimate = estimateDialogueDuration(trimmed);
+      console.log(`${logPrefix} Post-trim dialogue: ${postTrimEstimate.requiredSeconds.toFixed(1)}s (${postTrimEstimate.totalWords} words, ${postTrimEstimate.beatCount} beats)`);
+      return {
+        refinedPrompt: trimmed,
+        ...(!explicitDuration ? { suggestedDuration: 20 } : {}),
+      };
+    }
+
+    console.warn(`${logPrefix} Dialogue trim too short (${trimmed.length} chars), using original refined prompt`);
+    return {
+      refinedPrompt,
+      ...(!explicitDuration ? { suggestedDuration: Math.min(Math.ceil(estimate.requiredSeconds), 20) } : {}),
+    };
+  } catch (err) {
+    console.error(`${logPrefix} Dialogue trimming failed, using original refined prompt:`, err);
+    return {
+      refinedPrompt,
+      ...(!explicitDuration ? { suggestedDuration: Math.min(Math.ceil(estimate.requiredSeconds), 20) } : {}),
+    };
   }
 }

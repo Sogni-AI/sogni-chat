@@ -164,7 +164,8 @@ export async function execute(
   const prompt = args.prompt as string;
   const rawModelKey = (args.videoModel as string) || 'ltx23';
   const modelKey = T2V_MODELS[rawModelKey] ? rawModelKey : 'ltx23';
-  const duration = Math.max(2, Math.min(20, (args.duration as number) || 5));
+  let duration = Math.max(2, Math.min(20, (args.duration as number) || 5));
+  const explicitDuration = args.duration !== undefined;
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
   const aspectRatio = args.aspectRatio as string | undefined;
 
@@ -188,18 +189,17 @@ export async function execute(
     config,
     targetResolution,
   );
-  const frames = computeFrames(duration, config);
   const fps = config.defaultFps;
   const steps = config.defaultSteps;
 
   const videoAspectRatio = `${width} / ${height}`;
-  const mediaLabel = `${config.name} — ${duration}s @ ${width}x${height}`;
 
   // Creative prompt refinement: expand shallow/intent-level prompts
   // into detailed, production-quality video prompts with actual dialogue,
   // character descriptions, scene staging, and sensory detail.
   let composedPrompt = prompt;
   if (isLTX && needsCreativeRefinement(prompt, duration)) {
+    const mediaLabel = `${config.name} — ${duration}s @ ${width}x${height}`;
     callbacks.onToolProgress({
       type: 'started',
       toolName: 'generate_video',
@@ -208,12 +208,20 @@ export async function execute(
       videoAspectRatio,
       modelName: mediaLabel,
     });
-    composedPrompt = await withTimeout(
-      refineVideoPrompt(context.sogniClient, prompt, duration, context.tokenType, '[GENERATE VIDEO]', context.signal),
+    const refinementResult = await withTimeout(
+      refineVideoPrompt(context.sogniClient, prompt, duration, context.tokenType, '[GENERATE VIDEO]', context.signal, false, '', explicitDuration),
       LLM_THINKING_TIMEOUT_MS,
       'Video prompt refinement',
-    ) ?? prompt;
+    );
+    composedPrompt = refinementResult?.refinedPrompt ?? prompt;
+    if (refinementResult?.suggestedDuration) {
+      duration = refinementResult.suggestedDuration;
+    }
   }
+
+  // Compute frames AFTER refinement — duration may have been adjusted for dialogue fitting
+  const frames = computeFrames(duration, config);
+  const mediaLabel = `${config.name} — ${duration}s @ ${width}x${height}`;
 
   // Cost estimation & pre-flight
   const originalToken = context.tokenType;

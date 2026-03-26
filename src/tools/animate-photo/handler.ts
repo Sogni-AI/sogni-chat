@@ -115,7 +115,8 @@ export async function execute(
 ): Promise<string> {
   const prompt = args.prompt as string;
   const rawSourceIndex = args.sourceImageIndex as number | undefined;
-  const duration = Math.max(2, Math.min(20, (args.duration as number) || 5));
+  let duration = Math.max(2, Math.min(20, (args.duration as number) || 5));
+  const explicitDuration = args.duration !== undefined;
   const rawVideoModel = (args.videoModel as string) || 'ltx23';
   const validVideoModels: VideoModelId[] = ['ltx23', 'wan22'];
   const videoModelId: VideoModelId = validVideoModels.includes(rawVideoModel as VideoModelId)
@@ -256,7 +257,7 @@ export async function execute(
   // Pre-compute video dimensions for aspect ratio (used in all progress callbacks)
   const { width: vidW, height: vidH } = calculateVideoDimensions(sourceWidth, sourceHeight, targetResolution, videoModelId, aspectRatio);
   const videoAspectRatio = `${vidW} / ${vidH}`;
-  const mediaLabel = `${isLTX ? 'LTX 2.3' : 'WAN 2.2'} — ${duration}s @ ${vidW}x${vidH}`;
+  let mediaLabel = `${isLTX ? 'LTX 2.3' : 'WAN 2.2'} — ${duration}s @ ${vidW}x${vidH}`;
 
   // Compose the final video prompt based on model
   let composedPrompt: string;
@@ -290,11 +291,16 @@ export async function execute(
         videoAspectRatio,
         modelName: mediaLabel,
       });
-      refinedPrompt = await withTimeout(
-        refineVideoPrompt(context.sogniClient, prompt, duration, context.tokenType, '[ANIMATE]', context.signal, true, sceneDescription),
+      const refinementResult = await withTimeout(
+        refineVideoPrompt(context.sogniClient, prompt, duration, context.tokenType, '[ANIMATE]', context.signal, true, sceneDescription, explicitDuration),
         LLM_THINKING_TIMEOUT_MS,
         'Video prompt refinement',
-      ) ?? prompt;
+      );
+      refinedPrompt = refinementResult?.refinedPrompt ?? prompt;
+      if (refinementResult?.suggestedDuration) {
+        duration = refinementResult.suggestedDuration;
+        mediaLabel = `${isLTX ? 'LTX 2.3' : 'WAN 2.2'} — ${duration}s @ ${vidW}x${vidH}`;
+      }
     }
 
     if (frameRole === 'end') {

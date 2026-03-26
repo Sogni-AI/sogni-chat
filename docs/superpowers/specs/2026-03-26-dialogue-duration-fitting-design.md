@@ -64,10 +64,11 @@ Added to `refineVideoPrompt()` after the thinking-mode LLM returns the refined p
 
 ### 4. Handler Integration
 
-In `generate-video/handler.ts`, `animate-photo/handler.ts`, and `sound-to-video/handler.ts`:
+In `generate-video/handler.ts` and `animate-photo/handler.ts`:
 
 - Destructure `{ refinedPrompt, suggestedDuration }` from `refineVideoPrompt()`
 - Use `suggestedDuration ?? duration` for frame calculation
+- No changes to `sound-to-video` (audio track drives duration, no prompt refinement layer)
 - No changes to `video-to-video` (transforms existing video, no dialogue generation)
 - No changes to `stitch-video` (concatenation only)
 - No changes to frame calculation logic (already accepts duration as input)
@@ -92,7 +93,6 @@ No user-facing messages. Adjustments happen transparently inside the refinement 
 | `src/tools/shared/videoPromptRefinement.ts` | Add `estimateDialogueDuration()`, `wasExplicitDuration()`, post-refinement validation, change return type |
 | `src/tools/generate-video/handler.ts` | Destructure `suggestedDuration`, use for frame calc |
 | `src/tools/animate-photo/handler.ts` | Destructure `suggestedDuration`, use for frame calc |
-| `src/tools/sound-to-video/handler.ts` | Destructure `suggestedDuration`, use for frame calc |
 
 ## Not Changed
 
