@@ -127,6 +127,12 @@ export async function execute(
   const frameRole = (args.frameRole as 'start' | 'end' | 'both' | undefined) ?? 'start';
   const rawEndImageIndex = args.endImageIndex as number | undefined;
   const isLTX = videoModelId.startsWith('ltx');
+  // When called from a pipeline (e.g. orbit_video) that has already crafted a
+  // precise prompt with directional/motion language, skip vision description,
+  // creative refinement, and the "A cinematic scene of" prefix. Both keyframes
+  // are provided so the model has visual context; the prompt just needs to
+  // specify the motion.
+  const skipPromptProcessing = !!args.skipPromptProcessing;
 
   if (!context.imageData && context.resultUrls.length === 0) {
     return JSON.stringify({ error: 'no_image', message: 'Please upload or generate an image first.' });
@@ -261,7 +267,15 @@ export async function execute(
 
   // Compose the final video prompt based on model
   let composedPrompt: string;
-  if (isLTX) {
+  if (skipPromptProcessing || !isLTX) {
+    // Pipeline-provided prompt (e.g. orbit_video) or WAN 2.2: use as-is.
+    // Pipelines craft precise prompts with directional/motion language that
+    // should not be diluted by vision descriptions or creative refinement.
+    composedPrompt = prompt;
+    if (skipPromptProcessing) {
+      console.log(`[ANIMATE] Using pipeline prompt verbatim (skipPromptProcessing=true)`);
+    }
+  } else {
     // Step 1: Use vision LLM to describe the source image for rich frame anchoring
     // (applies to both first-frame and last-frame modes)
     callbacks.onToolProgress({
@@ -313,9 +327,6 @@ export async function execute(
         ? `A cinematic scene of ${sceneDescription} ${refinedPrompt}`
         : `A cinematic scene of ${refinedPrompt}`;
     }
-  } else {
-    // WAN 2.2: Use the prompt directly — no scene description or cinematic prefix
-    composedPrompt = prompt;
   }
   console.log(`[ANIMATE] Video prompt (${videoModelId}, frameRole=${frameRole}, ${composedPrompt.length} chars):`, composedPrompt);
   console.log(`[ANIMATE] Video quality: ${qualityTier} -> ${targetResolution ? `${targetResolution}p shorter side` : 'default resolution'}`);

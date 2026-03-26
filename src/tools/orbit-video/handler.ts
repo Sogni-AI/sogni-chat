@@ -39,9 +39,17 @@ const TRANSITION_COUNT = 4;
 
 const DEFAULT_ELEVATION = 'eye-level shot';
 const DEFAULT_DISTANCE = 'medium shot';
-const DEFAULT_PROMPT = 'constant speed linear camera pan, steady uniform motion throughout, no acceleration or deceleration. Foley and ambient sound effects only, no music, no soundtrack.';
+const DEFAULT_PROMPT = 'constant speed linear camera pan to the right, steady uniform clockwise motion throughout, no acceleration or deceleration. Foley and ambient sound effects only, no music, no soundtrack.';
 const ORBIT_VIDEO_DURATION = 2.5; // seconds per transition clip
 const ORBIT_VIDEO_MODEL = 'ltx23' as const;
+
+/** Appended to all orbit transition prompts to enforce consistent clockwise pan direction */
+const ORBIT_DIRECTION_SUFFIX = 'The camera pans smoothly and continuously to the right in a clockwise orbit.';
+
+/** Labels for diagnostic logging — must stay in sync with TRANSITION_COUNT */
+const TRANSITION_LABELS = [
+  'front→right', 'right→back', 'back→left', 'left→front',
+] as const;
 
 export async function execute(
   args: Record<string, unknown>,
@@ -54,9 +62,15 @@ export async function execute(
   // LTX 2.3, which creates discontinuous music when stitched. Speech/narration
   // is fine since it's sequential, but music needs to be generated separately.
   const rawPrompt = (args.prompt as string) || DEFAULT_PROMPT;
-  const prompt = /no music|no soundtrack/i.test(rawPrompt)
+  const withMusic = /no music|no soundtrack/i.test(rawPrompt)
     ? rawPrompt
     : `${rawPrompt} Foley and ambient sound effects only, no music, no soundtrack.`;
+  // Ensure every transition prompt includes directional language so all clips
+  // pan in the same direction (clockwise). Without this, the video model may
+  // generate some transitions going left and others going right.
+  const prompt = /to the right|clockwise/i.test(withMusic)
+    ? withMusic
+    : `${withMusic} ${ORBIT_DIRECTION_SUFFIX}`;
   const rawSourceIndex = args.sourceImageIndex as number | undefined;
 
   // ---------------------------------------------------------------------------
@@ -170,6 +184,9 @@ export async function execute(
     },
     steps: [
       // Step 1: Generate 3 angle views (original image is the front view)
+      // Ordering guarantee: the pipeline's concurrent path uses pre-allocated
+      // slotResults[i] indexed by invocation order, so results preserve the
+      // [right, back, left] sequence regardless of completion order.
       {
         label: 'Generating angle views',
         toolName: 'change_angle',
@@ -180,10 +197,15 @@ export async function execute(
           sourceImageIndex: effectiveSourceIndex ?? -1,
         }),
         collectResults: (state, results) => {
+          // results[i] corresponds to GENERATED_AZIMUTHS[i] via pre-allocated slots
           const angleImageUrls = results
             .flatMap(r => r.imageUrls)
             .filter(Boolean);
-          console.log(`[ORBIT] Collected ${angleImageUrls.length} angle images`);
+          // Verify we got exactly the expected count to prevent misalignment
+          if (angleImageUrls.length !== GENERATED_AZIMUTHS.length) {
+            console.warn(`[ORBIT] Expected ${GENERATED_AZIMUTHS.length} angle images but got ${angleImageUrls.length} — transitions may be misaligned`);
+          }
+          console.log(`[ORBIT] Collected ${angleImageUrls.length} angle images (slot-ordered: right, back, left)`);
           return {
             ...state,
             imageUrls: angleImageUrls,
@@ -193,6 +215,10 @@ export async function execute(
       },
 
       // Step 2: Generate 4 transition clips (front→right, right→back, back→left, left→front)
+      // Ordering guarantee: same pre-allocated slot pattern as Step 1. Each
+      // slotResults[i] holds the video for transition i, so collectResults
+      // produces clips in the correct stitch order regardless of which job
+      // finishes first.
       {
         label: 'Generating transitions',
         toolName: 'animate_photo',
@@ -204,7 +230,9 @@ export async function execute(
           // Transition i connects sequence[i] → sequence[(i+1) % 4]
           const sourceIndex = effectiveSourceIndex ?? -1;
 
-          // Map transition index to start/end image indices in context.resultUrls
+          // Map transition index to start/end image indices in context.resultUrls.
+          // Uses indexOf() by URL value so the lookup is correct regardless of
+          // the order images were pushed into context.resultUrls.
           let startIdx: number;
           let endIdx: number;
 
@@ -222,9 +250,14 @@ export async function execute(
             endIdx = context.resultUrls.indexOf(angleImageUrls[index]);
           }
 
-          if (startIdx < -1 || endIdx < -1) {
-            console.warn(`[ORBIT] Could not resolve angle image indices for transition ${index} (start=${startIdx}, end=${endIdx})`);
+          // For middle transitions (index 1, 2), -1 from indexOf means the angle
+          // image URL was not found — animate_photo would silently fall back to the
+          // original upload, producing a wrong transition. Edge transitions (0, 3)
+          // legitimately use -1 to mean "use the original uploaded image".
+          if (index > 0 && index < TRANSITION_COUNT - 1 && (startIdx === -1 || endIdx === -1)) {
+            console.error(`[ORBIT] Failed to resolve angle image for transition ${index} (${TRANSITION_LABELS[index]}): start=${startIdx}, end=${endIdx}`);
           }
+          console.log(`[ORBIT] Transition ${index} (${TRANSITION_LABELS[index]}): sourceImageIndex=${startIdx}, endImageIndex=${endIdx}`);
 
           return {
             prompt,
@@ -234,13 +267,22 @@ export async function execute(
             endImageIndex: endIdx,
             frameRole: 'both',
             numberOfVariations: 1,
+            // Skip animate_photo's vision description, creative refinement, and
+            // "A cinematic scene of" prefix. Orbit prompts have precise directional
+            // language that must not be buried or rewritten, and both keyframes
+            // give the model sufficient visual context.
+            skipPromptProcessing: true,
           };
         },
         collectResults: (state, results) => {
+          // results[i] corresponds to transition i via pre-allocated slots
           const transitionVideoUrls = results
             .flatMap(r => r.videoUrls)
             .filter(Boolean);
-          console.log(`[ORBIT] Collected ${transitionVideoUrls.length} transition videos`);
+          if (transitionVideoUrls.length !== TRANSITION_COUNT) {
+            console.warn(`[ORBIT] Expected ${TRANSITION_COUNT} transition videos but got ${transitionVideoUrls.length} — stitch order may be wrong`);
+          }
+          console.log(`[ORBIT] Collected ${transitionVideoUrls.length} transition videos (slot-ordered: front→right, right→back, back→left, left→front)`);
           return {
             ...state,
             videoUrls: transitionVideoUrls,
