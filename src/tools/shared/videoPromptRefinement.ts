@@ -82,6 +82,10 @@ export async function refineVideoPrompt(
   tokenType: TokenType,
   logPrefix = '[VIDEO]',
   signal?: AbortSignal,
+  /** When true, skip subject/environment expansion — a scene description from the source image is prepended separately. */
+  isI2V = false,
+  /** Vision-generated scene description of the source image (I2V only). Passed so the refinement LLM can anchor character names to visible details. */
+  sceneDescription = '',
 ): Promise<string> {
   if (signal?.aborted) {
     console.log('[VIDEO REFINEMENT] Skipping refinement — signal already aborted');
@@ -91,29 +95,61 @@ export async function refineVideoPrompt(
   try {
     console.log(`${logPrefix} Refining prompt with thinking mode (${duration}s video, ${prompt.length} chars)`);
 
+    // I2V mode: subject/environment come from a separate vision description prepended
+    // to the final prompt, so refinement should focus on motion, dialogue, camera, audio.
+    const t2vStructure = `PROMPT STRUCTURE — follow this order:
+1. SHOT/STYLE: Open with shot type and visual style (e.g. "Medium close-up, handheld tracking shot", "Wide establishing shot, film noir style").
+2. SUBJECT: Age, clothing, hairstyle, build, distinguishing details. The video model does not recognize names — describe APPEARANCE for any referenced characters.
+3. ENVIRONMENT & LIGHTING: Location, time of day, light sources, color palette, textures, atmosphere (fog, rain, reflections, dust, smoke).
+4. ACTION: What happens beat by beat in chronological order. Temporal connectors: "begins by...", "then...", "as this happens...", "after a beat...". For ${duration} seconds, pace action to fill the duration naturally. Show emotion through visible behavior — not "she is sad", instead "she looks down, pauses, and her voice cracks".
+5. CAMERA: Movement relative to the subject — tracking shot, dolly in, handheld follow, slow arc, pan, tilt, static frame, over-the-shoulder.
+6. AUDIO & DIALOGUE: Voice quality, room tone, ambience, music, weather, crowd noise, footsteps. Include language or accent if relevant. For speech, write ACTUAL DIALOGUE in double quotes. Break long speech into short quoted phrases with acting beats between them.`;
+
+    const i2vStructure = `This is an IMAGE-TO-VIDEO prompt. A separate scene description of the source image will be prepended — do NOT describe the subject's appearance or environment. Focus entirely on what CHANGES:
+
+PROMPT STRUCTURE — follow this order:
+1. SHOT/STYLE: Shot type only (e.g. "Medium close-up, handheld tracking shot").
+2. ACTION: The transition from stillness — what moves first, what happens next, beat by beat in chronological order. Temporal connectors: "begins by...", "then...", "as this happens...", "after a beat...". For ${duration} seconds, pace action to fill the duration naturally. Show emotion through visible behavior — not "she is sad", instead "she looks down, pauses, and her voice cracks".
+3. CAMERA: Movement relative to the subject — tracking shot, dolly in, handheld follow, slow arc, pan, tilt, static frame, over-the-shoulder.
+4. AUDIO & DIALOGUE: Voice quality, room tone, ambience, music, weather, crowd noise, footsteps. Include language or accent if relevant. For speech, write ACTUAL DIALOGUE in double quotes. Break long speech into short quoted phrases with acting beats between them.
+
+NAMES: If the input uses character names, anchor each name on first mention using visible details from the scene description below — gender, approximate age, position, clothing, or a distinguishing feature. Example: "Mark, the young man on the left in the blue shirt" or "Sarah, the woman with dark hair on the right." The video model cannot identify people by name alone. After anchoring, use names freely for dialogue and action attribution.`;
+
     const messages: ChatMessage[] = [
       {
         role: 'system',
-        content: `You are a video prompt engineer. Expand the user's video concept into a detailed, production-quality prompt for an AI video generation model (LTX 2.3).
+        content: `You are a cinematographer writing shot descriptions for an AI video generation model (LTX 2.3). Expand the user's concept into one detailed, flowing paragraph — a production-quality video prompt.
 
-CRITICAL RULES:
-1. DIALOGUE: If the concept implies conversation, argument, or speech, write out the ACTUAL DIALOGUE in double quotes. Never summarize dialogue — write the exact words each person says. Space dialogue naturally across ${duration} seconds with pauses, gestures, and reactions between lines.
+${isI2V ? i2vStructure : t2vStructure}
 
-2. CHARACTERS: The video model does not recognize names. If the user references characters from movies, TV, games, or real people, describe their PHYSICAL APPEARANCE in vivid detail (clothing, hair, build, distinguishing features, mannerisms) so the model can generate them visually. Never rely on a name alone.
+DIALOGUE PATTERN: A [character description] speaks in a [voice quality] voice, "[short line]." He/she [physical acting beat]. "[next short line]." Camera [movement]. Audio is [room tone / ambience].
 
-3. ACTION: Describe what physically happens on screen moment by moment. Use temporal connectors: "begins by...", "then...", "as this happens...", "suddenly...", "after a beat...". For ${duration} seconds of video, pace the action so it fills the duration naturally without feeling rushed or empty.
+WHAT WORKS WELL: Cinematic compositions, clear camera language, atmosphere (fog, rain, mist, reflections), strong single-subject performances, stylized looks (noir, analog, painterly, fashion editorial, pixel animation), lighting control (rim light, backlight, flicker, golden hour), speech and singing including multiple languages.
 
-4. SENSORY DETAIL: Include concrete visual details — lighting direction, color palette, textures, environment. Describe audio: ambient sounds, music style, tone of voice for dialogue. End with camera movement ("slow push-in", "handheld tracking shot", "static wide angle").
+COMMON FAILURES TO AVOID:
+- Too vague ("A nice video of nature")
+- Too short for duration (tiny prompt for ${duration}s video)
+- Too numerical (exact angles, counts, speeds, rigid measurements)
+- Contradictory (peaceful still lake plus violent crashing waves)
+- Too crowded (too many characters, actions, and lighting ideas at once)
+- Conflicting lighting logic
+- Abstract emotions with no visible physical cues
+- Readable text or logos as key requirements
 
-5. PRESENT TENSE only. Positive phrasing (describe what IS happening, not what isn't).
+RULES:
+- One flowing paragraph, present tense, positive phrasing.
+- Close-ups need more detail than wide shots.
+- Match prompt length to video duration — ${duration}s needs proportional detail.
 
-6. End with: "The footage remains smooth and stabilised throughout."
+USEFUL VOCABULARY — camera: tracking shot, handheld, dolly in, pan, tilt, overhead, over-the-shoulder, static frame, wide establishing shot. Lighting: golden hour, neon glow, flickering candlelight, dramatic shadows, shallow depth of field, film grain, lens flare, rim light. Atmosphere: fog, dust, smoke, rain, particles, reflections. Style: film noir, painterly, comic book, cyberpunk, 8-bit pixel, documentary, arthouse, fashion editorial.
 
 Return ONLY the refined prompt. No explanation, no commentary, no preamble.`,
       },
       {
         role: 'user',
-        content: `Expand this into a detailed ${duration}-second video prompt:\n\n${prompt}`,
+        content: isI2V && sceneDescription
+          ? `Scene description of the source image (for anchoring names to visible details — do NOT repeat this in your output):\n${sceneDescription}\n\nExpand this into a detailed ${duration}-second video prompt:\n\n${prompt}`
+          : `Expand this into a detailed ${duration}-second video prompt:\n\n${prompt}`,
       },
     ];
 

@@ -17,15 +17,21 @@ export const definition: ToolDefinition = {
       properties: {
         prompt: {
           type: 'string',
-          description: `Text description of the video. 2-4 present-tense sentences capturing scene, action, atmosphere, sound, and camera.
+          description: `Write one flowing paragraph like a cinematographer describing a shot. Present tense, specific natural language. Longer clips need longer prompts; close-ups need more detail than wide shots.
 
-For complex/creative scenes (characters, dialogue, skits): capture the full creative intent — who, what they say, what happens, tone and style. The system auto-expands into a detailed prompt.
+STRUCTURE: shot/style → subject (age, clothing, hairstyle, distinguishing details) → environment, lighting, atmosphere → action beat by beat → camera movement → audio and dialogue.
 
-DIALOGUE: Write ACTUAL spoken words in double quotes. Never summarize as "they argue about X" — write what they say. Create appropriate dialogue if user implies conversation without exact words.
+DIALOGUE: Put spoken lines in double quotes. Break long speech into short quoted phrases with acting beats between them (gestures, pauses, glances). Show emotion through visible behavior — not "she is sad", instead "she looks down, pauses, and her voice cracks".
 
-For specific characters (movies, TV): describe visual appearance (clothing, hair, build) — don't rely on names alone.
+AUDIO: Prompt sound intentionally — voice quality, room tone, ambience, music, weather, footsteps. Include language or accent if relevant.
 
-Capture the user's creative intent faithfully. Present tense. Positive phrasing. No vague words ("beautiful", "nice") — concrete sensory details. Natural, plausible movements.
+CAMERA: Cinematic terms — close-up, tracking shot, dolly in, handheld, slow arc, static frame. Describe movement relative to subject.
+
+For specific characters (movies, TV): describe visual appearance — don't rely on names alone.
+
+For complex/creative scenes (characters, dialogue, skits): capture the full creative intent. The system auto-expands into a detailed prompt.
+
+AVOID: Vague prompts, too many characters at once, conflicting lighting logic, readable text or logos, abstract emotions with no visible behavior, rigid numeric constraints (exact angles, counts, speeds).
 
 BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. Lock in any camera/subject/style the user specified, vary the rest. Example: "slow dolly in on a city street {at dawn with golden light|during a rainstorm|at night with neon reflections}".`,
         },

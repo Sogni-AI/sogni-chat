@@ -44,9 +44,10 @@ import { CHAT_MODEL } from '@/config/chat';
 /** System prompt for the /describe vision call used to anchor LTX 2.3 video prompts */
 const VIDEO_DESCRIBE_SYSTEM_PROMPT =
   'Describe this image in 2-3 dense present-tense sentences for a video generation model. ' +
-  'Include: subject identity, appearance, clothing, pose, expression, environment, lighting, surface textures, and colors. ' +
+  'Include: shot framing (e.g. medium close-up, wide shot), subject identity, appearance, clothing, pose, expression, ' +
+  'environment, lighting, color palette, surface textures, and spatial composition. ' +
   'Be concrete and specific — name materials, colors, light sources. ' +
-  'Do NOT mention what to animate or any motion. Just describe the static scene exactly as it appears.';
+  'Do NOT mention what to animate, any motion, camera movement, or sound. Describe only the static scene.';
 
 /**
  * Use the vision LLM to describe a source image in detail for LTX 2.3 video prompting.
@@ -290,7 +291,7 @@ export async function execute(
         modelName: mediaLabel,
       });
       refinedPrompt = await withTimeout(
-        refineVideoPrompt(context.sogniClient, prompt, duration, context.tokenType, '[ANIMATE]', context.signal),
+        refineVideoPrompt(context.sogniClient, prompt, duration, context.tokenType, '[ANIMATE]', context.signal, true, sceneDescription),
         LLM_THINKING_TIMEOUT_MS,
         'Video prompt refinement',
       ) ?? prompt;

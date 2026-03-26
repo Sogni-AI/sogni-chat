@@ -17,11 +17,17 @@ export const definition: ToolDefinition = {
       properties: {
         prompt: {
           type: 'string',
-          description: `Visual description of the video, synchronized to audio. 2-4 present-tense sentences.
+          description: `Describe the video like a cinematographer. Let the audio define timing — use the prompt for visual interpretation. One flowing paragraph, present tense, specific natural language.
 
-Lip-sync: describe how the person speaks and the atmosphere. Music visualization: describe visual style reacting to the beat. Audio-reactive: describe motion synchronized to sounds.
+STRUCTURE: shot/style → subject → environment and lighting → visual action synced to audio → camera movement.
 
-Present tense. Positive phrasing. Describe motion as it relates to the audio.
+LIP-SYNC: Shot framing, speaker's appearance and setting, physical performance synced to audio — gestures, expressions, jaw movement between phrases. Include acting beats.
+
+MUSIC VISUALIZATION: Visual style, environment, and how elements react to rhythm and energy.
+
+AUDIO-REACTIVE: Motion and visual changes that correspond to sounds in the track.
+
+AVOID: Vague prompts, too many competing visual elements, abstract descriptions without visible behavior, rigid numeric constraints.
 
 BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary the visual interpretation while keeping audio sync intent consistent. Example: "{abstract neon visualization|nature scene with swaying trees|urban street with rain} synced to the beat".`,
         },

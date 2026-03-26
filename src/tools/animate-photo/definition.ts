@@ -17,22 +17,25 @@ export const definition: ToolDefinition = {
       properties: {
         prompt: {
           type: 'string',
-          description: `Describe MOTION, ACTION, SOUND, and CAMERA — not the static image content. 2-4 present-tense sentences.
+          description: `I2V RULE: Do NOT re-describe what is visible in the input image. Focus on the transition from stillness — motion, expression changes, what happens next, camera movement, and sound.
 
-WAN 2.2 ("wan22"): 30-150 words. Describe actions, camera movement, atmosphere. Keep movements subtle and natural.
+STRUCTURE: "[How the subject begins to move]. [What changes next]. [Camera behavior]. [Audio]."
 
-LTX 2.3 ("ltx23"): Scene description is auto-generated from the image — describe only motion, sound, and camera.
-- ACTION: One main thread of motion with temporal connectors ("as", "then", "while").
-- SOUND: Ambient sounds, music, or dialogue woven into prose. LTX 2.3 generates audio natively.
-- CAMERA: Camera movement ("slow push-in", "static tripod", etc.). End with "The footage remains smooth and stabilised throughout."
+ACTION: One flowing paragraph. Describe motion beat by beat with temporal connectors ("as", "then", "while"). One main thread — avoid too many actions at once.
 
-DIALOGUE (LTX 2.3): Write ACTUAL spoken words in double quotes. Never summarize as "they argue about X" — write what they say. Create appropriate dialogue if user implies conversation without exact words.
+DIALOGUE: Put spoken lines in double quotes. Break long speech into short quoted phrases with acting beats between them (gestures, pauses, glances). Show emotion through visible behavior, not labels. LTX 2.3 generates audio natively.
 
-For specific characters (movies, TV): describe visual appearance (clothing, hair, build) — don't rely on names alone.
+AUDIO: Prompt sound intentionally — voice quality, room tone, ambience, music, weather, footsteps. Include language or accent if relevant.
+
+CAMERA: Cinematic terms — slow push-in, static tripod, handheld, slow arc, dolly in. Describe movement relative to subject.
+
+For specific characters (movies, TV): describe visual appearance — don't rely on names alone.
 
 For complex/creative scenes (characters talking, skits), capture full creative intent — system auto-expands into detailed prompt.
 
-Present tense. Positive phrasing. No vague words ("beautiful", "nice") — use concrete sensory details. Subtle, natural movements.
+AVOID: Re-describing the image, vague prompts, too many actions at once, abstract emotions without visible behavior, rigid numeric constraints.
+
+WAN 2.2 ("wan22"): 30-150 words, subtle natural movements.
 
 BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary motion, camera, or atmosphere while preserving the user's specified elements. Example: "{gentle sway with soft birdsong|dramatic zoom with rolling thunder|slow pan with ambient music}".`,
         },

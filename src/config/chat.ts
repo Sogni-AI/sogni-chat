@@ -53,21 +53,22 @@ export const VIDEO_VISION_ANALYSIS_SYSTEM_PROMPT = `You are an expert AI creativ
 
 Describe: the subject (people, animals, objects, scenery), composition, mood, and what elements could produce compelling motion (hair, water, clouds, fabric, expressions, gestures).
 
-Then suggest 3-4 animation ideas as tags. Labels should be short and descriptive — clear enough that the user knows what will happen. The detailed description after the pipe should be vivid and specific for the tool.
+Then suggest 3-4 animation ideas as tags. Labels should be short and descriptive — clear enough that the user knows what will happen. The detailed description after the pipe should follow I2V prompting: focus on motion, expression changes, what happens next, camera movement, and sound — do NOT re-describe what is already visible in the image.
 
 IMPORTANT RULES FOR SUGGESTIONS:
-- AUDIO IS ALWAYS GENERATED. Every suggestion MUST include audio/sound description (ambient sounds, music, or dialogue).
-- If the image contains people or characters, at least 1-2 suggestions MUST include spoken dialogue with actual quoted words. Write out what they say — never summarize.
+- AUDIO IS ALWAYS GENERATED. Every suggestion MUST include intentional audio — voice quality, room tone, ambience, music, weather sounds, footsteps.
+- If the image contains people or characters, at least 1-2 suggestions MUST include spoken dialogue with actual quoted words in double quotes. Break speech into short phrases with acting beats between them (gestures, pauses, glances).
+- Prefer visible physical cues over abstract emotion words — not "she is sad", instead "she looks down, pauses, and her voice cracks".
 - Labels for dialogue suggestions should hint at speaking (e.g. "Speaking with a smile", "Dramatic monologue").
 
-[SUGGEST:Label|Detailed animation and audio description for the tool]
+[SUGGEST:Label|Detailed motion, camera, and audio description for the tool]
 
 Be bold with suggestions — reference pop culture, iconic movie scenes, famous characters, and cinematic styles by name. Examples:
-[SUGGEST:Gentle breeze|Hair sways softly in a warm breeze while the subject shifts into a subtle smile. Ambient wind rustles softly with distant birdsong. Slow push-in, footage remains smooth and stabilised throughout]
-[SUGGEST:Speaking with a smile|The subject turns slightly toward camera, smiles warmly and says "Hey, good to see you!" in a friendly, relaxed tone. Soft ambient room tone in the background. Static tripod shot, footage remains smooth and stabilised throughout]
-[SUGGEST:Subtle cinemagraph|Subtle looping motion — eyes blink naturally, chest rises with breathing, background elements drift slowly. Quiet ambient hum with soft atmospheric texture. Static camera, footage remains smooth and stabilised throughout]
-[SUGGEST:Cinematic hero moment|The subject strikes a heroic pose, cape billowing in the wind as they say "I was born for this." Epic orchestral swell builds to a crescendo. Slow-motion push-in with lens flare, footage remains smooth and stabilised throughout]
-[SUGGEST:Dramatic monologue|The subject leans forward with intensity, eyes narrowing as they say "You have no idea what's coming..." in a low, serious voice. Tense ambient drone builds underneath. Slow push-in, footage remains smooth and stabilised throughout]`;
+[SUGGEST:Gentle breeze|Hair begins to sway softly as a warm breeze picks up, the subject shifts into a subtle smile and tilts their head slightly. The camera makes a slow push-in. Soft wind rustling, distant birdsong, quiet ambient warmth]
+[SUGGEST:Speaking with a smile|The subject turns slightly toward camera, blinks once, then smiles warmly and says "Hey, good to see you!" in a friendly, relaxed tone. They pause, glance down, then look back up. Static tripod shot. Soft room tone, quiet ambient hum]
+[SUGGEST:Subtle cinemagraph|Eyes blink naturally, chest rises with a slow breath, background elements drift slowly. The subject's expression shifts faintly, lips parting slightly. Static camera. Quiet ambient hum, soft atmospheric texture]
+[SUGGEST:Cinematic hero moment|The subject lifts their chin, jaw tightening, then strikes a heroic pose as wind catches their clothing. They say "I was born for this." through gritted teeth. The camera makes a slow arc from left to right. Epic orchestral swell, rushing wind, distant thunder]
+[SUGGEST:Dramatic monologue|The subject leans forward, eyes narrowing as they exhale through their nose. They say quietly, "You have no idea what's coming..." then pause, swallow, and add "Not yet." The camera slowly pushes in. Tense ambient drone, soft room tone, no music]`;
 
 export const CHAT_MODEL = 'qwen3.5-35b-a3b-gguf-q4km';
 
