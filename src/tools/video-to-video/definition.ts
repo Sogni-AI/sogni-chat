@@ -10,7 +10,7 @@ export const definition: ToolDefinition = {
   function: {
     name: 'video_to_video',
     description:
-      'Transform an existing video using AI. Apply ControlNet effects like canny edge detection, pose tracking, depth mapping, or subject replacement. Requires an uploaded video file. Use when the user wants to restyle, transform, or apply effects to an existing video.',
+      'Transform an existing video using AI. Default mode is WAN 2.2 Animate Move — applies camera/motion from a source video to a reference image, bringing photos to life with the video\'s movement. Also supports Animate Replace (swap the subject in a video with a reference image) and LTX-2 ControlNet effects (pose, detailer). Requires an uploaded video file. Use when the user wants to animate a photo with video motion, replace subjects in a video, restyle, or apply effects to an existing video.',
     parameters: {
       type: 'object',
       properties: {
@@ -19,12 +19,10 @@ export const definition: ToolDefinition = {
           description: `Describe the TARGET appearance (not the transformation process). 2-4 present-tense sentences.
 
 Examples by mode:
-- canny (preserves edges, restyle keeping shapes): "A watercolor painting with soft edges and flowing colors."
-- pose (tracks skeleton, replace person): "A cartoon character with exaggerated proportions performing the dance moves."
-- depth (preserves spatial depth, restyle scene): "An underwater coral reef scene with bioluminescent lighting."
-- detailer (enhance quality): "Ultra-detailed 4K footage with enhanced textures and sharp focus."
-- animate-move (camera animation from reference image): "Smooth cinematic camera movement following the subject."
-- animate-replace (swap subject from reference image): "The character from the reference image performing the video's movements."
+- animate-move (DEFAULT — WAN 2.2 Animate Move: applies camera/motion from source video to reference image): "Smooth cinematic camera movement following the subject through the scene."
+- animate-replace (WAN 2.2 Animate Replace: replaces the subject in the source video with the reference image): "The person from the reference photo performing the dance moves from the video."
+- pose (LTX-2 — tracks skeleton, replace person): "A cartoon character with exaggerated proportions performing the dance moves."
+- detailer (LTX-2 — enhance quality): "Ultra-detailed 4K footage with enhanced textures and sharp focus."
 
 Present tense. Positive phrasing. Concrete visual details.
 
@@ -37,9 +35,9 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
         },
         controlMode: {
           type: 'string',
-          enum: ['canny', 'pose', 'depth', 'detailer', 'animate-move', 'animate-replace'],
+          enum: ['animate-move', 'animate-replace', 'pose', 'detailer'],
           description:
-            'ControlNet mode determining how the source video guides the output. "canny": Edge detection — preserves shapes and outlines (default). "pose": Skeleton tracking — preserves body poses and movements. "depth": Depth mapping — preserves spatial layout. "detailer": Quality enhancement — improves detail and resolution. "animate-move": Camera motion animation (WAN, requires reference image). "animate-replace": Subject replacement (WAN, requires reference image). Default: "canny".',
+            'Mode determining how the source video and reference image interact. "animate-move" (DEFAULT): WAN 2.2 Animate Move — applies the camera movement and motion from the source video to the reference image, bringing a still photo to life (requires sourceImageIndex). "animate-replace": WAN 2.2 Animate Replace — replaces the subject in the source video with the person/character from the reference image, keeping the video\'s background and motion (requires sourceImageIndex). "pose": LTX-2 skeleton tracking — preserves body poses. "detailer": LTX-2 quality enhancement. Default: "animate-move".',
         },
         sourceImageIndex: {
           type: 'number',

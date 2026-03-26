@@ -37,6 +37,7 @@ interface V2VModelConfig {
   maxFrames: number;
   sampler: string;
   scheduler: string;
+  defaultShift?: number;
   requiresImage?: boolean;
 }
 
@@ -67,8 +68,9 @@ const WAN_ANIMATE_BASE: Omit<V2VModelConfig, 'id'> = {
   dimensionStep: 16,
   minDimension: 480,
   maxDimension: 1536,
-  defaultSteps: 4,
+  defaultSteps: 6,
   defaultGuidance: 1.0,
+  defaultShift: 8.0,
   defaultFps: 16,
   frameStep: 1,
   minFrames: 17,
@@ -78,7 +80,7 @@ const WAN_ANIMATE_BASE: Omit<V2VModelConfig, 'id'> = {
   requiresImage: true,
 };
 
-type ControlMode = 'canny' | 'pose' | 'depth' | 'detailer' | 'animate-move' | 'animate-replace';
+type ControlMode = 'pose' | 'detailer' | 'animate-move' | 'animate-replace';
 
 function getModelForControlMode(mode: ControlMode): V2VModelConfig {
   if (mode === 'animate-move') {
@@ -117,7 +119,7 @@ export async function execute(
   callbacks: ToolCallbacks,
 ): Promise<string> {
   const prompt = args.prompt as string;
-  const controlMode: ControlMode = (args.controlMode as ControlMode) || 'canny';
+  const controlMode: ControlMode = (args.controlMode as ControlMode) || 'animate-move';
   const duration = Math.max(2, Math.min(10, (args.duration as number) || 5));
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
   const videoSourceIndex = args.videoSourceIndex as number | undefined;
@@ -206,6 +208,7 @@ export async function execute(
           fps,
           steps,
           guidance: config.defaultGuidance,
+          shift: config.defaultShift,
           numberOfMedia,
           tokenType,
           sampler: config.sampler,
@@ -273,6 +276,7 @@ interface V2VParams {
   fps: number;
   steps: number;
   guidance: number;
+  shift?: number;
   numberOfMedia: number;
   tokenType: TokenType;
   sampler: string;
@@ -320,6 +324,9 @@ async function runV2VGeneration(
   }
   if (params.guidance !== undefined) {
     projectParams.guidance = params.guidance;
+  }
+  if (params.shift !== undefined) {
+    projectParams.shift = params.shift;
   }
 
   const projects = (sogniClient as unknown as { projects: {
