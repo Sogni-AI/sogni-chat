@@ -49,11 +49,11 @@ export const definition: ToolDefinition = {
         },
         dialogueSegment: {
           type: 'number',
-          enum: [0, 1, 2, 3],
           description:
-            'Which transition segment receives the dialogue (0-3). 0 = front→right ' +
-            '(first segment, default), 1 = right→back, 2 = back→left, 3 = left→front ' +
-            '(last segment). Only used when dialogue is provided.',
+            'Which transition segment receives the dialogue (0-based index into the ' +
+            'transition sequence). 0 = first transition (default), last index = wrap-back ' +
+            'to front. With default angles there are 4 transitions (0-3). With custom ' +
+            'angles the count equals angles.length + 1. Only used when dialogue is provided.',
         },
         angles: {
           type: 'array',

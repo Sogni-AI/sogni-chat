@@ -1,9 +1,9 @@
 /**
  * Handler for orbit_video tool.
  *
- * Orchestrates a 3-step pipeline to create a 360-degree orbit video:
- * 1. Generate 4 camera angle views (front, right, back, left) via change_angle
- * 2. Generate 4 transition video clips between adjacent angles via animate_photo
+ * Orchestrates a 3-step pipeline to create an orbit video:
+ * 1. Generate camera angle views via change_angle (default: right, back, left)
+ * 2. Generate transition video clips between consecutive angles via animate_photo
  * 3. Stitch all clips into one seamless looping video via concatenateVideos
  *
  * Uses the pipeline abstraction from src/tools/shared/pipeline.ts.
@@ -87,19 +87,6 @@ export async function execute(
     ? withMusic
     : `${withMusic} ${ORBIT_DIRECTION_SUFFIX}`;
 
-  // Per-segment dialogue: only inject into the specified segment, all others
-  // get the base motion/foley prompt. This prevents dialogue from being
-  // duplicated across every segment when the user only wants it in one.
-  const dialogue = args.dialogue as string | undefined;
-  const dialogueSegment = typeof args.dialogueSegment === 'number' ? args.dialogueSegment : 0;
-
-  const buildSegmentPrompt = (segmentIndex: number): string => {
-    if (dialogue && segmentIndex === dialogueSegment) {
-      return `${dialogue}. ${basePrompt}`;
-    }
-    return basePrompt;
-  };
-
   // ---------------------------------------------------------------------------
   // Resolve angle sequence
   // ---------------------------------------------------------------------------
@@ -126,6 +113,21 @@ export async function execute(
   transitionLabels.push(`${shortLabel(azimuths[azimuths.length - 1])}→front`);
 
   console.log(`[ORBIT] Angle sequence: front → ${azimuths.map(shortLabel).join(' → ')} → front (${transitionCount} transitions)`);
+
+  // Per-segment dialogue: only inject into the specified segment, all others
+  // get the base motion/foley prompt. This prevents dialogue from being
+  // duplicated across every segment when the user only wants it in one.
+  // Clamped to valid range after transitionCount is known.
+  const dialogue = args.dialogue as string | undefined;
+  const rawDialogueSegment = typeof args.dialogueSegment === 'number' ? args.dialogueSegment : 0;
+  const dialogueSegment = Math.max(0, Math.min(rawDialogueSegment, transitionCount - 1));
+
+  const buildSegmentPrompt = (segmentIndex: number): string => {
+    if (dialogue && segmentIndex === dialogueSegment) {
+      return `${dialogue}. ${basePrompt}`;
+    }
+    return basePrompt;
+  };
 
   const rawSourceIndex = args.sourceImageIndex as number | undefined;
 
