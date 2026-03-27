@@ -133,6 +133,7 @@ export async function execute(
   // are provided so the model has visual context; the prompt just needs to
   // specify the motion.
   const skipPromptProcessing = !!args.skipPromptProcessing;
+  const skipGallerySave = !!args.skipGallerySave;
 
   if (!context.imageData && context.resultUrls.length === 0) {
     return JSON.stringify({ error: 'no_image', message: 'Please upload or generate an image first.' });
@@ -370,8 +371,11 @@ export async function execute(
   const gallerySavedUrls = new Set<string>();
   const sourceImageBlob = new Blob([sourceImageData as BlobPart], { type: sourceImageMime });
 
-  // Save a single video to gallery and notify UI immediately (fire-and-forget)
+  // Save a single video to gallery and notify UI immediately (fire-and-forget).
+  // When called as a pipeline sub-step (e.g. orbit_video transitions), skip gallery
+  // saves — intermediate clips are not user-facing results.
   const saveVideoPerJob = (videoUrl: string) => {
+    if (skipGallerySave) return;
     if (gallerySavedUrls.has(videoUrl)) return;
     gallerySavedUrls.add(videoUrl);
     saveVideoToGallery({

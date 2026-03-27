@@ -18,6 +18,11 @@ import {
   generateThumbnail,
   migrateLegacySession,
 } from '@/utils/chatHistoryDB';
+import {
+  getImage as getGalleryImage,
+  deleteProject as deleteGalleryProject,
+} from '@/utils/galleryDB';
+
 const BROADCAST_CHANNEL = 'sogni-chat-sessions-sync';
 const ACTIVE_SESSION_KEY = 'sogni_chat_active_session';
 
@@ -91,6 +96,62 @@ async function cleanupStaleBackfill(): Promise<void> {
     try { localStorage.setItem(BACKFILL_CLEANUP_KEY, '1'); } catch { /* ignore */ }
   } catch (err) {
     console.error('[CHAT SESSIONS] Gallery backfill cleanup failed:', err);
+  }
+}
+
+function notifyGalleryTabs(): void {
+  if (typeof BroadcastChannel === 'undefined') return;
+  try {
+    const channel = new BroadcastChannel('sogni-gallery-sync');
+    channel.postMessage({ type: 'gallery-updated' });
+    channel.close();
+  } catch { /* ignore */ }
+}
+
+/**
+ * Delete all gallery items (projects, images, source images) associated with a
+ * chat session's messages. Collects gallery IDs from all messages, resolves
+ * their parent project IDs, then cascade-deletes each project.
+ */
+async function deleteSessionGalleryItems(session: ChatSession): Promise<void> {
+  const allGalleryIds: string[] = [];
+  for (const msg of session.uiMessages) {
+    if (msg.galleryImageIds) allGalleryIds.push(...msg.galleryImageIds);
+    if (msg.galleryVideoIds) allGalleryIds.push(...msg.galleryVideoIds);
+    if (msg.galleryAudioIds) allGalleryIds.push(...msg.galleryAudioIds);
+  }
+
+  if (allGalleryIds.length === 0) return;
+
+  // Resolve unique project IDs from gallery image records.
+  // Each save*ToGallery call creates its own project, so deleting by project
+  // won't affect images from other sessions.
+  const projectIds = new Set<string>();
+  const results = await Promise.all(
+    allGalleryIds.map(async (id) => {
+      try {
+        return (await getGalleryImage(id))?.projectId ?? null;
+      } catch {
+        return null; // Gallery item may already be deleted
+      }
+    }),
+  );
+  for (const pid of results) {
+    if (pid) projectIds.add(pid);
+  }
+
+  // Cascade-delete each project (images + source image)
+  for (const projectId of projectIds) {
+    try {
+      await deleteGalleryProject(projectId);
+    } catch (err) {
+      console.error('[CHAT SESSIONS] Failed to delete gallery project:', projectId, err);
+    }
+  }
+
+  if (projectIds.size > 0) {
+    console.log(`[CHAT SESSIONS] Deleted ${projectIds.size} gallery project(s) for session ${session.id}`);
+    notifyGalleryTabs();
   }
 }
 
@@ -248,6 +309,9 @@ export function useChatSessions(): UseChatSessionsReturn {
 
   const deleteSessionById = useCallback(async (id: string) => {
     try {
+      // Capture session data before deletion so we can clean up gallery items
+      const session = await getSession(id);
+
       await dbDeleteSession(id);
 
       // Revoke cached blob URL
@@ -260,6 +324,13 @@ export function useChatSessions(): UseChatSessionsReturn {
 
       await loadSessions();
       notifyOtherTabs();
+
+      // Clean up gallery items in the background (non-blocking — sidebar already updated)
+      if (session) {
+        deleteSessionGalleryItems(session).catch((err) => {
+          console.error('[CHAT SESSIONS] Background gallery cleanup failed:', err);
+        });
+      }
     } catch (err) {
       console.error('[CHAT SESSIONS] Failed to delete session:', err);
     }

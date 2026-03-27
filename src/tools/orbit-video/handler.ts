@@ -389,6 +389,9 @@ export async function execute(
             // language that must not be buried or rewritten, and both keyframes
             // give the model sufficient visual context.
             skipPromptProcessing: true,
+            // Transition clips are intermediate artifacts — only the final stitched
+            // orbit video should appear in My Media.
+            skipGallerySave: true,
           };
         },
         collectResults: (state, results) => {
