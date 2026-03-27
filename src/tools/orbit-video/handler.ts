@@ -34,16 +34,19 @@ const DEFAULT_AZIMUTHS = [
   'left side view',
 ] as const;
 
-/** All valid azimuth values (excluding front view which is always the source) */
-const VALID_AZIMUTHS = new Set([
-  'front-right quarter view',
-  'right side view',
-  'back-right quarter view',
-  'back view',
-  'back-left quarter view',
-  'left side view',
-  'front-left quarter view',
-]);
+/** All valid azimuth values (excluding front view which is always the source),
+ *  ordered clockwise from front. Index = position in the 8-point compass. */
+const AZIMUTH_CLOCKWISE_ORDER = [
+  'front-right quarter view',  // 45°
+  'right side view',           // 90°
+  'back-right quarter view',   // 135°
+  'back view',                 // 180°
+  'back-left quarter view',    // 225°
+  'left side view',            // 270°
+  'front-left quarter view',   // 315°
+] as const;
+
+const VALID_AZIMUTHS: Set<string> = new Set(AZIMUTH_CLOCKWISE_ORDER);
 
 /** Short labels for diagnostic logging */
 const AZIMUTH_SHORT_LABELS: Record<string, string> = {
@@ -90,22 +93,40 @@ export async function execute(
   // ---------------------------------------------------------------------------
   // Resolve angle sequence
   // ---------------------------------------------------------------------------
-  const rawAngles = args.angles as string[] | undefined;
-  const azimuths: string[] = rawAngles?.length
-    ? rawAngles.filter(a => VALID_AZIMUTHS.has(a))
-    : [...DEFAULT_AZIMUTHS];
+  const shortLabel = (azimuth: string) => AZIMUTH_SHORT_LABELS[azimuth] || azimuth;
 
-  if (azimuths.length === 0) {
-    return JSON.stringify({
-      error: 'invalid_angles',
-      message: 'No valid azimuth values provided. Valid values: ' + [...VALID_AZIMUTHS].join(', '),
-    });
+  const rawAngles = args.angles as string[] | undefined;
+  let azimuths: string[];
+
+  if (rawAngles?.length) {
+    const validAngles = rawAngles.filter(a => VALID_AZIMUTHS.has(a));
+    if (validAngles.length === 0) {
+      console.warn('[ORBIT] All provided angles are invalid, using defaults');
+      azimuths = [...DEFAULT_AZIMUTHS];
+    } else {
+      // Sort by position in the 8-point compass to enforce clockwise ordering.
+      const sorted = [...validAngles].sort(
+        (a, b) => AZIMUTH_CLOCKWISE_ORDER.indexOf(a as typeof AZIMUTH_CLOCKWISE_ORDER[number])
+               - AZIMUTH_CLOCKWISE_ORDER.indexOf(b as typeof AZIMUTH_CLOCKWISE_ORDER[number]),
+      );
+
+      // Check coverage: angles should span at least 180° of the compass (4 positions apart)
+      // to produce a meaningful orbit. If they cluster in a small arc, fall back to defaults.
+      const positions = sorted.map(a => AZIMUTH_CLOCKWISE_ORDER.indexOf(a as typeof AZIMUTH_CLOCKWISE_ORDER[number]));
+      const span = positions[positions.length - 1] - positions[0];
+      if (sorted.length >= 3 && span < 4) {
+        // All angles are within a 180° arc — not a useful orbit
+        console.warn(`[ORBIT] Provided angles cluster within ${(span + 1) * 45}° arc (${sorted.map(shortLabel).join(', ')}), using defaults for full 360°`);
+        azimuths = [...DEFAULT_AZIMUTHS];
+      } else {
+        azimuths = sorted;
+      }
+    }
+  } else {
+    azimuths = [...DEFAULT_AZIMUTHS];
   }
 
   const transitionCount = azimuths.length + 1; // +1 for the wrap-back to front
-
-  // Build transition labels for logging: front→right, right→back, etc.
-  const shortLabel = (azimuth: string) => AZIMUTH_SHORT_LABELS[azimuth] || azimuth;
   const transitionLabels = azimuths.map((az, i) => {
     const from = i === 0 ? 'front' : shortLabel(azimuths[i - 1]);
     return `${from}→${shortLabel(az)}`;
@@ -249,6 +270,7 @@ export async function execute(
         toolName: 'change_angle',
         count: azimuths.length,
         concurrent: true,
+        failOnAnyError: true,
         itemLabels: azimuths.map(az => `Generating ${shortLabel(az)} view`),
         buildArgs: (_state, index) => ({
           description: `${azimuths[index]} ${elevation} ${distance}`,
@@ -263,9 +285,18 @@ export async function execute(
           // Hard-fail if any angle is missing — a partial orbit produces visible
           // jump cuts that are worse than no result at all.
           if (angleImageUrls.length !== azimuths.length) {
+            // Surface per-angle errors for debugging
+            const errors = results.map((r, i) => {
+              try {
+                const parsed = JSON.parse(r.rawResult);
+                if (parsed.error) return `${shortLabel(azimuths[i])}: ${parsed.message || parsed.error}`;
+              } catch { /* not JSON */ }
+              if (r.imageUrls.length === 0) return `${shortLabel(azimuths[i])}: no image generated`;
+              return null;
+            }).filter(Boolean);
             throw new Error(
               `Orbit requires ${azimuths.length} angle views but only ${angleImageUrls.length} were generated. ` +
-              `Cannot produce a seamless orbit video with missing angles.`,
+              (errors.length > 0 ? `Failures: ${errors.join('; ')}` : 'Cannot produce a seamless orbit video with missing angles.'),
             );
           }
           console.log(`[ORBIT] Collected ${angleImageUrls.length} angle images (slot-ordered: ${azimuths.map(shortLabel).join(', ')})`);

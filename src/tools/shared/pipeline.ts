@@ -29,6 +29,8 @@ export interface PipelineStep {
   concurrent?: boolean;
   /** Per-invocation labels for concurrent steps (e.g. angle names). Falls back to step.label. */
   itemLabels?: string[];
+  /** Treat ANY sub-tool error as fatal (not just insufficient_credits/no_image). Default: false. */
+  failOnAnyError?: boolean;
   buildArgs: (state: PipelineState, index: number) => Record<string, unknown>;
   customExecute?: (
     state: PipelineState,
@@ -181,9 +183,13 @@ export async function executePipeline(
             try {
               const parsed = JSON.parse(rawResult);
               if (parsed.error) {
-                console.error(`[PIPELINE] Sub-tool error in "${step.label}" invocation ${i}:`, parsed.error);
-                if (parsed.error === 'insufficient_credits' || parsed.error === 'no_image') {
-                  throw new Error(parsed.error);
+                console.error(`[PIPELINE] Sub-tool error in "${step.label}" invocation ${i}:`, parsed.error, parsed.message);
+                if (
+                  step.failOnAnyError ||
+                  parsed.error === 'insufficient_credits' ||
+                  parsed.error === 'no_image'
+                ) {
+                  throw new Error(parsed.message || parsed.error);
                 }
               }
             } catch (e) {
