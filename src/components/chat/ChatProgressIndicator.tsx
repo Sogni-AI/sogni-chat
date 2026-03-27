@@ -540,7 +540,7 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
                       }}
                     />
 
-                    {/* Label */}
+                    {/* Label — use per-job label when available (e.g. angle name) */}
                     <span
                       style={{
                         fontSize: '0.75rem',
@@ -549,7 +549,7 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
                         textShadow: '0 1px 4px rgba(0,0,0,0.6)',
                       }}
                     >
-                      {label}...
+                      {jobData?.label || label}...
                     </span>
 
                     {/* Progress or ETA */}

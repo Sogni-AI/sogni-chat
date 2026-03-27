@@ -763,6 +763,7 @@ export function useChat(): UseChatResult {
                         [progress.jobIndex]: {
                           progress: progress.progress ?? prevJob?.progress,
                           etaSeconds: progress.etaSeconds ?? prevJob?.etaSeconds,
+                          label: progress.jobLabel ?? prevJob?.label,
                           ...(resultUrl ? { resultUrl, isVideo: isVideoResult } : prevJob?.resultUrl ? { resultUrl: prevJob.resultUrl, isVideo: prevJob.isVideo } : {}),
                           ...(progress.error ? { error: progress.error } : prevJob?.error ? { error: prevJob.error } : {}),
                         },
@@ -1799,6 +1800,7 @@ export function useChat(): UseChatResult {
                 [progress.jobIndex]: {
                   progress: progress.progress ?? prevJob?.progress,
                   etaSeconds: progress.etaSeconds ?? prevJob?.etaSeconds,
+                  label: progress.jobLabel ?? prevJob?.label,
                   ...(resultUrl ? { resultUrl, isVideo: isVideoResult } : prevJob?.resultUrl ? { resultUrl: prevJob.resultUrl, isVideo: prevJob.isVideo } : {}),
                   ...(progress.error ? { error: progress.error } : prevJob?.error ? { error: prevJob.error } : {}),
                 },

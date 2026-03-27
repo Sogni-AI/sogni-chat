@@ -117,6 +117,8 @@ export interface ToolExecutionProgress {
   sourceImageUrl?: string;
   /** Sub-step label shown during multi-phase operations (e.g. "Analyzing image...") */
   stepLabel?: string;
+  /** Per-job label for concurrent operations (stored into perJobProgress[i].label) */
+  jobLabel?: string;
   /** Target video aspect ratio as "w / h" CSS string (e.g. "9 / 16") for preloader sizing */
   videoAspectRatio?: string;
   /** Display name of the AI model used (e.g. "Z-Image Turbo", "LTX-2") */
@@ -131,6 +133,8 @@ export interface ToolExecutionProgress {
     error?: string;
     /** True when resultUrl is a video (vs image). Used by pipeline steps that mix media types. */
     isVideo?: boolean;
+    /** Per-job display label (e.g. "Generating right side view") */
+    label?: string;
   }>;
 }
 

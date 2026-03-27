@@ -249,6 +249,7 @@ export async function execute(
         toolName: 'change_angle',
         count: azimuths.length,
         concurrent: true,
+        itemLabels: azimuths.map(az => `Generating ${shortLabel(az)} view`),
         buildArgs: (_state, index) => ({
           description: `${azimuths[index]} ${elevation} ${distance}`,
           sourceImageIndex: effectiveSourceIndex ?? -1,
@@ -314,6 +315,7 @@ export async function execute(
         toolName: 'animate_photo',
         count: transitionCount,
         concurrent: true,
+        itemLabels: transitionLabels.map(tl => `Generating ${tl}`),
         buildArgs: (state, index) => {
           // angleResultIndices: [source/front, ...generated angles]
           // Transition i connects angleResultIndices[i] → angleResultIndices[(i+1) % count].

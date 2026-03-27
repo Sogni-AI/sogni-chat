@@ -27,6 +27,8 @@ export interface PipelineStep {
   count: number;
   /** Run all invocations concurrently via Promise.all (default: false — sequential). */
   concurrent?: boolean;
+  /** Per-invocation labels for concurrent steps (e.g. angle names). Falls back to step.label. */
+  itemLabels?: string[];
   buildArgs: (state: PipelineState, index: number) => Record<string, unknown>;
   customExecute?: (
     state: PipelineState,
@@ -109,6 +111,7 @@ export async function executePipeline(
               ...progress,
               toolName: config.parentToolName,
               stepLabel: step.label,
+              jobLabel: step.itemLabels?.[i],
               jobIndex: i,
               totalCount: step.count,
               completedCount,
