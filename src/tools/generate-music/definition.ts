@@ -29,7 +29,9 @@ Include:
 - Genre (rock, jazz, electronic, classical, hip-hop, etc.)
 - Mood (happy, melancholic, energetic, relaxing, epic, etc.)
 - Instruments (piano, guitar, drums, synth, strings, etc.)
-- Style descriptors (driving, mellow, atmospheric, punchy, etc.)`,
+- Style descriptors (driving, mellow, atmospheric, punchy, etc.)
+
+BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary ONE dimension across separate tracks. Lock in any genre/mood/instruments the user specified, vary the rest. Example: "{lo-fi hip hop beat with muted keys|jazz piano trio with brushed drums|ambient electronic with soft pads} with warm reverb and vinyl texture".`,
         },
         duration: {
           type: 'number',
@@ -66,6 +68,13 @@ Include:
           enum: [2, 3, 4, 6],
           description:
             'Time signature (beats per measure). 4 = 4/4 time (default, most common). 3 = 3/4 time (waltz). 2 = 2/4 time (march). 6 = 6/8 time (compound). Default: 4.',
+        },
+        numberOfVariations: {
+          type: 'number',
+          description:
+            'Number of variations (1-16). Use 1 unless user requests multiple. Default: 1.',
+          minimum: 1,
+          maximum: 16,
         },
       },
       required: ['prompt'],

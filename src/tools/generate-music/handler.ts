@@ -35,24 +35,25 @@ export async function execute(
   const keyscale = (args.keyscale as string) || 'C major';
   const lyrics = args.lyrics as string | undefined;
   const timesig = ([2, 3, 4, 6].includes(args.timesig as number) ? args.timesig : 4) as number;
+  const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
 
   const audioModel = AUDIO_MODELS[modelKey];
   const steps = audioModel.steps.default;
 
   // Cost estimation & pre-flight
   const originalToken = context.tokenType;
-  let estimatedCost = await fetchAudioCostEstimate(context.sogniClient, context.tokenType, audioModel.id, duration, steps);
+  let estimatedCost = await fetchAudioCostEstimate(context.sogniClient, context.tokenType, audioModel.id, duration, steps, numberOfMedia);
 
   const preflight = preflightCreditCheck(context, estimatedCost);
   if (!preflight.ok) return preflight.errorJson;
   if (context.tokenType !== originalToken) {
-    estimatedCost = await fetchAudioCostEstimate(context.sogniClient, context.tokenType, audioModel.id, duration, steps);
+    estimatedCost = await fetchAudioCostEstimate(context.sogniClient, context.tokenType, audioModel.id, duration, steps, numberOfMedia);
   }
 
   callbacks.onToolProgress({
     type: 'started',
     toolName: 'generate_music',
-    totalCount: 1,
+    totalCount: numberOfMedia,
     estimatedCost,
     modelName: `${audioModel.name} — ${duration}s`,
   });
@@ -76,6 +77,7 @@ export async function execute(
           steps,
           shift: audioModel.shift.default,
           guidance: audioModel.guidance?.default,
+          numberOfMedia,
           tokenType,
           disableNSFWFilter: context.safeContentFilter === false,
         },
@@ -85,8 +87,8 @@ export async function execute(
             toolName: 'generate_music',
             progress: progress.progress,
             completedCount: progress.completedCount,
-            totalCount: 1,
-            jobIndex: 0,
+            totalCount: numberOfMedia,
+            jobIndex: progress.jobIndex,
             etaSeconds: progress.etaSeconds,
             estimatedCost,
           });
@@ -129,7 +131,7 @@ export async function execute(
       timesig,
       hasLyrics: !!lyrics,
       creditsCost: formatCredits(estimatedCost),
-      message: `Successfully generated ${duration}-second ${lyrics ? 'song' : 'instrumental'} using ${audioModel.name} at ${bpm} BPM in ${keyscale}. Cost: ~${formatCredits(estimatedCost)} credits. The user can now listen to the result. The audio URL(s) can be used with sound_to_video to create a music video.`,
+      message: `Successfully generated ${audioUrls.length} ${duration}-second ${lyrics ? 'song' : 'instrumental'}${audioUrls.length !== 1 ? 's' : ''} using ${audioModel.name} at ${bpm} BPM in ${keyscale}. Cost: ~${formatCredits(estimatedCost)} credits. The user can now listen to the result${audioUrls.length !== 1 ? 's' : ''}. The audio URL(s) can be used with sound_to_video to create a music video.`,
     });
   } catch (err: unknown) {
     if (billingId) discardPending(billingId);
@@ -155,6 +157,7 @@ interface MusicParams {
   steps: number;
   shift: number;
   guidance?: number;
+  numberOfMedia: number;
   tokenType: TokenType;
   disableNSFWFilter?: boolean;
 }
@@ -162,6 +165,7 @@ interface MusicParams {
 interface MusicProgress {
   progress?: number;
   completedCount?: number;
+  jobIndex?: number;
   etaSeconds?: number;
   resultUrl?: string;
   completed?: boolean;
@@ -178,6 +182,7 @@ async function runMusicGeneration(
     type: 'audio',
     modelId: params.modelId,
     positivePrompt: params.prompt,
+    numberOfMedia: params.numberOfMedia,
     tokenType: params.tokenType,
     duration: params.duration,
     bpm: params.bpm,
@@ -206,8 +211,12 @@ async function runMusicGeneration(
   if (sessionId) void projectSessionMap.register(project.id, sessionId);
 
   return new Promise<string[]>((resolve, reject) => {
-    const resultUrls: string[] = [];
-    let completed = false;
+    // Pre-allocate slots so results land at their original jobIndex position
+    // regardless of which job finishes first (dePIN network order varies).
+    const resultUrls: (string | null)[] = new Array(params.numberOfMedia).fill(null);
+    let completedCount = 0;
+    let failedCount = 0;
+    const totalJobs = params.numberOfMedia;
 
     // Check if already aborted before setting up listeners
     if (signal?.aborted) {
@@ -215,14 +224,22 @@ async function runMusicGeneration(
       return;
     }
 
-    // Timeout: 10 minutes (music can generate up to 600-second tracks)
-    const timeoutMs = 600_000;
-    const timeoutId = setTimeout(() => {
-      if (!completed) {
+    // Activity-based inactivity timeout: reject if no progress/ETA for 10 min
+    // (music tracks can be up to 600s, so use a longer inactivity window)
+    let lastActivityTime = Date.now();
+    const INACTIVITY_TIMEOUT_MS = 600_000; // 10 minutes
+    const inactivityCheck = setInterval(() => {
+      const idleMs = Date.now() - lastActivityTime;
+      if (idleMs >= INACTIVITY_TIMEOUT_MS) {
+        console.warn(`[MUSIC] No activity for ${(idleMs / 1000).toFixed(0)}s — timing out`);
         cleanup();
-        reject(new Error('Music generation timed out'));
+        if (resultUrls.some(url => url !== null)) {
+          resolve(resultUrls.filter((url): url is string => url !== null));
+        } else {
+          reject(new Error('Music generation timed out (no activity)'));
+        }
       }
-    }, timeoutMs);
+    }, 30_000);
 
     const abortHandler = () => {
       cleanup();
@@ -230,10 +247,21 @@ async function runMusicGeneration(
     };
 
     const cleanup = () => {
-      clearTimeout(timeoutId);
+      clearInterval(inactivityCheck);
       signal?.removeEventListener('abort', abortHandler);
       projects.off('job', jobHandler);
       projects.off('project', projectHandler);
+    };
+
+    const checkDone = () => {
+      if (completedCount + failedCount >= totalJobs) {
+        cleanup();
+        if (failedCount === totalJobs) {
+          reject(new Error(`All ${totalJobs} music generation jobs failed`));
+        } else {
+          resolve(resultUrls.filter((url): url is string => url !== null));
+        }
+      }
     };
 
     if (signal) {
@@ -241,7 +269,6 @@ async function runMusicGeneration(
     }
 
     // Map jobId → jobIndex from initiating/started events (which include jobIndex)
-    // Music is single-job, so fallback to 0 is safe
     const jobIdToIndex = new Map<string, number>();
 
     const jobHandler = (event: Record<string, unknown>) => {
@@ -256,36 +283,46 @@ async function runMusicGeneration(
           break;
         }
         case 'progress': {
+          lastActivityTime = Date.now();
           const step = event.step as number | undefined;
           const stepCount = event.stepCount as number | undefined;
           if (step !== undefined && stepCount !== undefined && stepCount > 0) {
-            onProgress({ progress: step / stepCount });
+            onProgress({ progress: step / stepCount, jobIndex: event.jobId ? jobIdToIndex.get(event.jobId as string) : undefined });
           }
           break;
         }
         case 'jobETA': {
-          onProgress({ etaSeconds: event.etaSeconds as number | undefined });
+          lastActivityTime = Date.now();
+          onProgress({ etaSeconds: event.etaSeconds as number | undefined, jobIndex: event.jobId ? jobIdToIndex.get(event.jobId as string) : undefined });
           break;
         }
         case 'completed': {
-          if (!event.jobId || completed) return;
+          if (!event.jobId) return;
           const resultUrl = event.resultUrl as string | undefined;
           if (resultUrl && !event.error) {
-            resultUrls.push(resultUrl);
-            completed = true;
-            onProgress({ completed: true, completedCount: 1, resultUrl, progress: 1 });
-            cleanup();
-            resolve(resultUrls);
+            const jobIndex = jobIdToIndex.get(event.jobId as string);
+            if (jobIndex !== undefined && jobIndex >= 0 && jobIndex < resultUrls.length) {
+              resultUrls[jobIndex] = resultUrl;
+            } else {
+              const emptySlot = resultUrls.indexOf(null);
+              if (emptySlot !== -1) {
+                resultUrls[emptySlot] = resultUrl;
+              }
+            }
+            completedCount++;
+            onProgress({ completed: completedCount >= totalJobs, completedCount, jobIndex: jobIdToIndex.get(event.jobId as string), resultUrl, progress: 1 });
           } else {
-            cleanup();
-            reject(new Error(String(event.error || 'Music generation completed with no result')));
+            failedCount++;
+            console.error('[MUSIC] Job completed with error:', event.error);
           }
+          checkDone();
           break;
         }
         case 'error':
         case 'failed': {
-          cleanup();
-          reject(new Error(String((event.error as { message?: string })?.message || event.error || 'Music generation failed')));
+          failedCount++;
+          console.error('[MUSIC] Job failed:', event.error);
+          checkDone();
           break;
         }
       }
