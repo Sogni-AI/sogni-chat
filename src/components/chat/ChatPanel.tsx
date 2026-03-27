@@ -771,6 +771,15 @@ export function ChatPanel({
                 {welcomeGreeting || 'What would you like to create?'}
               </h1>
 
+              {/* Default Media Quality selector */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <QualityDropdown
+                  qualityTier={qualityTier}
+                  onQualityTierChange={onQualityTierChange}
+                  disabled={isLoading}
+                />
+              </div>
+
               {/* What can I do? chip */}
               <button
                 onClick={() => handleSend('What can I do? Give me a comprehensive overview of all your creative capabilities with concrete examples for each.')}
