@@ -15,10 +15,21 @@ export const LLM_THINKING_TIMEOUT_MS = 45_000;
 /** Race a promise against a timeout. Returns undefined on timeout. */
 export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T | undefined> {
   let timer: ReturnType<typeof setTimeout>;
+  let timedOut = false;
   const raced = Promise.race([
-    promise,
+    promise.catch((err) => {
+      // If the timeout already won, absorb the orphaned rejection to avoid
+      // UnhandledPromiseRejection. If the promise lost the race legitimately
+      // (rejected before timeout), re-throw so the caller sees the error.
+      if (timedOut) {
+        console.warn(`[LLM HELPERS] ${label} rejected after timeout:`, err);
+        return undefined;
+      }
+      throw err;
+    }),
     new Promise<undefined>((resolve) => {
       timer = setTimeout(() => {
+        timedOut = true;
         console.warn(`[LLM HELPERS] ${label} timed out after ${ms}ms`);
         resolve(undefined);
       }, ms);

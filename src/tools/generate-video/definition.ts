@@ -51,12 +51,12 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax. Lock i
         width: {
           type: 'number',
           description:
-            'Video width in pixels. LTX 2.3: 640-3840 (step 64), default 1920. WAN: 480-1536 (step 16), default 640. Resolution mappings: 480p=640x480, 720p=1280x720, 1080p=1920x1088, 4K=3840x2176.',
+            'Video width in pixels. LTX 2.3: 640-3840 (step 64). WAN: 480-1536 (step 16), default 640. Default resolution depends on quality tier — Standard ~720p, High ~1080p. Only set for explicit resolution requests. Mappings: 480p=640x480, 720p=1280x720, 1080p=1920x1088, 4K=3840x2176.',
         },
         height: {
           type: 'number',
           description:
-            'Video height in pixels. LTX 2.3: 640-3840 (step 64), default 1088. WAN: 480-1536 (step 16), default 640. Set both width and height for resolution requests.',
+            'Video height in pixels. LTX 2.3: 640-3840 (step 64). WAN: 480-1536 (step 16), default 640. Set both width and height for explicit resolution requests.',
         },
         numberOfVariations: {
           type: 'number',

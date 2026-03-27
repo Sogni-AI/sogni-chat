@@ -43,7 +43,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, the prompt must describe ONE subj
         sourceImageIndex: {
           type: 'number',
           description:
-            'Index of the primary image to use as the main reference (0-based, from uploaded files). The primary image and any additional uploaded images are passed as context images to guide generation.',
+            'Index of the primary image to use as the main reference (0-based, counting only uploaded image files — video and audio files are excluded from this index). The primary image and any additional uploaded images are passed as context images to guide generation.',
         },
         numberOfVariations: {
           type: 'number',

@@ -198,7 +198,17 @@ export async function executePipeline(
           });
       });
 
-      await Promise.all(promises);
+      // Use allSettled so a single sub-tool failure doesn't abandon siblings
+      // (which would continue running and consuming credits with no result collection).
+      const settled = await Promise.allSettled(promises);
+      const errors = settled
+        .map((r, i) => r.status === 'rejected' ? { index: i, reason: r.reason } : null)
+        .filter(Boolean) as { index: number; reason: unknown }[];
+      if (errors.length > 0) {
+        // Re-throw the first fatal error after all siblings have finished
+        const firstError = errors[0];
+        throw firstError.reason instanceof Error ? firstError.reason : new Error(String(firstError.reason));
+      }
       stepResults.push(...slotResults);
     } else {
       // ---------------------------------------------------------------

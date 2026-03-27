@@ -156,9 +156,17 @@ export async function execute(
     }
   }
 
-  // Use video dimensions if known, otherwise defaults
-  const width = config.defaultWidth;
-  const height = config.defaultHeight;
+  // Use source video dimensions when available, snapped to model step size
+  // and clamped to model min/max. Falls back to model defaults.
+  let width = config.defaultWidth;
+  let height = config.defaultHeight;
+  if (videoFile.width && videoFile.height) {
+    const step = config.dimensionStep;
+    width = Math.round(videoFile.width / step) * step;
+    height = Math.round(videoFile.height / step) * step;
+    width = Math.max(config.minDimension, Math.min(config.maxDimension, width));
+    height = Math.max(config.minDimension, Math.min(config.maxDimension, height));
+  }
   const frames = computeFrames(duration, config);
   const fps = config.defaultFps;
   const steps = config.defaultSteps;

@@ -47,7 +47,7 @@ BATCH VARIATIONS: When numberOfVariations > 1, use Dynamic Prompt syntax to vary
         duration: {
           type: 'number',
           description:
-            'Output video duration in seconds. Default: matches source video length (up to 10s). Range: 2-10.',
+            'Output video duration in seconds. Default: 5. Range: 2-10.',
           minimum: 2,
           maximum: 10,
         },
