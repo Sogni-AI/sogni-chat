@@ -55,6 +55,30 @@ export const definition: ToolDefinition = {
             '(first segment, default), 1 = right→back, 2 = back→left, 3 = left→front ' +
             '(last segment). Only used when dialogue is provided.',
         },
+        angles: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: [
+              'front-right quarter view',
+              'right side view',
+              'back-right quarter view',
+              'back view',
+              'back-left quarter view',
+              'left side view',
+              'front-left quarter view',
+            ],
+          },
+          description:
+            'Custom azimuth sequence for the orbit. The source image is always the ' +
+            'starting "front view" — list only the intermediate angles to generate, ' +
+            'in clockwise order. The orbit transitions through each angle in order ' +
+            'and wraps back to front. Default (omit): ["right side view", "back view", ' +
+            '"left side view"] = standard 360° at 90° increments (4 transitions). ' +
+            'For a smoother orbit use all 7 positions at 45° increments. For a partial ' +
+            'orbit (e.g. just the right side), use a subset like ["front-right quarter view", ' +
+            '"right side view"]. More angles = more credits and generation time.',
+        },
         sourceImageIndex: {
           type: 'number',
           description:

@@ -27,15 +27,35 @@ import { saveVideoToGallery } from '@/services/galleryService';
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Generated azimuths — the original image serves as "front view" */
-const GENERATED_AZIMUTHS = [
+/** Default azimuths for a standard 360° orbit at 90° increments */
+const DEFAULT_AZIMUTHS = [
   'right side view',
   'back view',
   'left side view',
 ] as const;
 
-/** Total transition count: original→right, right→back, back→left, left→original */
-const TRANSITION_COUNT = 4;
+/** All valid azimuth values (excluding front view which is always the source) */
+const VALID_AZIMUTHS = new Set([
+  'front-right quarter view',
+  'right side view',
+  'back-right quarter view',
+  'back view',
+  'back-left quarter view',
+  'left side view',
+  'front-left quarter view',
+]);
+
+/** Short labels for diagnostic logging */
+const AZIMUTH_SHORT_LABELS: Record<string, string> = {
+  'front view': 'front',
+  'front-right quarter view': 'f-right',
+  'right side view': 'right',
+  'back-right quarter view': 'b-right',
+  'back view': 'back',
+  'back-left quarter view': 'b-left',
+  'left side view': 'left',
+  'front-left quarter view': 'f-left',
+};
 
 const DEFAULT_ELEVATION = 'eye-level shot';
 const DEFAULT_DISTANCE = 'medium shot';
@@ -45,11 +65,6 @@ const ORBIT_VIDEO_MODEL = 'ltx23' as const;
 
 /** Appended to all orbit transition prompts to enforce consistent clockwise pan direction */
 const ORBIT_DIRECTION_SUFFIX = 'The camera pans smoothly and continuously to the right in a clockwise orbit.';
-
-/** Labels for diagnostic logging — must stay in sync with TRANSITION_COUNT */
-const TRANSITION_LABELS = [
-  'front→right', 'right→back', 'back→left', 'left→front',
-] as const;
 
 export async function execute(
   args: Record<string, unknown>,
@@ -84,6 +99,34 @@ export async function execute(
     }
     return basePrompt;
   };
+
+  // ---------------------------------------------------------------------------
+  // Resolve angle sequence
+  // ---------------------------------------------------------------------------
+  const rawAngles = args.angles as string[] | undefined;
+  const azimuths: string[] = rawAngles?.length
+    ? rawAngles.filter(a => VALID_AZIMUTHS.has(a))
+    : [...DEFAULT_AZIMUTHS];
+
+  if (azimuths.length === 0) {
+    return JSON.stringify({
+      error: 'invalid_angles',
+      message: 'No valid azimuth values provided. Valid values: ' + [...VALID_AZIMUTHS].join(', '),
+    });
+  }
+
+  const transitionCount = azimuths.length + 1; // +1 for the wrap-back to front
+
+  // Build transition labels for logging: front→right, right→back, etc.
+  const shortLabel = (azimuth: string) => AZIMUTH_SHORT_LABELS[azimuth] || azimuth;
+  const transitionLabels = azimuths.map((az, i) => {
+    const from = i === 0 ? 'front' : shortLabel(azimuths[i - 1]);
+    return `${from}→${shortLabel(az)}`;
+  });
+  transitionLabels.push(`${shortLabel(azimuths[azimuths.length - 1])}→front`);
+
+  console.log(`[ORBIT] Angle sequence: front → ${azimuths.map(shortLabel).join(' → ')} → front (${transitionCount} transitions)`);
+
   const rawSourceIndex = args.sourceImageIndex as number | undefined;
 
   // ---------------------------------------------------------------------------
@@ -160,8 +203,8 @@ export async function execute(
     videoCost = 0;
   }
 
-  const totalAngleCost = angleCost * GENERATED_AZIMUTHS.length;
-  const totalVideoCost = videoCost * TRANSITION_COUNT;
+  const totalAngleCost = angleCost * azimuths.length;
+  const totalVideoCost = videoCost * transitionCount;
   const estimatedCost = totalAngleCost + totalVideoCost;
 
   if (estimatedCost > 0) {
@@ -198,59 +241,58 @@ export async function execute(
       },
     },
     steps: [
-      // Step 1: Generate 3 angle views (original image is the front view)
+      // Step 1: Generate angle views (original image is the front view)
       {
         label: 'Generating angle views',
         toolName: 'change_angle',
-        count: GENERATED_AZIMUTHS.length,
+        count: azimuths.length,
         concurrent: true,
         buildArgs: (_state, index) => ({
-          description: `${GENERATED_AZIMUTHS[index]} ${elevation} ${distance}`,
+          description: `${azimuths[index]} ${elevation} ${distance}`,
           sourceImageIndex: effectiveSourceIndex ?? -1,
         }),
         collectResults: (state, results) => {
-          // results[i] corresponds to GENERATED_AZIMUTHS[i] via pre-allocated slots
+          // results[i] corresponds to azimuths[i] via pre-allocated slots
           const angleImageUrls = results
             .flatMap(r => r.imageUrls)
             .filter(Boolean);
 
           // Hard-fail if any angle is missing — a partial orbit produces visible
           // jump cuts that are worse than no result at all.
-          if (angleImageUrls.length !== GENERATED_AZIMUTHS.length) {
+          if (angleImageUrls.length !== azimuths.length) {
             throw new Error(
-              `Orbit requires ${GENERATED_AZIMUTHS.length} angle views but only ${angleImageUrls.length} were generated. ` +
-              `Cannot produce a seamless 360° orbit video with missing angles.`,
+              `Orbit requires ${azimuths.length} angle views but only ${angleImageUrls.length} were generated. ` +
+              `Cannot produce a seamless orbit video with missing angles.`,
             );
           }
-          console.log(`[ORBIT] Collected ${angleImageUrls.length} angle images (slot-ordered: right, back, left)`);
+          console.log(`[ORBIT] Collected ${angleImageUrls.length} angle images (slot-ordered: ${azimuths.map(shortLabel).join(', ')})`);
 
           // Verify each angle URL is present in context.resultUrls (the pipeline's
           // onToolComplete should have pushed them, but race conditions or dedup
           // guards can cause misses). Push any missing URLs and log a warning.
           for (let i = 0; i < angleImageUrls.length; i++) {
             if (!context.resultUrls.includes(angleImageUrls[i])) {
-              console.warn(`[ORBIT] Angle image "${GENERATED_AZIMUTHS[i]}" URL missing from context.resultUrls — pushing manually`);
+              console.warn(`[ORBIT] Angle image "${azimuths[i]}" URL missing from context.resultUrls — pushing manually`);
               context.resultUrls.push(angleImageUrls[i]);
             }
           }
 
           // Pre-compute context.resultUrls indices for each angle image.
-          // Full angle sequence for transitions: [source/front, right, back, left]
+          // Full angle sequence for transitions: [source/front, ...azimuths]
           // Index 0 = source image (effectiveSourceIndex or -1 for original upload)
-          // Indices 1..3 = generated angle images in GENERATED_AZIMUTHS order
+          // Indices 1..N = generated angle images in azimuths order
           const sourceIdx = effectiveSourceIndex ?? -1;
           const angleResultIndices = [
             sourceIdx,
             ...angleImageUrls.map((url, i) => {
               const idx = context.resultUrls.indexOf(url);
               if (idx === -1) {
-                // Should never happen after the push above, but guard defensively
-                console.error(`[ORBIT] BUG: Angle image "${GENERATED_AZIMUTHS[i]}" not found in context.resultUrls after manual push`);
+                console.error(`[ORBIT] BUG: Angle image "${azimuths[i]}" not found in context.resultUrls after manual push`);
               }
               return idx;
             }),
           ];
-          console.log(`[ORBIT] Pre-computed angleResultIndices: [${angleResultIndices.join(', ')}] (source, right, back, left)`);
+          console.log(`[ORBIT] Pre-computed angleResultIndices: [${angleResultIndices.join(', ')}] (source, ${azimuths.map(shortLabel).join(', ')})`);
 
           return {
             ...state,
@@ -260,7 +302,7 @@ export async function execute(
         },
       },
 
-      // Step 2: Generate 4 transition clips (front→right, right→back, back→left, left→front)
+      // Step 2: Generate transition clips between consecutive angles + wrap-back
       // Ordering guarantee: same pre-allocated slot pattern as Step 1. Each
       // slotResults[i] holds the video for transition i, so collectResults
       // produces clips in the correct stitch order regardless of which job
@@ -268,28 +310,28 @@ export async function execute(
       {
         label: 'Generating transitions',
         toolName: 'animate_photo',
-        count: TRANSITION_COUNT,
+        count: transitionCount,
         concurrent: true,
         buildArgs: (state, index) => {
-          // angleResultIndices is a 4-element array: [source, right, back, left]
-          // representing pre-computed context.resultUrls indices for each angle.
-          // Transition i connects angleResultIndices[i] → angleResultIndices[(i+1) % 4].
+          // angleResultIndices: [source/front, ...generated angles]
+          // Transition i connects angleResultIndices[i] → angleResultIndices[(i+1) % count].
+          // The last transition wraps back to front (index 0).
           const angleResultIndices = state.data.angleResultIndices as number[];
 
           const startIdx = angleResultIndices[index];
-          const endIdx = angleResultIndices[(index + 1) % TRANSITION_COUNT];
+          const endIdx = angleResultIndices[(index + 1) % angleResultIndices.length];
 
           // Validate: -1 is only legitimate for the source/front image (index 0
           // in the sequence) when the user's original upload is the source.
-          // For generated angles (indices 1-3), -1 means the URL was lost.
+          // For generated angles (indices 1+), -1 means the URL was lost.
           if (startIdx === -1 && index !== 0) {
-            console.error(`[ORBIT] BUG: Pre-computed startIdx is -1 for transition ${index} (${TRANSITION_LABELS[index]}) — angle image URL was not resolved`);
+            console.error(`[ORBIT] BUG: Pre-computed startIdx is -1 for transition ${index} (${transitionLabels[index]}) — angle image URL was not resolved`);
           }
-          if (endIdx === -1 && index !== TRANSITION_COUNT - 1) {
-            console.error(`[ORBIT] BUG: Pre-computed endIdx is -1 for transition ${index} (${TRANSITION_LABELS[index]}) — angle image URL was not resolved`);
+          if (endIdx === -1 && index !== transitionCount - 1) {
+            console.error(`[ORBIT] BUG: Pre-computed endIdx is -1 for transition ${index} (${transitionLabels[index]}) — angle image URL was not resolved`);
           }
           const segmentPrompt = buildSegmentPrompt(index);
-          console.log(`[ORBIT] Transition ${index} (${TRANSITION_LABELS[index]}): sourceImageIndex=${startIdx}, endImageIndex=${endIdx}${dialogue && index === dialogueSegment ? ` [+dialogue]` : ''}`);
+          console.log(`[ORBIT] Transition ${index} (${transitionLabels[index]}): sourceImageIndex=${startIdx}, endImageIndex=${endIdx}${dialogue && index === dialogueSegment ? ` [+dialogue]` : ''}`);
 
           return {
             prompt: segmentPrompt,
@@ -311,10 +353,10 @@ export async function execute(
           const transitionVideoUrls = results
             .flatMap(r => r.videoUrls)
             .filter(Boolean);
-          if (transitionVideoUrls.length !== TRANSITION_COUNT) {
-            console.warn(`[ORBIT] Expected ${TRANSITION_COUNT} transition videos but got ${transitionVideoUrls.length} — stitch order may be wrong`);
+          if (transitionVideoUrls.length !== transitionCount) {
+            console.warn(`[ORBIT] Expected ${transitionCount} transition videos but got ${transitionVideoUrls.length} — stitch order may be wrong`);
           }
-          console.log(`[ORBIT] Collected ${transitionVideoUrls.length} transition videos (slot-ordered: front→right, right→back, back→left, left→front)`);
+          console.log(`[ORBIT] Collected ${transitionVideoUrls.length} transition videos (slot-ordered: ${transitionLabels.join(', ')})`);
           return {
             ...state,
             videoUrls: transitionVideoUrls,
@@ -407,7 +449,7 @@ export async function execute(
       resultCount: 1,
       mediaType: 'video',
       creditsCost: estimatedCost > 0 ? formatCredits(estimatedCost) : undefined,
-      message: `Successfully created a 360-degree orbit video with ${TRANSITION_COUNT} transitions.${estimatedCost > 0 ? ` Estimated cost: ~${formatCredits(estimatedCost)} credits.` : ''} The user can now see and play the orbit video.`,
+      message: `Successfully created an orbit video with ${transitionCount} transitions (${azimuths.length} angles).${estimatedCost > 0 ? ` Estimated cost: ~${formatCredits(estimatedCost)} credits.` : ''} The user can now see and play the orbit video.`,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
