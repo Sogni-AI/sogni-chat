@@ -30,12 +30,12 @@ export const definition: ToolDefinition = {
         prompt: {
           type: 'string',
           description:
-            'Motion and ambient audio description applied to ALL transition clips. ' +
-            'Describes how the camera moves between angles and what ambient/foley sounds ' +
-            'play throughout (e.g. "footsteps on gravel, wind blowing"). Default uses ' +
-            'constant-speed linear motion. Do NOT put spoken dialogue here — use the ' +
-            'dialogue parameter instead. Music is automatically suppressed — use ' +
-            'generate_music separately for soundtrack.',
+            'Describe the SUBJECT and ambient environment (e.g. "the bobblehead ' +
+            'couple on the beach, ocean waves lapping, palm trees swaying in the ' +
+            'breeze"). Do NOT describe camera motion, rotation, panning, orbiting, ' +
+            'or 360-degree movement — camera motion is handled automatically. ' +
+            'Do NOT put spoken dialogue here — use the dialogue parameter instead. ' +
+            'Music is automatically suppressed — use generate_music separately.',
         },
         dialogue: {
           type: 'string',

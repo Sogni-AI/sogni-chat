@@ -62,13 +62,8 @@ const AZIMUTH_SHORT_LABELS: Record<string, string> = {
 
 const DEFAULT_ELEVATION = 'eye-level shot';
 const DEFAULT_DISTANCE = 'medium shot';
-const DEFAULT_PROMPT = 'Steady camera pan. Foley and ambient sound effects only, no music, no soundtrack.';
 const ORBIT_VIDEO_DURATION = 2.5; // seconds per transition clip
 const ORBIT_VIDEO_MODEL = 'ltx23' as const;
-
-/** Appended to all orbit transition prompts to enforce consistent clockwise pan direction
- *  and constant-speed linear motion (no ease-in/ease-out ramps between segments). */
-const ORBIT_MOTION_SUFFIX = 'The camera pans to the right in a clockwise orbit at constant speed with absolutely linear motion throughout, no acceleration, no deceleration, no easing, no speed ramps, no pausing.';
 
 export async function execute(
   args: Record<string, unknown>,
@@ -77,17 +72,21 @@ export async function execute(
 ): Promise<string> {
   const elevation = (args.elevation as string) || DEFAULT_ELEVATION;
   const distance = (args.distance as string) || DEFAULT_DISTANCE;
-  // Suppress per-clip music generation — each clip gets independent audio from
+  // The LLM's prompt describes the subject and ambient environment. The handler
+  // wraps it into the correct per-segment structure so the video model sees:
+  //   "A single continuous cinematic shot of [subject/scene] as the camera
+  //    rotates around the subject in a smooth and continuous motion."
+  // Suppress per-clip music — each 2.5s segment gets independent audio from
   // LTX 2.3, which creates discontinuous music when stitched. Speech/narration
-  // is fine since it's sequential, but music needs to be generated separately.
-  const rawPrompt = (args.prompt as string) || DEFAULT_PROMPT;
-  const withMusic = /no music|no soundtrack/i.test(rawPrompt)
-    ? rawPrompt
-    : `${rawPrompt} Foley and ambient sound effects only, no music, no soundtrack.`;
-  // Always append linear motion enforcement so all clips pan clockwise at
-  // constant speed with no ease-in/ease-out ramps. This prevents visible
-  // pauses at each angle when segments are stitched together.
-  const basePrompt = `${withMusic} ${ORBIT_MOTION_SUFFIX}`;
+  // is fine since it's sequential, but music needs generate_music separately.
+  const rawPrompt = (args.prompt as string)?.trim() || '';
+
+  const subjectClause = rawPrompt
+    ? `A single continuous cinematic shot of ${rawPrompt}`
+    : 'A single continuous cinematic shot';
+  const motionClause = 'as the camera rotates around the subject in a smooth and continuous motion.';
+  const audioClause = 'Foley and ambient sound effects only, no music, no soundtrack.';
+  const basePrompt = `${subjectClause} ${motionClause} ${audioClause}`;
 
   // ---------------------------------------------------------------------------
   // Resolve angle sequence
