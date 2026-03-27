@@ -110,13 +110,23 @@ export async function execute(
                - AZIMUTH_CLOCKWISE_ORDER.indexOf(b as typeof AZIMUTH_CLOCKWISE_ORDER[number]),
       );
 
-      // Check coverage: angles should span at least 180° of the compass (4 positions apart)
-      // to produce a meaningful orbit. If they cluster in a small arc, fall back to defaults.
-      const positions = sorted.map(a => AZIMUTH_CLOCKWISE_ORDER.indexOf(a as typeof AZIMUTH_CLOCKWISE_ORDER[number]));
-      const span = positions[positions.length - 1] - positions[0];
-      if (sorted.length >= 3 && span < 4) {
-        // All angles are within a 180° arc — not a useful orbit
-        console.warn(`[ORBIT] Provided angles cluster within ${(span + 1) * 45}° arc (${sorted.map(shortLabel).join(', ')}), using defaults for full 360°`);
+      // Validate angular coverage: check that no gap between consecutive angles
+      // (including front→first and last→front) exceeds 135° (3 positions).
+      // The full sequence is: front(0) → sorted angles → front(8, wraps back).
+      const positions = sorted.map(
+        a => AZIMUTH_CLOCKWISE_ORDER.indexOf(a as typeof AZIMUTH_CLOCKWISE_ORDER[number]) + 1,
+      ); // +1 because front=0, first azimuth=1, etc. in 8-point space
+      const fullSequence = [0, ...positions, 8]; // front → angles → front (wrap)
+      const maxGap = Math.max(
+        ...fullSequence.slice(1).map((pos, i) => pos - fullSequence[i]),
+      );
+
+      // Max gap of 3+ positions (135°+) means visible jump cuts between views.
+      // The default 90° orbit has gaps of exactly 2 — allow up to 2 (90°).
+      if (maxGap > 2) {
+        console.warn(
+          `[ORBIT] Custom angles have a ${maxGap * 45}° gap (${sorted.map(shortLabel).join(', ')}), using defaults for full 360°`,
+        );
         azimuths = [...DEFAULT_AZIMUTHS];
       } else {
         azimuths = sorted;

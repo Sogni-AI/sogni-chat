@@ -252,9 +252,13 @@ export async function executePipeline(
         try {
           const parsed = JSON.parse(rawResult);
           if (parsed.error) {
-            console.error(`[PIPELINE] Sub-tool error in "${step.label}" invocation ${i}:`, parsed.error);
-            if (parsed.error === 'insufficient_credits' || parsed.error === 'no_image') {
-              throw new Error(parsed.error);
+            console.error(`[PIPELINE] Sub-tool error in "${step.label}" invocation ${i}:`, parsed.error, parsed.message);
+            if (
+              step.failOnAnyError ||
+              parsed.error === 'insufficient_credits' ||
+              parsed.error === 'no_image'
+            ) {
+              throw new Error(parsed.message || parsed.error);
             }
           }
         } catch (e) {
