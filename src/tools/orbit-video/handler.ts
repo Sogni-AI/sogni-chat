@@ -68,9 +68,22 @@ export async function execute(
   // Ensure every transition prompt includes directional language so all clips
   // pan in the same direction (clockwise). Without this, the video model may
   // generate some transitions going left and others going right.
-  const prompt = /to the right|clockwise/i.test(withMusic)
+  const basePrompt = /to the right|clockwise/i.test(withMusic)
     ? withMusic
     : `${withMusic} ${ORBIT_DIRECTION_SUFFIX}`;
+
+  // Per-segment dialogue: only inject into the specified segment, all others
+  // get the base motion/foley prompt. This prevents dialogue from being
+  // duplicated across every segment when the user only wants it in one.
+  const dialogue = args.dialogue as string | undefined;
+  const dialogueSegment = typeof args.dialogueSegment === 'number' ? args.dialogueSegment : 0;
+
+  const buildSegmentPrompt = (segmentIndex: number): string => {
+    if (dialogue && segmentIndex === dialogueSegment) {
+      return `${dialogue}. ${basePrompt}`;
+    }
+    return basePrompt;
+  };
   const rawSourceIndex = args.sourceImageIndex as number | undefined;
 
   // ---------------------------------------------------------------------------
@@ -275,10 +288,11 @@ export async function execute(
           if (endIdx === -1 && index !== TRANSITION_COUNT - 1) {
             console.error(`[ORBIT] BUG: Pre-computed endIdx is -1 for transition ${index} (${TRANSITION_LABELS[index]}) — angle image URL was not resolved`);
           }
-          console.log(`[ORBIT] Transition ${index} (${TRANSITION_LABELS[index]}): sourceImageIndex=${startIdx}, endImageIndex=${endIdx}`);
+          const segmentPrompt = buildSegmentPrompt(index);
+          console.log(`[ORBIT] Transition ${index} (${TRANSITION_LABELS[index]}): sourceImageIndex=${startIdx}, endImageIndex=${endIdx}${dialogue && index === dialogueSegment ? ` [+dialogue]` : ''}`);
 
           return {
-            prompt,
+            prompt: segmentPrompt,
             videoModel: ORBIT_VIDEO_MODEL,
             duration: ORBIT_VIDEO_DURATION,
             sourceImageIndex: startIdx,

@@ -30,12 +30,30 @@ export const definition: ToolDefinition = {
         prompt: {
           type: 'string',
           description:
-            'Motion/animation description for transition clips. Describes how the ' +
-            'camera moves between angles. Default uses constant-speed linear motion. ' +
-            'Can include speech/narration or foley/sound effects descriptions ' +
-            '(e.g. "footsteps on gravel, wind blowing") which carry across clips with ' +
-            'audio continuity when stitched. Foley and ambient SFX are recommended for ' +
-            'realism. Music is automatically suppressed — use generate_music separately for soundtrack.',
+            'Motion and ambient audio description applied to ALL transition clips. ' +
+            'Describes how the camera moves between angles and what ambient/foley sounds ' +
+            'play throughout (e.g. "footsteps on gravel, wind blowing"). Default uses ' +
+            'constant-speed linear motion. Do NOT put spoken dialogue here — use the ' +
+            'dialogue parameter instead. Music is automatically suppressed — use ' +
+            'generate_music separately for soundtrack.',
+        },
+        dialogue: {
+          type: 'string',
+          description:
+            'Spoken dialogue or narration for a SINGLE segment of the orbit video. ' +
+            'This is applied ONLY to the segment specified by dialogueSegment (default: ' +
+            'first segment). All other segments get foley/ambient audio only. Keep it ' +
+            'brief — each segment is 2.5 seconds (~6 words max). If the user asks for ' +
+            'dialogue in "just the first segment" or "only at the start", put the speech ' +
+            'here and leave prompt for motion/foley only.',
+        },
+        dialogueSegment: {
+          type: 'number',
+          enum: [0, 1, 2, 3],
+          description:
+            'Which transition segment receives the dialogue (0-3). 0 = front→right ' +
+            '(first segment, default), 1 = right→back, 2 = back→left, 3 = left→front ' +
+            '(last segment). Only used when dialogue is provided.',
         },
         sourceImageIndex: {
           type: 'number',
