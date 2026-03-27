@@ -70,14 +70,12 @@ export const definition: ToolDefinition = {
             ],
           },
           description:
-            'Custom azimuth sequence for the orbit. The source image is always the ' +
-            'starting "front view" — list only the intermediate angles to generate, ' +
-            'in clockwise order. The orbit transitions through each angle in order ' +
-            'and wraps back to front. Default (omit): ["right side view", "back view", ' +
-            '"left side view"] = standard 360° at 90° increments (4 transitions). ' +
-            'For a smoother orbit use all 7 positions at 45° increments. For a partial ' +
-            'orbit (e.g. just the right side), use a subset like ["front-right quarter view", ' +
-            '"right side view"]. More angles = more credits and generation time.',
+            'OMIT THIS PARAMETER for standard 360° orbits — the default (3 angles ' +
+            'at 90° increments: right, back, left + source as front = 4 transitions) ' +
+            'works for nearly all requests. Only provide this when the user explicitly ' +
+            'asks for specific angles, a partial orbit, or extra-smooth rotation. ' +
+            'Each additional angle costs extra credits and generation time. ' +
+            'Values are clockwise azimuths between the source (front) and wrap-back.',
         },
         sourceImageIndex: {
           type: 'number',

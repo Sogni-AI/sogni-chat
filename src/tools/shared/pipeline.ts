@@ -84,6 +84,24 @@ export async function executePipeline(
         stepLabel: step.label,
       });
 
+      // Immediately emit per-job labels so the UI shows them from the start,
+      // before any sub-tool progress events arrive.
+      if (step.itemLabels) {
+        for (let j = 0; j < step.count; j++) {
+          if (step.itemLabels[j]) {
+            callbacks.onToolProgress({
+              type: 'progress',
+              toolName: config.parentToolName,
+              stepLabel: step.label,
+              jobLabel: step.itemLabels[j],
+              jobIndex: j,
+              totalCount: step.count,
+              completedCount: 0,
+            });
+          }
+        }
+      }
+
       // Pre-allocate result slots so concurrent callbacks write to the correct index
       const slotResults: StepResult[] = new Array(step.count).fill(null).map(() => ({
         rawResult: '',
