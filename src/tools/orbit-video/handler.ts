@@ -62,12 +62,13 @@ const AZIMUTH_SHORT_LABELS: Record<string, string> = {
 
 const DEFAULT_ELEVATION = 'eye-level shot';
 const DEFAULT_DISTANCE = 'medium shot';
-const DEFAULT_PROMPT = 'constant speed linear camera pan to the right, steady uniform clockwise motion throughout, no acceleration or deceleration. Foley and ambient sound effects only, no music, no soundtrack.';
+const DEFAULT_PROMPT = 'Steady camera pan. Foley and ambient sound effects only, no music, no soundtrack.';
 const ORBIT_VIDEO_DURATION = 2.5; // seconds per transition clip
 const ORBIT_VIDEO_MODEL = 'ltx23' as const;
 
-/** Appended to all orbit transition prompts to enforce consistent clockwise pan direction */
-const ORBIT_DIRECTION_SUFFIX = 'The camera pans smoothly and continuously to the right in a clockwise orbit.';
+/** Appended to all orbit transition prompts to enforce consistent clockwise pan direction
+ *  and constant-speed linear motion (no ease-in/ease-out ramps between segments). */
+const ORBIT_MOTION_SUFFIX = 'The camera pans to the right in a clockwise orbit at constant speed with absolutely linear motion throughout, no acceleration, no deceleration, no easing, no speed ramps, no pausing.';
 
 export async function execute(
   args: Record<string, unknown>,
@@ -83,12 +84,10 @@ export async function execute(
   const withMusic = /no music|no soundtrack/i.test(rawPrompt)
     ? rawPrompt
     : `${rawPrompt} Foley and ambient sound effects only, no music, no soundtrack.`;
-  // Ensure every transition prompt includes directional language so all clips
-  // pan in the same direction (clockwise). Without this, the video model may
-  // generate some transitions going left and others going right.
-  const basePrompt = /to the right|clockwise/i.test(withMusic)
-    ? withMusic
-    : `${withMusic} ${ORBIT_DIRECTION_SUFFIX}`;
+  // Always append linear motion enforcement so all clips pan clockwise at
+  // constant speed with no ease-in/ease-out ramps. This prevents visible
+  // pauses at each angle when segments are stitched together.
+  const basePrompt = `${withMusic} ${ORBIT_MOTION_SUFFIX}`;
 
   // ---------------------------------------------------------------------------
   // Resolve angle sequence
