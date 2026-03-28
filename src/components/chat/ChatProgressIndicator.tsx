@@ -306,6 +306,8 @@ interface ChatProgressIndicatorProps {
   onCancel?: () => void;
   /** Called when user clicks a completed result in the progress grid */
   onMediaClick?: (index: number, mediaType: 'image' | 'video' | 'audio') => void;
+  /** When true, skip the visual grid (videos are rendered by ChatVideoResults) */
+  hideVideoGrid?: boolean;
 }
 
 const TOOL_LABELS: Record<string, string> = {
@@ -329,6 +331,7 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
   imageUrl,
   onCancel,
   onMediaClick,
+  hideVideoGrid,
 }: ChatProgressIndicatorProps) {
   const label = progress.stepLabel || TOOL_LABELS[progress.toolName] || 'Processing';
   const percentage = progress.progress ? Math.round(progress.progress * 100) : 0;
@@ -396,7 +399,8 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
           gap: '0.5rem',
         }}
       >
-        {/* Thumbnail grid — blurred originals with completed results replacing them */}
+        {/* Thumbnail grid — skipped when videos are rendered externally by ChatVideoResults */}
+        {!(hideVideoGrid && isVideoTool) && (
         <div
           style={{
             display: 'inline-grid',
@@ -634,6 +638,61 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
             );
           })}
         </div>
+        )}
+
+        {/* Single-item progress info when video grid is hidden */}
+        {hideVideoGrid && isVideoTool && !isBatch && hasAnyPending && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.5rem 0.75rem',
+              background: 'var(--color-bg-elevated)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '0.75rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {costLabel && (
+                <span style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>
+                  {costLabel}
+                </span>
+              )}
+              {progressText && (
+                <span style={{ color: 'var(--color-text-secondary)' }}>
+                  {progressText}
+                </span>
+              )}
+            </div>
+            {onCancel && (
+              <button
+                onClick={onCancel}
+                aria-label="Cancel"
+                style={{
+                  background: 'rgba(239, 68, 68, 0.08)',
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  color: '#dc2626',
+                  fontSize: '0.6875rem',
+                  fontWeight: 500,
+                  padding: '0.25rem 0.75rem',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+                }}
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Model name label */}
         {progress.modelName && (

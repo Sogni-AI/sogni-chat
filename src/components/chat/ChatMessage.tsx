@@ -3,7 +3,7 @@
  * Renders user messages, assistant messages (with streaming indicator),
  * system notifications, inline image results, and tool execution progress.
  */
-import { memo, useState, useCallback } from 'react';
+import { memo } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import type { UIChatMessage } from '@/hooks/useChat';
 import { ChatImageResults } from './ChatImageResults';
@@ -76,11 +76,8 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
   const hasUploadedImage = !!message.uploadedImageUrl;
   const hasUploadedImages = message.uploadedImageUrls && message.uploadedImageUrls.length > 0;
 
-  // Track which video/audio is currently active (for "Save current" in menu)
-  const [activeVideoIndex, setActiveVideoIndex] = useState(0);
-  const [activeAudioIndex, setActiveAudioIndex] = useState(0);
-  const handleVideoIndexChange = useCallback((i: number) => setActiveVideoIndex(i), []);
-  const handleAudioIndexChange = useCallback((i: number) => setActiveAudioIndex(i), []);
+  // Detect when current progress is for a video tool — renders video grid from ChatVideoResults
+  const isVideoToolProgress = !!message.toolProgress && ['animate_photo', 'generate_video', 'sound_to_video', 'video_to_video', 'stitch_video', 'orbit_video'].includes(message.toolProgress.toolName);
 
   // Don't render empty assistant messages (but keep streaming/cancelled ones visible)
   if (isAssistant && !hasVisibleContent && !hasProgress && !hasImages && !hasVideos && !hasAudios && !message.isStreaming && !message.wasCancelled) {
@@ -340,8 +337,8 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
         </div>
       )}
 
-      {/* Tool execution progress */}
-      {message.toolProgress && (
+      {/* Tool execution progress (non-video tools — video tools render progress inline with ChatVideoResults) */}
+      {message.toolProgress && !isVideoToolProgress && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
           <ChatProgressIndicator progress={message.toolProgress} imageUrl={imageUrl} onCancel={onCancelTool} onMediaClick={onProgressMediaClick} />
           <SogniTVOffer executionId={message.id} etaSeconds={message.toolProgress?.etaSeconds} />
@@ -381,28 +378,45 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
         </div>
       )}
 
-      {/* Video results — no LazyMedia wrapper since videos lack thumbnails;
-           the player has its own loading spinner and gallery blobs are local */}
-      {message.videoResults && message.videoResults.length > 0 && !message.toolProgress && (
+      {/* Video results — always rendered during video progress to prevent re-render on batch completion.
+           Placeholder slots are pre-allocated based on totalCount so the DOM is stable from first frame. */}
+      {(hasVideos || isVideoToolProgress) && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
-          <ChatVideoResults urls={message.videoResults} galleryVideoIds={message.galleryVideoIds} videoAspectRatio={message.videoAspectRatio} autoPlay={!message.isFromHistory} onActiveIndexChange={handleVideoIndexChange} onVideoClick={onVideoClick} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.25rem' }}>
-            <MediaActionsMenu
-              message={message}
-              onBranchChat={onBranchChat}
-              onRetry={onRetry}
-              mediaType="video"
-              mediaUrls={message.videoResults}
-              galleryVideoIds={message.galleryVideoIds}
-              downloadSlug={downloadSlug}
-              activeMediaIndex={activeVideoIndex}
-            />
-            {message.modelName && (
-              <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', opacity: 0.6 }}>
-                {message.modelName}
-              </div>
-            )}
-          </div>
+          <ChatVideoResults
+            urls={message.videoResults || []}
+            galleryVideoIds={message.galleryVideoIds}
+            videoAspectRatio={message.videoAspectRatio || message.toolProgress?.videoAspectRatio}
+            autoPlay={!message.isFromHistory}
+            onVideoClick={onVideoClick}
+            totalCount={message.toolProgress?.totalCount}
+            perJobProgress={message.toolProgress?.perJobProgress}
+          />
+          {/* During video progress: show summary bar (cost, cancel, completion count) */}
+          {isVideoToolProgress && (
+            <ChatProgressIndicator progress={message.toolProgress!} imageUrl={imageUrl} onCancel={onCancelTool} onMediaClick={onProgressMediaClick} hideVideoGrid />
+          )}
+          {isVideoToolProgress && (
+            <SogniTVOffer executionId={message.id} etaSeconds={message.toolProgress?.etaSeconds} />
+          )}
+          {/* After completion: show actions menu */}
+          {!message.toolProgress && hasVideos && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.25rem' }}>
+              <MediaActionsMenu
+                message={message}
+                onBranchChat={onBranchChat}
+                onRetry={onRetry}
+                mediaType="video"
+                mediaUrls={message.videoResults}
+                galleryVideoIds={message.galleryVideoIds}
+                downloadSlug={downloadSlug}
+              />
+              {message.modelName && (
+                <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', opacity: 0.6 }}>
+                  {message.modelName}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -410,7 +424,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
       {message.audioResults && message.audioResults.length > 0 && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
           <LazyMedia enabled={!!message.isFromHistory} placeholderHeight={80}>
-            <ChatAudioResults audioUrls={message.audioResults} galleryAudioIds={message.galleryAudioIds} onActiveIndexChange={handleAudioIndexChange} />
+            <ChatAudioResults audioUrls={message.audioResults} galleryAudioIds={message.galleryAudioIds} />
           </LazyMedia>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.25rem' }}>
             <MediaActionsMenu
@@ -420,7 +434,6 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
               mediaType="audio"
               mediaUrls={message.audioResults}
               downloadSlug={downloadSlug}
-              activeMediaIndex={activeAudioIndex}
             />
             {message.modelName && (
               <div style={{ fontSize: '0.625rem', color: 'var(--color-text-tertiary)', opacity: 0.6 }}>

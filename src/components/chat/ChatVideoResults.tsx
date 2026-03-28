@@ -570,6 +570,16 @@ interface ChatVideoResultsProps {
   onActiveIndexChange?: (index: number) => void;
   /** Called when a grid thumbnail is clicked — opens fullscreen viewer */
   onVideoClick?: (url: string, index: number) => void;
+  /** Expected total slot count during progress — renders placeholders for pending slots */
+  totalCount?: number;
+  /** Per-job progress data for loading overlays on pending slots */
+  perJobProgress?: Record<number, {
+    progress?: number;
+    etaSeconds?: number;
+    resultUrl?: string;
+    error?: string;
+    label?: string;
+  }>;
 }
 
 export const ChatVideoResults = memo(function ChatVideoResults({
@@ -579,11 +589,15 @@ export const ChatVideoResults = memo(function ChatVideoResults({
   autoPlay = true,
   onActiveIndexChange,
   onVideoClick,
+  totalCount,
+  perJobProgress,
 }: ChatVideoResultsProps) {
   // Resolve gallery IDs to blob URLs — persistent local copies that never expire
   const galleryBlobUrls = useGalleryBlobUrls(galleryVideoIds);
   const [failedVideos, setFailedVideos] = useState<Set<number>>(new Set());
-  const isGrid = urls.length > 1;
+  // Number of slots: use totalCount during progress, otherwise urls.length
+  const slotCount = Math.max(totalCount || 0, urls.length);
+  const isGrid = slotCount > 1;
 
   const handleError = useCallback((index: number) => {
     setFailedVideos((prev) => new Set([...prev, index]));
@@ -592,10 +606,10 @@ export const ChatVideoResults = memo(function ChatVideoResults({
   return (
     <div
       role="group"
-      aria-label={`${urls.length} video result${urls.length !== 1 ? 's' : ''}`}
+      aria-label={`${slotCount} video result${slotCount !== 1 ? 's' : ''}`}
       style={isGrid ? {
         display: 'grid',
-        gridTemplateColumns: `repeat(${urls.length <= 2 ? urls.length : 2}, minmax(0, 1fr))`,
+        gridTemplateColumns: `repeat(${slotCount <= 2 ? slotCount : 2}, minmax(0, 1fr))`,
         gap: '0.5rem',
         width: '100%',
       } : {
@@ -604,15 +618,31 @@ export const ChatVideoResults = memo(function ChatVideoResults({
         gap: '0.5rem',
       }}
     >
-      {urls.map((url, index) => {
-        // Prefer gallery blob URL (persistent) over remote URL (may expire)
+      {Array.from({ length: slotCount }, (_, index) => {
+        // During progress: per-job URL (keyed by slot index, always correct)
+        // After progress: urls array (final truth)
+        const perJobUrl = perJobProgress?.[index]?.resultUrl;
+        const rawUrl = perJobUrl || urls[index] || '';
         const blobUrl = galleryBlobUrls.get(index);
-        const displayUrl = blobUrl || url;
-        const isFailed = failedVideos.has(index);
+        const displayUrl = blobUrl || rawUrl;
+        const jobError = perJobProgress?.[index]?.error;
+        const isFailed = failedVideos.has(index) || !!jobError;
+        const isPending = !rawUrl && !isFailed;
+
+        // Per-job progress info for pending slot overlays
+        const jobData = perJobProgress?.[index];
+        const jobProg = jobData?.progress;
+        const jobPct = jobProg !== undefined ? Math.round(jobProg * 100) : 0;
+        const jobETA = jobData?.etaSeconds;
+        const jobProgressText = jobETA !== undefined && jobETA > 0
+          ? `~${Math.ceil(jobETA)}s remaining`
+          : jobProg !== undefined
+            ? `${jobPct}%`
+            : null;
 
         return (
         <div
-          key={`${url}-${index}`}
+          key={index}
           style={{
             position: 'relative',
             borderRadius: 'var(--radius-md)',
@@ -650,6 +680,60 @@ export const ChatVideoResults = memo(function ChatVideoResults({
                 Video expired
               </span>
             </div>
+          ) : isPending ? (
+            /* Loading placeholder for pending video slot */
+            <div
+              style={{
+                width: '100%',
+                aspectRatio: videoAspectRatio || '16 / 9',
+                background: 'rgba(var(--rgb-primary), 0.06)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem',
+              }}
+            >
+              <div
+                className="animate-spin"
+                style={{
+                  width: '1.5rem',
+                  height: '1.5rem',
+                  border: '2.5px solid var(--color-border)',
+                  borderTopColor: 'var(--color-accent)',
+                  borderRadius: '50%',
+                }}
+              />
+              {jobData?.label && (
+                <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--color-text-secondary)' }}>
+                  {jobData.label}...
+                </span>
+              )}
+              {jobProgressText && (
+                <span style={{ fontSize: '0.6875rem', color: 'var(--color-text-tertiary)' }}>
+                  {jobProgressText}
+                </span>
+              )}
+              {jobProg !== undefined && (
+                <div style={{
+                  width: '60%',
+                  height: '3px',
+                  background: 'rgba(var(--rgb-primary), 0.1)',
+                  borderRadius: '2px',
+                  overflow: 'hidden',
+                }}>
+                  <div style={{
+                    width: `${jobPct}%`,
+                    height: '100%',
+                    background: 'var(--color-accent)',
+                    borderRadius: '2px',
+                    transition: 'width 0.3s ease',
+                  }} />
+                </div>
+              )}
+            </div>
           ) : isGrid ? (
             /* Grid mode — thumbnail card with play overlay, click opens fullscreen viewer */
             <VideoThumbnailCard
@@ -674,7 +758,7 @@ export const ChatVideoResults = memo(function ChatVideoResults({
           )}
 
           {/* Index badge (hidden for single results) */}
-          {urls.length > 1 && (
+          {slotCount > 1 && (
             <div
               style={{
                 position: 'absolute',

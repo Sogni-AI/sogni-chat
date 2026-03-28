@@ -32,8 +32,6 @@ interface MediaActionsMenuProps {
   galleryVideoIds?: string[];
   /** Descriptive slug for download filenames */
   downloadSlug?: string;
-  /** Index of the currently active/playing media item (video or audio) */
-  activeMediaIndex?: number;
 }
 
 export const MediaActionsMenu = memo(function MediaActionsMenu({
@@ -45,7 +43,6 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
   galleryImageIds,
   galleryVideoIds,
   downloadSlug,
-  activeMediaIndex = 0,
 }: MediaActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const [showRetrySubmenu, setShowRetrySubmenu] = useState(false);
@@ -113,7 +110,6 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
 
   // Labels for single vs multi
   const singleLabel = mediaType === 'video' ? 'Save video' : mediaType === 'audio' ? 'Save audio' : 'Save image';
-  const currentLabel = mediaType === 'video' ? 'Save current video' : mediaType === 'audio' ? 'Save current track' : singleLabel;
   const allLabel = mediaType === 'video' ? 'Save all videos' : mediaType === 'audio' ? 'Save all tracks' : 'Save all images';
 
   // Download a single item by index
@@ -141,13 +137,6 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
       setTimeout(() => downloadOne(index), index * 300);
     });
   }, [mediaUrls, downloadOne]);
-
-  // Download the currently active item
-  const handleDownloadCurrent = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setOpen(false);
-    downloadOne(activeMediaIndex);
-  }, [downloadOne, activeMediaIndex]);
 
   const handleToggleFavorite = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -333,14 +322,17 @@ export const MediaActionsMenu = memo(function MediaActionsMenu({
           {/* Save / Download */}
           {mediaUrls && mediaUrls.length > 0 && (
             isMulti && (mediaType === 'video' || mediaType === 'audio') ? (
-              /* Video / Audio with multiple items: "Save current" + "Save all" */
+              /* Video / Audio with multiple items: individual save per item + "Save all" */
               <>
-                <MenuItem
-                  icon={<DownloadIcon />}
-                  label={currentLabel}
-                  onClick={handleDownloadCurrent}
-                  isMobile={isMobile}
-                />
+                {mediaUrls.map((_url, idx) => (
+                  <MenuItem
+                    key={idx}
+                    icon={<DownloadIcon />}
+                    label={mediaType === 'video' ? `Save video ${idx + 1}` : `Save track ${idx + 1}`}
+                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); setOpen(false); downloadOne(idx); }}
+                    isMobile={isMobile}
+                  />
+                ))}
                 <MenuItem
                   icon={<DownloadIcon />}
                   label={allLabel}
