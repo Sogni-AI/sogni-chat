@@ -6,6 +6,7 @@ import type { SogniClient } from '@sogni-ai/sogni-client';
 import useApiAction from './useApiAction';
 import useApiQuery from './useApiQuery';
 import { getPurchase, getStripeProducts, startPurchase } from '@/services/stripeService';
+import { setPaymentMethod } from '@/services/walletService';
 
 function useSparkPurchase() {
   const { data: products, error: productsError } = useApiQuery(getStripeProducts);
@@ -40,6 +41,14 @@ function useSparkPurchase() {
     resetIntent();
     resetStatus();
   }, [resetIntent, resetStatus]);
+
+  // Auto-switch payment method to Spark when purchase completes
+  useEffect(() => {
+    if (purchaseStatus?.status === 'completed' || purchaseStatus?.status === 'processing') {
+      setPaymentMethod('spark');
+      window.dispatchEvent(new CustomEvent('payment-method-change', { detail: 'spark' }));
+    }
+  }, [purchaseStatus]);
 
   useEffect(() => {
     if (productsError) {

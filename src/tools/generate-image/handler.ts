@@ -378,9 +378,35 @@ export async function execute(
   const guidanceArg = args.guidance as number | undefined;
 
   const modelConfig = IMAGE_MODELS[modelKey] ?? IMAGE_MODELS['z-turbo'];
+
+  // Quality-tier-aware dimension targeting:
+  // When the LLM passes only an aspect ratio (e.g. "9:16") without explicit
+  // width/height, the model's default area (~1 MP for flux2) produces small
+  // output (768x1360). Override with tier-appropriate short-side targets so
+  // Pro quality produces ~1080p and HQ produces ~1024p.
+  let effectiveWidth = args.width as number | undefined;
+  let effectiveHeight = args.height as number | undefined;
+  if (effectiveWidth === undefined && effectiveHeight === undefined && aspectRatio) {
+    const ratioCheck = parseAspectRatio(aspectRatio);
+    if (ratioCheck?.type === 'ratio') {
+      const SHORT_SIDE_TARGET: Record<string, number> = { pro: 1080, hq: 1080 };
+      const target = SHORT_SIDE_TARGET[context.qualityTier ?? ''];
+      if (target) {
+        const ratio = ratioCheck.ratioW / ratioCheck.ratioH;
+        if (ratio <= 1) {
+          effectiveWidth = target;
+          effectiveHeight = Math.round(target / ratio);
+        } else {
+          effectiveHeight = target;
+          effectiveWidth = Math.round(target * ratio);
+        }
+      }
+    }
+  }
+
   const { width, height } = computeDimensions(
-    args.width as number | undefined,
-    args.height as number | undefined,
+    effectiveWidth,
+    effectiveHeight,
     aspectRatio,
     modelConfig,
   );
