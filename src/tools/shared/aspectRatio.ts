@@ -4,7 +4,7 @@
  * the LLM has contextual guidance when deciding to set (or omit) the value.
  */
 
-export const ASPECT_RATIO_DESCRIPTION = `Do NOT set unless the user explicitly requests an aspect ratio, format, or resolution. Omit to preserve source ratio.
+export const ASPECT_RATIO_DESCRIPTION = `Do NOT set unless the user explicitly requests an aspect ratio, format, or resolution. When the user uploaded an image, default to its aspect ratio (use the dimensions from the [Uploaded images: ...] annotation). Omit to preserve source ratio.
 
 Formats: "16:9", "9:16", "4:5", "1:1", "4:3", "3:2", "21:9", or exact pixels like "1920x1080".
 

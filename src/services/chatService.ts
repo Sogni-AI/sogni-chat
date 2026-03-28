@@ -206,7 +206,7 @@ export async function sendChatMessage(
   const personalityContext = await buildPersonalityContext();
   const dynamicSystemPrompt = CHAT_SYSTEM_PROMPT
     + (personaContext
-      ? `\nUser's people: ${personaContext}. "me", "I", "myself" = the person marked (self) — call resolve_personas with their name immediately, never ask who they mean. When creating images of these people: call resolve_personas first, then use edit_image (never generate_image). When creating videos of these people: ALWAYS generate an image first (resolve_personas → edit_image), then STOP — show the image result and ask if it looks good before proceeding to animate_photo. Never chain image → video without user approval. Pronouns like "us", "we", "our" refer to these people — always call resolve_personas again for each new image generation, even in follow-up messages. If user mentions someone not listed, suggest adding them to My Personas.`
+      ? `\nUser's people: ${personaContext}. "me", "I", "myself" = the person marked (self) — call resolve_personas with their name immediately, never ask who they mean. When creating images of these people: call resolve_personas first, then use edit_image (never generate_image). When creating videos of these people: ALWAYS generate an image first (resolve_personas → edit_image), then STOP — show the image result and ask if it looks good before proceeding to animate_photo. Never chain image → video without user approval. IMPORTANT: Only use resolve_personas when the user explicitly names a persona or uses "me"/"I"/"myself". When the user uploads a photo and uses pronouns like "them", "they", "these", "us", "we", or "our", those pronouns refer to the subjects IN THE UPLOADED IMAGE, NOT to registered personas — do NOT call resolve_personas in that case. Only match personas by explicit name or self-referencing pronouns. In follow-up messages without an uploaded image, "us"/"we"/"our" may refer to personas — use context to decide. If user mentions someone not listed, suggest adding them to My Personas.`
       : '')
     + (memoryContext
       ? `\nUser preferences (always respect these): ${memoryContext}`
@@ -293,6 +293,30 @@ export async function sendChatMessage(
           allMessages[lastUserIdx] = {
             ...allMessages[lastUserIdx],
             content: `[Attached files: ${fileList}]\n${allMessages[lastUserIdx].content}`,
+          };
+        }
+      }
+
+      // Annotate the latest user message with uploaded image dimensions so the
+      // LLM can match the source aspect ratio when generating.
+      // Only enhances the API copy; stored history stays unchanged.
+      const imageFiles = context.uploadedFiles.filter(f => f.type === 'image' && !f.filename?.startsWith('persona-'));
+      if (imageFiles.length > 0) {
+        let lastUserIdx = -1;
+        for (let i = allMessages.length - 1; i >= 0; i--) {
+          if (allMessages[i].role === 'user') {
+            lastUserIdx = i;
+            break;
+          }
+        }
+        if (lastUserIdx >= 0 && typeof allMessages[lastUserIdx].content === 'string') {
+          const dimList = imageFiles.map(f =>
+            `${f.filename} (${f.width ?? '?'}×${f.height ?? '?'}px)`
+          ).join(', ');
+          const annotation = `[Uploaded images: ${dimList} — match this aspect ratio by default]`;
+          allMessages[lastUserIdx] = {
+            ...allMessages[lastUserIdx],
+            content: `${annotation}\n${allMessages[lastUserIdx].content}`,
           };
         }
       }
