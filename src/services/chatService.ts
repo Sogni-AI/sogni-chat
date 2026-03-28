@@ -278,6 +278,13 @@ PERSONA RULES:
     }
   }
 
+  // When persona resolution is blocked, exclude resolve_personas from the
+  // tool list so the LLM doesn't attempt to call it or identify photo
+  // subjects as registered personas.
+  const toolDefinitions = blockPersonaResolution
+    ? toolRegistry.getDefinitions().filter(d => d.function.name !== 'resolve_personas')
+    : toolRegistry.getDefinitions();
+
   // Cache uploaded image URIs — refreshed if tools modify context.uploadedFiles
   // (e.g. resolve_personas injects persona photos).
   let uploadedImageUris = await prepareUploadedImageUris(context);
@@ -369,6 +376,24 @@ PERSONA RULES:
         }
       }
 
+      // When persona resolution is blocked, annotate so the LLM doesn't
+      // misidentify uploaded photo subjects as registered personas.
+      if (blockPersonaResolution) {
+        let lastUserIdx = -1;
+        for (let i = allMessages.length - 1; i >= 0; i--) {
+          if (allMessages[i].role === 'user') {
+            lastUserIdx = i;
+            break;
+          }
+        }
+        if (lastUserIdx >= 0 && typeof allMessages[lastUserIdx].content === 'string') {
+          allMessages[lastUserIdx] = {
+            ...allMessages[lastUserIdx],
+            content: `[IMPORTANT: The people in this photo are NOT from your persona list. Do not identify them by persona names or call resolve_personas. Edit the uploaded photo directly.]\n${allMessages[lastUserIdx].content}`,
+          };
+        }
+      }
+
       // Attach cached vision context to the latest user message.
       // Only enhances the copy sent to the API; stored history stays text-only.
       if (visionDataUris.length > 0) {
@@ -397,7 +422,7 @@ PERSONA RULES:
         model: context.model || CHAT_MODEL,
         messages: allMessages,
         ...(!isLastRound && {
-          tools: toolRegistry.getDefinitions(),
+          tools: toolDefinitions,
           tool_choice: 'auto',
         }),
         stream: true,
