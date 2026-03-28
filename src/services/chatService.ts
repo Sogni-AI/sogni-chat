@@ -206,7 +206,16 @@ export async function sendChatMessage(
   const personalityContext = await buildPersonalityContext();
   const dynamicSystemPrompt = CHAT_SYSTEM_PROMPT
     + (personaContext
-      ? `\nUser's people: ${personaContext}. "me", "I", "myself" = the person marked (self) — call resolve_personas with their name immediately, never ask who they mean. When creating images of these people: call resolve_personas first, then use edit_image (never generate_image). When creating videos of these people: ALWAYS generate an image first (resolve_personas → edit_image), then STOP — show the image result and ask if it looks good before proceeding to animate_photo. Never chain image → video without user approval. IMPORTANT: Only use resolve_personas when the user explicitly names a persona or uses "me"/"I"/"myself". When the user uploads a photo and uses pronouns like "them", "they", "these", "us", "we", or "our", those pronouns refer to the subjects IN THE UPLOADED IMAGE, NOT to registered personas — do NOT call resolve_personas in that case. Only match personas by explicit name or self-referencing pronouns. In follow-up messages without an uploaded image, "us"/"we"/"our" may refer to personas — use context to decide. If user mentions someone not listed, suggest adding them to My Personas.`
+      ? `\nUser's people: ${personaContext}.
+
+PERSONA RULES:
+- "me"/"I"/"myself" = the person marked (self) — call resolve_personas with their name immediately; never ask who they mean.
+- When creating images of personas: call resolve_personas first, then use edit_image (never generate_image).
+- When creating videos of personas: ALWAYS generate an image first (resolve_personas → edit_image), then STOP and show for approval before animate_photo.
+- CRITICAL: When the user UPLOADS A PHOTO and uses "them"/"they"/"these"/"us"/"we"/"our", those words refer to the people IN THE UPLOADED PHOTO — NOT registered personas. Do NOT call resolve_personas. Only resolve personas when the user says a persona's NAME explicitly (e.g. "${personaNames[0] || 'their name'}").
+- Only match personas by explicit name or self-referencing pronouns ("me"/"I"/"myself") — never by third-person pronouns alone.
+- In follow-up messages WITHOUT an uploaded image, pronouns may refer to personas — use context.
+- If user mentions someone not listed, suggest adding them to My Personas.`
       : '')
     + (memoryContext
       ? `\nUser preferences (always respect these): ${memoryContext}`
@@ -229,6 +238,45 @@ export async function sendChatMessage(
     onInsufficientCredits: callbacks.onInsufficientCredits,
     onGallerySaved: callbacks.onGallerySaved,
   };
+
+  // Determine whether persona resolution should be blocked for this request.
+  // When the user uploaded images and didn't name any persona explicitly,
+  // pronouns refer to photo subjects, not registered personas.
+  const hasUserUploadedImages = context.uploadedFiles?.some(
+    f => f.type === 'image' && !f.filename?.startsWith('persona-'),
+  );
+  let blockPersonaResolution = false;
+  if (hasUserUploadedImages && personaNames.length > 0) {
+    // Extract the latest user message text (before annotations)
+    let latestUserText = '';
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        const content = messages[i].content;
+        if (typeof content === 'string') {
+          latestUserText = content;
+        } else if (Array.isArray(content)) {
+          latestUserText = (content as Array<{ type: string; text?: string }>)
+            .filter(c => c.type === 'text')
+            .map(c => c.text || '')
+            .join(' ');
+        }
+        break;
+      }
+    }
+    // Check if user explicitly mentioned any persona name (word-boundary match)
+    const userExplicitlyNamedPersona = personaNames.some(name => {
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(`\\b${escaped}\\b`, 'i').test(latestUserText);
+    });
+    // Also allow persona resolution for self-referencing pronouns ("me"/"myself").
+    // These legitimately trigger the self persona (e.g. "put me in this scene").
+    // "I" is excluded — too common in ordinary English to be a reliable signal.
+    const userSaidSelfPronoun = /\bm(?:e|yself)\b/i.test(latestUserText);
+    blockPersonaResolution = !userExplicitlyNamedPersona && !userSaidSelfPronoun;
+    if (blockPersonaResolution) {
+      console.log('[CHAT SERVICE] Persona resolution blocked — user uploaded images without naming any persona');
+    }
+  }
 
   // Cache uploaded image URIs — refreshed if tools modify context.uploadedFiles
   // (e.g. resolve_personas injects persona photos).
@@ -417,8 +465,10 @@ export async function sendChatMessage(
         // prompt, force a resolve_personas call first.  This catches the case
         // where the LLM ignores the system prompt instruction to call
         // resolve_personas before generating images of known people.
+        // Skip when persona resolution is blocked (user uploaded images
+        // without naming any persona — pronouns refer to photo subjects).
         const hasPersonaPhotos = context.uploadedFiles?.some(f => f.filename?.startsWith('persona-'));
-        if (personaNames.length > 0 && !hasPersonaPhotos) {
+        if (personaNames.length > 0 && !hasPersonaPhotos && !blockPersonaResolution) {
           for (const toolCall of result.tool_calls) {
             if (toolCall.function.name === 'generate_image' || toolCall.function.name === 'edit_image') {
               try {
@@ -492,6 +542,24 @@ export async function sendChatMessage(
         for (const toolCall of result.tool_calls) {
           const toolName = toolCall.function.name as ToolName;
           const args = parseChatToolArgs(toolCall);
+
+          // Guardrail 0: Intercept resolve_personas when user uploaded images
+          // without naming any persona. Return guidance to use the photo directly.
+          if (toolName === 'resolve_personas' && blockPersonaResolution) {
+            console.log('[CHAT SERVICE] Intercepted resolve_personas — returning photo guidance instead');
+            callbacks.onToolCall(toolName, args);
+            updatedMessages.push({
+              role: 'tool',
+              content: JSON.stringify({
+                error: 'no_persona_match',
+                message: 'The user did not reference any persona by name. They uploaded a photo and used pronouns ("them", "they", etc.) which refer to the people IN THE UPLOADED PHOTO, not registered personas. Use edit_image with the uploaded image directly — it is already available as a context image. Do not call resolve_personas again.',
+              }),
+              tool_call_id: toolCall.id,
+              name: toolName,
+            });
+            callbacks.onConversationUpdate?.(updatedMessages);
+            continue;
+          }
 
           callbacks.onToolCall(toolName, args);
 
