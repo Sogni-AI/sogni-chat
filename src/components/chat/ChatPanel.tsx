@@ -692,42 +692,38 @@ export function ChatPanel({
         </div>
 
         <div className="chat-panel-quality" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          {(hasImage || messages.length > 1) && (
-            <>
-              <QualityDropdown
-                qualityTier={qualityTier}
-                onQualityTierChange={onQualityTierChange}
-                disabled={isLoading}
-              />
+          <QualityDropdown
+            qualityTier={qualityTier}
+            onQualityTierChange={onQualityTierChange}
+            disabled={isLoading}
+          />
 
-              {messages.length > 1 && (
-                <button
-                  onClick={onClearAll || (() => reset())}
-                  title={isMobile ? 'Start a new conversation' : 'Clear conversation and start fresh'}
-                  style={{
-                    padding: '0.25rem 0.625rem',
-                    fontSize: '0.75rem',
-                    fontWeight: 500,
-                    color: '#8e8e8e',
-                    background: 'transparent',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: 'var(--radius-lg)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = '#ececec';
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.color = '#8e8e8e';
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                  }}
-                >
-                  {isMobile ? 'New' : 'Clear'}
-                </button>
-              )}
-            </>
+          {messages.length > 1 && (
+            <button
+              onClick={onClearAll || (() => reset())}
+              title={isMobile ? 'Start a new conversation' : 'Clear conversation and start fresh'}
+              style={{
+                padding: '0.25rem 0.625rem',
+                fontSize: '0.75rem',
+                fontWeight: 500,
+                color: '#8e8e8e',
+                background: 'transparent',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: 'var(--radius-lg)',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#ececec';
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = '#8e8e8e';
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+              }}
+            >
+              {isMobile ? 'New' : 'Clear'}
+            </button>
           )}
         </div>
       </div>
@@ -770,15 +766,6 @@ export function ChatPanel({
               >
                 {welcomeGreeting || 'What would you like to create?'}
               </h1>
-
-              {/* Default Media Quality selector */}
-              <div style={{ marginBottom: '1.5rem' }}>
-                <QualityDropdown
-                  qualityTier={qualityTier}
-                  onQualityTierChange={onQualityTierChange}
-                  disabled={isLoading}
-                />
-              </div>
 
               {/* What can I do? chip */}
               <button
