@@ -129,7 +129,9 @@ export async function execute(
 
       promptGuidance = `Reference photos loaded as context images: ${mappingStr}.${preExistingNote}
 
-IMPORTANT — Creative generation with edit_image using persona references:
+EXCEPTION — dance_montage: Do NOT call edit_image separately for dance requests. Instead, pass imagePrompt to dance_montage directly (e.g. imagePrompt="cute 3D bobblehead character"). dance_montage generates per-persona images internally with scoped context, guaranteeing each image contains exactly one person.
+
+IMPORTANT — Creative generation with edit_image using persona references (for NON-dance requests):
 1. Anchor each person's face with their picture number: "use the face from picture ${preExistingImageCount + 1} for ${personas[0]?.name || 'Name'}"
 2. LEAD with the creative transformation — what to create, the scene, the style, the mood. This is the MAIN instruction.
 3. Keep identity anchors brief — the model already sees the reference photos. Just the picture number is enough to bind the face.

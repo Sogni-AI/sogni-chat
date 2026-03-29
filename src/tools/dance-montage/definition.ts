@@ -14,7 +14,7 @@ export const definition: ToolDefinition = {
   function: {
     name: 'dance_montage',
     description:
-      'REQUIRED for ALL dance video requests — do NOT use animate_photo or generate_video for dances. Uses real choreography reference videos to transfer dance motion onto a photo via WAN 2.2 Animate Move. Output is always 9:16 480p portrait. IMAGE PREP: When generating images for dance (via generate_image), ALWAYS use aspectRatio="9:16" and numberOfVariations=4 with Dynamic Prompts for variety — 4 images enable 4-way concurrent clip rendering for faster output. All generated images are used automatically as alternating montage segments. Requires at least one uploaded photo or previously generated image. Best results with photos of people.',
+      'REQUIRED for ALL dance video requests — do NOT use animate_photo or generate_video for dances. Uses real choreography reference videos to transfer dance motion onto a photo via WAN 2.2 Animate Move. Output is always 9:16 480p portrait. IMAGE PREP: When generating images for dance (via generate_image), ALWAYS use aspectRatio="9:16" and numberOfVariations=4 with Dynamic Prompts for variety — 4 images enable 4-way concurrent clip rendering for faster output. All generated images are used automatically as alternating montage segments. PERSONAS: When personas are referenced (resolve_personas was called), do NOT pre-generate images separately — pass imagePrompt with the desired style/look and dance_montage will generate per-persona images internally, ensuring each image contains only ONE person. Requires at least one uploaded photo, previously generated image, or loaded personas. Best results with photos of people.',
     parameters: {
       type: 'object',
       properties: {
@@ -34,6 +34,11 @@ export const definition: ToolDefinition = {
           type: 'number',
           description:
             'Which previously generated result image to use (0-based index). Use -1 for the original uploaded image. When omitted, all previously generated images are used automatically as alternating montage segments.',
+        },
+        imagePrompt: {
+          type: 'string',
+          description:
+            'Creative style/look for auto-generated persona images (e.g. "cute 3D bobblehead cartoon character with oversized head", "anime chibi character"). Used ONLY when personas are loaded — dance_montage generates one image per persona internally to guarantee each contains exactly one person. If omitted, uses a default full-body portrait style.',
         },
       },
       required: ['dance'],

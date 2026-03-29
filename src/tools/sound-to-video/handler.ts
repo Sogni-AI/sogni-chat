@@ -197,7 +197,11 @@ export async function execute(
   let audioData: Uint8Array;
   let audioMimeType: string;
 
-  const audioFiles = context.uploadedFiles.filter((f: UploadedFile) => f.type === 'audio');
+  // Exclude persona voice clips (injected by resolve_personas for Audio ID) —
+  // those are for referenceAudioIdentity, not for audio-driven video generation.
+  const audioFiles = context.uploadedFiles.filter(
+    (f: UploadedFile) => f.type === 'audio' && !f.filename?.startsWith('persona-voiceclip-'),
+  );
   const audioIndex = audioSourceIndex ?? 0;
   const audioFile = audioFiles[audioIndex];
 

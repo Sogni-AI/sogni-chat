@@ -93,6 +93,7 @@ export async function execute(
   const danceId = args.dance as string;
   let duration = (args.duration as number) || 15;
   const rawSourceIndex = args.sourceImageIndex as number | undefined;
+  const imagePrompt = args.imagePrompt as string | undefined;
 
   // 1. Look up dance preset
   const preset: DancePreset | undefined = DANCE_PRESETS.find(p => p.id === danceId);
@@ -211,6 +212,133 @@ export async function execute(
       mimeType: imageFiles[0]?.mimeType ?? 'image/jpeg',
     });
     console.log('[DANCE MONTAGE] Using primary image data');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Auto-generate per-persona images when personas are loaded but no images
+  // resolved. Each persona gets its own scoped context (only that persona's
+  // reference photo) so the generation model produces exactly ONE person per
+  // image — fixing the issue where all persona photos in context cause every
+  // generated image to contain all people.
+  // ---------------------------------------------------------------------------
+  const personaPhotos = context.uploadedFiles.filter(
+    (f: UploadedFile) => f.type === 'image' && f.filename?.startsWith('persona-'),
+  );
+
+  if (resolvedImages.length === 0 && personaPhotos.length > 0) {
+    const stylePrompt = imagePrompt || 'full-body portrait in a fun, dynamic pose, perfect for dancing';
+    const imagesPerPersona = Math.max(1, Math.ceil(4 / personaPhotos.length));
+    const totalImages = imagesPerPersona * personaPhotos.length;
+
+    console.log(
+      `[DANCE MONTAGE] Auto-generating ${totalImages} persona images ` +
+      `(${imagesPerPersona} per persona × ${personaPhotos.length} personas)`,
+    );
+
+    callbacks.onToolProgress({
+      type: 'started',
+      toolName: 'dance_montage',
+      totalCount: 1,
+      stepLabel: 'Generating persona images',
+    });
+
+    for (let p = 0; p < personaPhotos.length; p++) {
+      if (context.signal?.aborted) break;
+      const photo = personaPhotos[p];
+      const personaName = photo.filename
+        ?.replace(/^persona-/, '')
+        .replace(/\.jpg$/, '')
+        .replace(/-/g, ' ') || 'person';
+
+      // Scoped context: ONLY this persona's reference photo.
+      // Object.create preserves access to shared getters (sogniClient, tokenType,
+      // etc.) while letting us override uploadedFiles and imageData.
+      const scopedContext = Object.create(context) as ToolExecutionContext;
+      scopedContext.uploadedFiles = [photo];
+      scopedContext.imageData = photo.data;
+      scopedContext.width = photo.width || 512;
+      scopedContext.height = photo.height || 512;
+
+      const prompt = `Use the face from picture 1 for ${personaName}. ${stylePrompt}`;
+      console.log(`[DANCE MONTAGE] Generating ${imagesPerPersona} image(s) for persona "${personaName}"`);
+
+      const generatedUrls: string[] = [];
+      const editCallbacks: ToolCallbacks = {
+        onToolProgress: (progress) => {
+          if (progress.type === 'started') return;
+          callbacks.onToolProgress({
+            ...progress,
+            toolName: 'dance_montage',
+            stepLabel: `Generating ${personaName} image`,
+          });
+        },
+        onToolComplete: (_toolName, resultUrls) => {
+          if (resultUrls) generatedUrls.push(...resultUrls);
+        },
+        onInsufficientCredits: callbacks.onInsufficientCredits,
+      };
+
+      try {
+        const rawResult = await toolRegistry.execute(
+          'edit_image',
+          {
+            prompt,
+            numberOfVariations: imagesPerPersona,
+            aspectRatio: '9:16',
+          },
+          scopedContext,
+          editCallbacks,
+        );
+
+        // Check for errors from edit_image
+        try {
+          const parsed = JSON.parse(rawResult);
+          if (parsed.error) {
+            console.error(`[DANCE MONTAGE] edit_image failed for "${personaName}":`, parsed.message);
+            continue;
+          }
+        } catch { /* not JSON — treat as success */ }
+
+        // Fetch the generated images as binary data
+        for (const url of generatedUrls) {
+          try {
+            const fetched = await fetchImageAsUint8Array(url);
+            resolvedImages.push({
+              data: fetched.data,
+              width: fetched.width,
+              height: fetched.height,
+              mimeType: fetched.mimeType,
+            });
+          } catch (err) {
+            console.warn('[DANCE MONTAGE] Failed to fetch generated persona image:', err);
+          }
+        }
+      } catch (err) {
+        console.error(`[DANCE MONTAGE] Failed to generate persona image for "${personaName}":`, err);
+      }
+    }
+
+    if (resolvedImages.length > 0) {
+      // Interleave images so personas alternate: [A1, B1, A2, B2, ...]
+      if (personaPhotos.length > 1) {
+        const perPersona: ResolvedImage[][] = Array.from({ length: personaPhotos.length }, () => []);
+        let personaIdx = 0;
+        for (const img of resolvedImages) {
+          perPersona[personaIdx].push(img);
+          if (perPersona[personaIdx].length >= imagesPerPersona) personaIdx++;
+        }
+        const interleaved: ResolvedImage[] = [];
+        const maxLen = Math.max(...perPersona.map(a => a.length));
+        for (let i = 0; i < maxLen; i++) {
+          for (const group of perPersona) {
+            if (group[i]) interleaved.push(group[i]);
+          }
+        }
+        resolvedImages.length = 0;
+        resolvedImages.push(...interleaved);
+      }
+      console.log(`[DANCE MONTAGE] Generated ${resolvedImages.length} persona images (interleaved)`);
+    }
   }
 
   if (resolvedImages.length === 0) {
