@@ -74,7 +74,7 @@ const WAN_ANIMATE_BASE: Omit<V2VModelConfig, 'id'> = {
   defaultFps: 16,
   frameStep: 1,
   minFrames: 17,
-  maxFrames: 161,
+  maxFrames: 321,
   sampler: 'euler',
   scheduler: 'simple',
   requiresImage: true,
@@ -120,10 +120,18 @@ export async function execute(
 ): Promise<string> {
   const prompt = args.prompt as string;
   const controlMode: ControlMode = (args.controlMode as ControlMode) || 'animate-move';
-  const duration = Math.max(2, Math.min(10, (args.duration as number) || 5));
+  // WAN Animate Move/Replace support up to 20s; LTX-2 modes cap at 10s
+  const isWanAnimate = controlMode === 'animate-move' || controlMode === 'animate-replace';
+  const maxDuration = isWanAnimate ? 20 : 10;
+  const duration = Math.max(2, Math.min(maxDuration, (args.duration as number) || 5));
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
   const videoSourceIndex = args.videoSourceIndex as number | undefined;
   const sourceImageIndex = args.sourceImageIndex as number | undefined;
+  // Optional overrides passed by pipeline callers (e.g. dance_montage)
+  const videoStartOffset = args.videoStartOffset as number | undefined;
+  const fpsOverride = args.fps as number | undefined;
+  const widthOverride = args.width as number | undefined;
+  const heightOverride = args.height as number | undefined;
 
   const config = getModelForControlMode(controlMode);
 
@@ -156,19 +164,25 @@ export async function execute(
     }
   }
 
-  // Use source video dimensions when available, snapped to model step size
-  // and clamped to model min/max. Falls back to model defaults.
-  let width = config.defaultWidth;
-  let height = config.defaultHeight;
-  if (videoFile.width && videoFile.height) {
+  // Explicit dimension overrides take priority (e.g. dance_montage forces 9:16).
+  // Otherwise use source video dimensions snapped to model step, or model defaults.
+  let width: number;
+  let height: number;
+  if (widthOverride && heightOverride) {
+    width = widthOverride;
+    height = heightOverride;
+  } else if (videoFile.width && videoFile.height) {
     const step = config.dimensionStep;
     width = Math.round(videoFile.width / step) * step;
     height = Math.round(videoFile.height / step) * step;
     width = Math.max(config.minDimension, Math.min(config.maxDimension, width));
     height = Math.max(config.minDimension, Math.min(config.maxDimension, height));
+  } else {
+    width = config.defaultWidth;
+    height = config.defaultHeight;
   }
   const frames = computeFrames(duration, config);
-  const fps = config.defaultFps;
+  const fps = fpsOverride ?? config.defaultFps;
   const steps = config.defaultSteps;
   const videoAspectRatio = `${width} / ${height}`;
   const mediaLabel = `${config.name} — ${duration}s @ ${width}x${height}`;
@@ -222,6 +236,7 @@ export async function execute(
           sampler: config.sampler,
           scheduler: config.scheduler,
           disableNSFWFilter: context.safeContentFilter === false,
+          videoStartOffset,
         },
         (progress) => {
           callbacks.onToolProgress({
@@ -290,6 +305,8 @@ interface V2VParams {
   sampler: string;
   scheduler: string;
   disableNSFWFilter?: boolean;
+  /** Start offset in seconds into the source video (for timeline splitting) */
+  videoStartOffset?: number;
 }
 
 interface V2VProgress {
@@ -308,24 +325,33 @@ async function runV2VGeneration(
   signal?: AbortSignal,
   sessionId?: string,
 ): Promise<string[]> {
+  const isWan = params.modelId.startsWith('wan_');
   const projectParams: Record<string, unknown> = {
     type: 'video',
     modelId: params.modelId,
     positivePrompt: params.prompt,
+    negativePrompt: '',
+    stylePrompt: '',
     numberOfMedia: params.numberOfMedia,
+    sizePreset: 'custom',
     width: params.width,
     height: params.height,
     frames: params.frames,
     fps: params.fps,
     steps: params.steps,
     seed: -1,
-    controlNet: { name: params.controlMode },
     referenceVideo: new Blob([params.sourceVideo as BlobPart], { type: params.sourceVideoMime || 'video/mp4' }),
     sampler: params.sampler,
     scheduler: params.scheduler,
     tokenType: params.tokenType,
     disableNSFWFilter: !!params.disableNSFWFilter,
   };
+
+  // ControlNet is only for LTX-2 modes (pose, detailer).
+  // WAN Animate Move/Replace workflows are defined by the model ID, not controlNet.
+  if (!isWan) {
+    projectParams.controlNet = { name: params.controlMode };
+  }
 
   if (params.referenceImage) {
     projectParams.referenceImage = new Blob([params.referenceImage as BlobPart], { type: params.referenceImageMime || 'image/jpeg' });
@@ -335,6 +361,9 @@ async function runV2VGeneration(
   }
   if (params.shift !== undefined) {
     projectParams.shift = params.shift;
+  }
+  if (params.videoStartOffset !== undefined) {
+    projectParams.videoStart = params.videoStartOffset;
   }
 
   const projects = (sogniClient as unknown as { projects: {

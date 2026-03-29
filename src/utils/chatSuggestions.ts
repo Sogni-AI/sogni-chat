@@ -21,7 +21,8 @@ type ChatToolName =
   | 'analyze_image'
   | 'extract_metadata'
   | 'resolve_personas'
-  | 'manage_memory';
+  | 'manage_memory'
+  | 'dance_montage';
 
 /** A suggestion chip with display label and prompt text sent on click */
 export interface Suggestion {
@@ -156,6 +157,11 @@ const SUGGESTIONS_BY_TOOL: Record<ChatToolName, Suggestion[]> = {
     { label: 'Show my preferences', prompt: 'What preferences do you remember about me?' },
     { label: 'Generate an image', prompt: 'Generate an image using my preferences' },
   ],
+  dance_montage: [
+    { label: 'Try a different dance', prompt: 'Try a different dance style' },
+    { label: 'Make it longer', prompt: 'Make the dance video longer' },
+    { label: 'Try with another photo', prompt: 'Try the dance with a different photo' },
+  ],
 };
 
 /**
@@ -234,8 +240,9 @@ const READY_TO_GENERATE_PATTERNS = [
 ];
 
 /** Detect the creative topic from message history */
-function detectTopic(messages: UIChatMessage[]): 'image' | 'video' | 'music' | null {
+function detectTopic(messages: UIChatMessage[]): 'image' | 'video' | 'music' | 'dance' | null {
   const allText = messages.map((m) => m.content || '').join(' ').toLowerCase();
+  if (/\b(dance|dancing|choreography)\b/.test(allText) || /\b(rasputin|jellyfish jam)\b/.test(allText) || /dance_montage/.test(allText)) return 'dance';
   if (/\b(song|music|compose|melody|soundtrack|lyrics|beat|bpm|tempo)\b/.test(allText)) return 'music';
   if (/\b(video|animate|animation|clip|motion)\b/.test(allText)) return 'video';
   if (/\b(image|photo|picture|illustration|painting|drawing|portrait)\b/.test(allText)) return 'image';
@@ -279,6 +286,14 @@ function getMidConversationSuggestions(messages: UIChatMessage[]): Suggestion[] 
   // Detect ongoing conversation about a specific topic (LLM asking questions)
   const topic = detectTopic(nonWelcome);
   if (topic) {
+    if (topic === 'dance') {
+      return [
+        { label: 'SpongeBob dance', prompt: 'Make them do the SpongeBob Jellyfish Jam dance' },
+        { label: 'Rasputin dance', prompt: 'Make them dance to Rasputin' },
+        { label: 'Chanel dance', prompt: 'Make them do the Chanel dance' },
+        { label: 'This Is America', prompt: 'Make them do the This Is America dance' },
+      ];
+    }
     if (topic === 'image') {
       return [
         { label: 'Famous painting', prompt: 'Make it look like a famous painting — think Klimt, Frida Kahlo, or Hokusai' },

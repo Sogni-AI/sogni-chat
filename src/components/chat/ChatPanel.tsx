@@ -279,32 +279,36 @@ export function ChatPanel({
     [messages, isLoading, analysisSuggestions, imageData, uploadIntent, hasPersonas, hasAudio],
   );
 
-  // Smart auto-scroll
+  // Smart auto-scroll — only for new messages or active LLM text streaming,
+  // NOT for tool progress updates (which would rubber-band when user scrolls up).
+  const messageCount = messages.length;
+  const hasStreamingMessage = messages.some((m) => m.isStreaming);
   useEffect(() => {
     if (!isUserNearBottomRef.current) return;
-    const isNewMessage = messages.length !== prevMessageCountRef.current;
-    const hasStreamingMessage = messages.some((m) => m.isStreaming);
-    if (isNewMessage || hasStreamingMessage || suggestions.length > 0) {
-      prevMessageCountRef.current = messages.length;
+    const isNewMessage = messageCount !== prevMessageCountRef.current;
+    if (isNewMessage || hasStreamingMessage) {
+      prevMessageCountRef.current = messageCount;
       messagesEndRef.current?.scrollIntoView({ behavior: isNewMessage ? 'smooth' : 'instant' });
     }
-  }, [messages, suggestions]);
+  }, [messageCount, hasStreamingMessage, suggestions]);
 
-  // ResizeObserver-based auto-scroll
+  // ResizeObserver-based auto-scroll — maintain scroll position when content
+  // grows (e.g. new messages, images loading). Skipped during tool execution
+  // to prevent rubber-banding when the user scrolls up during rendering.
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
     let prevHeight = container.scrollHeight;
     const observer = new ResizeObserver(() => {
       const newHeight = container.scrollHeight;
-      if (newHeight > prevHeight && isUserNearBottomRef.current) {
+      if (newHeight > prevHeight && isUserNearBottomRef.current && !isLoading) {
         messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
       }
       prevHeight = newHeight;
     });
     observer.observe(container);
     return () => observer.disconnect();
-  }, []);
+  }, [isLoading]);
 
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;

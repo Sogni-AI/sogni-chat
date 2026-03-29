@@ -37,6 +37,7 @@ import './manage-memory';
 // Video stitching & orbit
 import './stitch-video';
 import './orbit-video';
+import './dance-montage';
 
 export { toolRegistry } from './registry';
 export type {

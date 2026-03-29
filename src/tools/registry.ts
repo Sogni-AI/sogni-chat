@@ -22,6 +22,7 @@ class ToolRegistry {
     extract_metadata: 60_000,
     orbit_video: 1_800_000,   // 30 min — 3 angles + 4 videos + stitch
     stitch_video: 600_000,    // 10 min — large concatenation can be slow
+    dance_montage: 600_000,   // 10 min — multi-clip dance pipeline
   };
 
   /** Register a tool handler */

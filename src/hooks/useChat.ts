@@ -758,16 +758,28 @@ export function useChat(): UseChatResult {
                       const prevJob = perJobProgress?.[progress.jobIndex];
                       const isVideoResult = !!progress.videoResultUrls?.[0];
                       const resultUrl = progress.videoResultUrls?.[0] || progress.resultUrls?.[0];
+                      // Merge per-job progress — also check the progress event's own perJobProgress
+                      // for fields like retryKey that are sent via perJobProgress directly
+                      const eventJobData = progress.perJobProgress?.[progress.jobIndex];
                       perJobProgress = {
                         ...perJobProgress,
                         [progress.jobIndex]: {
-                          progress: progress.progress ?? prevJob?.progress,
-                          etaSeconds: progress.etaSeconds ?? prevJob?.etaSeconds,
-                          label: progress.jobLabel ?? prevJob?.label,
+                          progress: eventJobData?.progress ?? progress.progress ?? prevJob?.progress,
+                          etaSeconds: eventJobData?.etaSeconds ?? progress.etaSeconds ?? prevJob?.etaSeconds,
+                          label: eventJobData?.label ?? progress.jobLabel ?? prevJob?.label,
+                          retryKey: eventJobData?.retryKey,
                           ...(resultUrl ? { resultUrl, isVideo: isVideoResult } : prevJob?.resultUrl ? { resultUrl: prevJob.resultUrl, isVideo: prevJob.isVideo } : {}),
-                          ...(progress.error ? { error: progress.error } : prevJob?.error ? { error: prevJob.error } : {}),
+                          ...(eventJobData?.error ? { error: eventJobData.error } : progress.error ? { error: progress.error } : prevJob?.error ? { error: prevJob.error } : {}),
                         },
                       };
+                    } else if (progress.perJobProgress) {
+                      // Merge perJobProgress sent directly (without jobIndex), e.g. retry state updates
+                      perJobProgress = { ...perJobProgress };
+                      for (const [key, val] of Object.entries(progress.perJobProgress)) {
+                        const idx = Number(key);
+                        const prev = perJobProgress[idx];
+                        perJobProgress[idx] = { ...prev, ...val };
+                      }
                     }
                     // Persist image results progressively so auto-save captures them
                     // even if the batch isn't complete yet (survives page refresh)

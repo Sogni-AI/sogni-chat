@@ -16,6 +16,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useGalleryBlobUrls } from '@/hooks/useGalleryBlobUrls';
 import { activeVideos, pauseOtherVideos, isFullscreenOpen, markAutoPlay, consumeAutoPlay } from './videoCoordination';
+import { triggerRetry } from '@/services/retryBus';
 
 /** Shared style for custom video control buttons */
 const videoControlBtnStyle: React.CSSProperties = {
@@ -579,6 +580,7 @@ interface ChatVideoResultsProps {
     resultUrl?: string;
     error?: string;
     label?: string;
+    retryKey?: string;
   }>;
 }
 
@@ -651,7 +653,7 @@ export const ChatVideoResults = memo(function ChatVideoResults({
           }}
         >
           {isFailed ? (
-            /* Expired / error state */
+            /* Failed / expired state — with retry button when retryKey is available */
             <div
               style={{
                 display: 'flex',
@@ -667,7 +669,6 @@ export const ChatVideoResults = memo(function ChatVideoResults({
                 color: 'var(--color-text-tertiary)',
               }}
             >
-              {/* Film/video icon with X */}
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
                 <rect x="2" y="4" width="20" height="16" rx="2" />
                 <path d="M2 8h20" />
@@ -676,9 +677,27 @@ export const ChatVideoResults = memo(function ChatVideoResults({
                 <path d="M18 4v16" />
                 <line x1="2" y1="4" x2="22" y2="20" />
               </svg>
-              <span style={{ fontSize: '0.75rem', fontWeight: 500, opacity: 0.7 }}>
-                Video expired
-              </span>
+              {jobData?.retryKey ? (
+                <button
+                  onClick={() => triggerRetry(jobData.retryKey!)}
+                  style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    padding: '0.25rem 0.75rem',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'var(--color-accent)',
+                    color: 'white',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Retry clip
+                </button>
+              ) : (
+                <span style={{ fontSize: '0.75rem', fontWeight: 500, opacity: 0.7 }}>
+                  Video expired
+                </span>
+              )}
             </div>
           ) : isPending ? (
             /* Loading placeholder for pending video slot */

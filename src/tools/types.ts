@@ -73,7 +73,7 @@ export interface ToolExecutionContext {
 // Tool names
 // ---------------------------------------------------------------------------
 
-/** Tool name union — expanded from original 5 to 16 tools */
+/** Tool name union */
 export type ToolName =
   | 'restore_photo'
   | 'apply_style'
@@ -92,7 +92,8 @@ export type ToolName =
   | 'resolve_personas'
   | 'manage_memory'
   | 'stitch_video'
-  | 'orbit_video';
+  | 'orbit_video'
+  | 'dance_montage';
 
 // ---------------------------------------------------------------------------
 // Progress & callbacks
@@ -135,6 +136,8 @@ export interface ToolExecutionProgress {
     isVideo?: boolean;
     /** Per-job display label (e.g. "Generating right side view") */
     label?: string;
+    /** When set, the UI should show a retry button that calls triggerRetry(retryKey) */
+    retryKey?: string;
   }>;
 }
 
