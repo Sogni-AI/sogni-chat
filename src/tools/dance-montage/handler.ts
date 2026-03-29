@@ -35,37 +35,13 @@ const V2V_FPS = 32; // 16fps internal + post-gen frame interpolation
 const V2V_INTERNAL_FPS = 16;
 const V2V_STEPS = 6;
 
-/** WAN 2.2 dimension constraints */
-const DIMENSION_STEP = 16;
-const MIN_DIMENSION = 480;
-const MAX_DIMENSION = 1536;
-
 /** Max duration for a single V2V clip (WAN 2.2 Animate Move supports up to 20s) */
 const MAX_CLIP_DURATION = 20;
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Snap a dimension to the nearest multiple of DIMENSION_STEP, clamped to min/max. */
-function snapDimension(value: number): number {
-  const snapped = Math.round(value / DIMENSION_STEP) * DIMENSION_STEP;
-  return Math.max(MIN_DIMENSION, Math.min(MAX_DIMENSION, snapped));
-}
-
-/** Calculate 9:16 output dimensions — always 480p for dance videos. */
-function calculateDanceDimensions(): { width: number; height: number } {
-  const w = snapDimension(480);
-  const h = snapDimension(Math.round(w * (16 / 9)));
-  return { width: w, height: h };
-}
-
-/** Calculate WAN 2.2 Animate Move frame count for a given duration. */
-function computeFrames(duration: number): number {
-  const frames = Math.round(duration * V2V_INTERNAL_FPS) + 1;
-  // WAN Animate Move/Replace: up to 321 frames (20s @ 16fps)
-  return Math.max(17, Math.min(321, frames));
-}
+/** Fixed 9:16 480p output — matches dance reference video format.
+ *  480 / 16 = 30 (exact), 480 * 16/9 = 853.3 → round to 848 (53 * 16). */
+const DANCE_WIDTH = 480;
+const DANCE_HEIGHT = 848;
 
 /** Fetch a video from a URL and return as Uint8Array. */
 async function fetchVideoAsUint8Array(
@@ -174,7 +150,43 @@ export async function execute(
       mimeType: imageFiles[0]?.mimeType ?? 'image/jpeg',
     });
     console.log('[DANCE MONTAGE] Using original uploaded image');
-  } else if (imageFiles.length === 1) {
+  } else if (rawSourceIndex === undefined && context.resultUrls.length > 0) {
+    // No explicit sourceImageIndex — use ALL previously generated images.
+    // This is the common path when generate_image produced multiple images
+    // (e.g. 4 bobblehead variants) and the LLM then calls dance_montage
+    // without specifying which image to use.
+    console.log(`[DANCE MONTAGE] Fetching ${context.resultUrls.length} previously generated result(s) for montage`);
+    const fetchResults = await Promise.allSettled(
+      context.resultUrls.map((url, i) =>
+        fetchImageAsUint8Array(url).then(fetched => ({
+          index: i,
+          data: fetched.data,
+          width: fetched.width,
+          height: fetched.height,
+          mimeType: fetched.mimeType,
+        })),
+      ),
+    );
+    for (const result of fetchResults) {
+      if (result.status === 'fulfilled') {
+        resolvedImages.push({
+          data: result.value.data,
+          width: result.value.width,
+          height: result.value.height,
+          mimeType: result.value.mimeType,
+        });
+      } else {
+        console.warn('[DANCE MONTAGE] Skipping unfetchable result image:', result.reason);
+      }
+    }
+    if (resolvedImages.length > 0) {
+      console.log(`[DANCE MONTAGE] Using ${resolvedImages.length} generated result image(s) for montage`);
+    }
+    // If all fetches failed, fall through to uploaded image fallbacks below
+  }
+
+  // Fallbacks: if no images resolved yet, try uploaded files or primary image data
+  if (resolvedImages.length === 0 && imageFiles.length === 1) {
     // Single uploaded image
     resolvedImages.push({
       data: imageFiles[0].data,
@@ -183,7 +195,7 @@ export async function execute(
       mimeType: imageFiles[0].mimeType,
     });
     console.log('[DANCE MONTAGE] Using single uploaded image');
-  } else if (context.imageData) {
+  } else if (resolvedImages.length === 0 && context.imageData) {
     // Fallback to primary uploaded image data
     resolvedImages.push({
       data: context.imageData,
@@ -228,7 +240,8 @@ export async function execute(
   segmentDuration = Math.max(2, Math.min(MAX_CLIP_DURATION, segmentDuration));
   duration = segmentDuration * segmentCount;
 
-  const framesPerClip = computeFrames(segmentDuration);
+  // Frame count for cost estimation only — V2V computes its own frames internally
+  const framesPerClip = Math.max(17, Math.min(321, Math.round(segmentDuration * V2V_INTERNAL_FPS) + 1));
 
   // Build image alternation and video offsets
   const imageForSegment: ResolvedImage[] = [];
@@ -243,8 +256,8 @@ export async function execute(
     `${framesPerClip} frames/clip, ${imageCount} image(s) alternating`,
   );
 
-  // 6. Calculate output dimensions — always 9:16 480p for dance videos
-  const { width, height } = calculateDanceDimensions();
+  const width = DANCE_WIDTH;
+  const height = DANCE_HEIGHT;
   const videoAspectRatio = `${width} / ${height}`;
 
   console.log(`[DANCE MONTAGE] Output dimensions: ${width}x${height}`);
@@ -278,134 +291,23 @@ export async function execute(
   callbacks.onToolProgress({
     type: 'started',
     toolName: 'dance_montage',
-    totalCount: 1,
+    totalCount: segmentCount,
     estimatedCost: estimatedCost > 0 ? estimatedCost : undefined,
     stepLabel: `Preparing ${preset.title} dance`,
     videoAspectRatio,
+    modelName: `WAN 2.2 Animate — ${duration}s (${segmentCount} clips)`,
   });
 
   // ---------------------------------------------------------------------------
-  // Phase 2: Generate clips
+  // Phase 2: Generate clips via pipeline
   // ---------------------------------------------------------------------------
 
-  // Build the dance video UploadedFile entry for injection into V2V contexts
   const danceVideoFile: UploadedFile = {
     type: 'video',
     data: danceVideoData,
     mimeType: danceVideoMime,
     filename: `${preset.id}-reference.mp4`,
   };
-
-  // Single-segment shortcut: skip pipeline, call V2V directly
-  if (segmentCount === 1) {
-    try {
-      const singleContext = Object.create(context) as ToolExecutionContext;
-      // Inject dance video as the video source
-      singleContext.uploadedFiles = [danceVideoFile, ...imageForSegment.map((img): UploadedFile => ({
-        type: 'image',
-        data: img.data,
-        width: img.width,
-        height: img.height,
-        mimeType: img.mimeType,
-        filename: 'source-image.jpg',
-      }))];
-      // Set primary image data for V2V's fallback reference image resolution
-      singleContext.imageData = imageForSegment[0].data;
-      singleContext.width = imageForSegment[0].width;
-      singleContext.height = imageForSegment[0].height;
-
-      const v2vArgs: Record<string, unknown> = {
-        prompt: '',
-        controlMode: 'animate-move',
-        duration: segmentDuration,
-        numberOfVariations: 1,
-        fps: V2V_FPS,
-        width,
-        height,
-      };
-
-      let capturedVideoUrls: string[] = [];
-      const v2vCallbacks: ToolCallbacks = {
-        onToolProgress: (progress) => {
-          callbacks.onToolProgress({
-            ...progress,
-            toolName: 'dance_montage',
-            stepLabel: `Generating ${preset.title} dance`,
-            sourceImageUrl: undefined,
-          });
-        },
-        onToolComplete: (_toolName, _resultUrls, videoResultUrls) => {
-          capturedVideoUrls = videoResultUrls || [];
-        },
-        onInsufficientCredits: callbacks.onInsufficientCredits,
-        onGallerySaved: undefined,
-      };
-
-      const rawResult = await toolRegistry.execute(
-        'video_to_video',
-        v2vArgs,
-        singleContext,
-        v2vCallbacks,
-        { skipValidation: true },
-      );
-
-      try {
-        const parsed = JSON.parse(rawResult);
-        if (parsed.error) {
-          return JSON.stringify({
-            error: parsed.error,
-            message: parsed.message || `Dance generation failed: ${parsed.error}`,
-          });
-        }
-      } catch { /* V2V returned non-JSON — continue if we have URLs */ }
-
-      const videoUrl = capturedVideoUrls[0];
-      if (!videoUrl) {
-        return JSON.stringify({
-          error: 'dance_failed',
-          message: 'Dance generation completed but no video was produced.',
-        });
-      }
-
-      // Save to gallery
-      let galleryVideoId: string | undefined;
-      try {
-        const response = await fetch(videoUrl);
-        const blob = await response.blob();
-        const { galleryImageId } = await saveVideoToGallery({ videoBlob: blob });
-        galleryVideoId = galleryImageId;
-      } catch (err) {
-        console.error('[DANCE MONTAGE] Failed to save to gallery:', err);
-      }
-
-      callbacks.onToolComplete('dance_montage', [], [videoUrl]);
-
-      if (galleryVideoId) {
-        callbacks.onGallerySaved?.([], [galleryVideoId]);
-      }
-
-      return JSON.stringify({
-        success: true,
-        resultCount: 1,
-        mediaType: 'video',
-        dance: preset.title,
-        duration: segmentDuration,
-        creditsCost: estimatedCost > 0 ? formatCredits(estimatedCost) : undefined,
-        message: `Successfully created a ${segmentDuration}s ${preset.title} dance video.${estimatedCost > 0 ? ` Estimated cost: ~${formatCredits(estimatedCost)} credits.` : ''} The user can now see and play the dance video.`,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message === 'insufficient_credits' || message === 'no_image') {
-        return JSON.stringify({ error: message, message: `Dance generation aborted: ${message}` });
-      }
-      console.error('[DANCE MONTAGE] Single-segment generation failed:', message);
-      return JSON.stringify({ error: 'dance_failed', message });
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Multi-segment: use pipeline
-  // ---------------------------------------------------------------------------
 
   const pipelineConfig: PipelineConfig = {
     parentToolName: 'dance_montage',
@@ -437,9 +339,10 @@ export async function execute(
             toolName: 'dance_montage',
             totalCount: segmentCount,
             stepLabel: 'Generating dance clips',
+            videoAspectRatio,
+            modelName: `WAN 2.2 Animate — ${segmentDuration}s/clip`,
           });
 
-          // Emit initial per-job labels
           for (let j = 0; j < segmentCount; j++) {
             stepCallbacks.onToolProgress({
               type: 'progress',
@@ -449,6 +352,7 @@ export async function execute(
               jobIndex: j,
               totalCount: segmentCount,
               completedCount: 0,
+              videoAspectRatio,
             });
           }
 
@@ -486,6 +390,8 @@ export async function execute(
                   jobIndex: i,
                   totalCount: segmentCount,
                   completedCount,
+                  estimatedCost: estimatedCost > 0 ? estimatedCost : undefined,
+                  videoAspectRatio,
                   videoResultUrls: undefined,
                   sourceImageUrl: undefined,
                 });
@@ -577,13 +483,17 @@ export async function execute(
 
             console.log(`[DANCE MONTAGE] Waiting for user retry on clips: ${failedIndices.map(i => i + 1).join(', ')}`);
 
-            // Wait for ANY retry button click, then retry that clip
-            const retryIndex = await Promise.race(
-              failedIndices.map(i => {
+            // Wait for ANY retry button click OR abort signal
+            const retryIndex = await Promise.race([
+              ...failedIndices.map(i => {
                 const key = retryKeys.find(k => k.includes(`-clip-${i}-`))!;
                 return onRetry(key).then(() => i);
               }),
-            );
+              new Promise<never>((_, reject) => {
+                if (ctx.signal?.aborted) reject(new Error('Cancelled'));
+                else ctx.signal?.addEventListener('abort', () => reject(new Error('Cancelled')), { once: true });
+              }),
+            ]);
 
             // Clean up all pending retry listeners for this round
             for (const key of retryKeys) cancelRetry(key);

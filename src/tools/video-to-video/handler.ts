@@ -12,6 +12,7 @@ import {
   recordCompletion,
   discardPending,
   formatCredits,
+  getPersonaVoiceClip,
 } from '../shared';
 import type { TokenType } from '@/types/wallet';
 import { fetchVideoCostEstimate } from '@/services/creditsService';
@@ -208,6 +209,10 @@ export async function execute(
     modelName: mediaLabel,
   });
 
+  // Extract persona voice clip for LTX-2 referenceAudioIdentity (V2V LTX modes only)
+  const isLTX = !config.id.startsWith('wan_');
+  const personaVoiceClip = isLTX ? getPersonaVoiceClip(context.uploadedFiles) : null;
+
   const billingId = estimatedCost > 0
     ? registerPendingCost('video_to_video', estimatedCost, context.tokenType)
     : null;
@@ -237,6 +242,7 @@ export async function execute(
           scheduler: config.scheduler,
           disableNSFWFilter: context.safeContentFilter === false,
           videoStartOffset,
+          referenceAudioIdentity: personaVoiceClip,
         },
         (progress) => {
           callbacks.onToolProgress({
@@ -307,6 +313,8 @@ interface V2VParams {
   disableNSFWFilter?: boolean;
   /** Start offset in seconds into the source video (for timeline splitting) */
   videoStartOffset?: number;
+  /** Persona voice clip for LTX-2 audio identity */
+  referenceAudioIdentity?: Blob | null;
 }
 
 interface V2VProgress {
@@ -364,6 +372,10 @@ async function runV2VGeneration(
   }
   if (params.videoStartOffset !== undefined) {
     projectParams.videoStart = params.videoStartOffset;
+  }
+  if (params.referenceAudioIdentity) {
+    projectParams.referenceAudioIdentity = params.referenceAudioIdentity;
+    console.log('[VIDEO TO VIDEO] Injecting persona voice clip as referenceAudioIdentity');
   }
 
   const projects = (sogniClient as unknown as { projects: {
@@ -424,6 +436,9 @@ async function runV2VGeneration(
 
     // Map jobId → jobIndex from initiating/started events (which include jobIndex)
     const jobIdToIndex = new Map<string, number>();
+    // Track latest ETA and progress per job so every callback includes both
+    const lastETAByJob = new Map<string, number>();
+    const lastProgressByJob = new Map<string, number>();
 
     const jobHandler = (event: Record<string, unknown>) => {
       if ((event as { projectId?: string }).projectId !== project.id) return;
@@ -440,12 +455,28 @@ async function runV2VGeneration(
           const step = event.step as number | undefined;
           const stepCount = event.stepCount as number | undefined;
           if (step !== undefined && stepCount !== undefined && stepCount > 0) {
-            onProgress({ progress: step / stepCount, jobIndex: event.jobId ? jobIdToIndex.get(event.jobId as string) : undefined });
+            const jobId = event.jobId as string;
+            const progress = step / stepCount;
+            if (jobId) lastProgressByJob.set(jobId, progress);
+            const jobIndex = jobId ? jobIdToIndex.get(jobId) : undefined;
+            onProgress({
+              progress,
+              jobIndex,
+              etaSeconds: jobId ? lastETAByJob.get(jobId) : undefined,
+            });
           }
           break;
         }
         case 'jobETA': {
-          onProgress({ etaSeconds: event.etaSeconds as number | undefined, jobIndex: event.jobId ? jobIdToIndex.get(event.jobId as string) : undefined });
+          const jobId = event.jobId as string;
+          const eta = event.etaSeconds as number | undefined;
+          if (jobId && eta !== undefined) lastETAByJob.set(jobId, eta);
+          const jobIndex = jobId ? jobIdToIndex.get(jobId) : undefined;
+          onProgress({
+            etaSeconds: eta,
+            jobIndex,
+            progress: jobId ? lastProgressByJob.get(jobId) : undefined,
+          });
           break;
         }
         case 'completed': {

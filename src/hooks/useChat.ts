@@ -1764,8 +1764,18 @@ export function useChat(): UseChatResult {
                 filename: `persona-${persona.name.toLowerCase().replace(/\s+/g, '-')}.jpg`,
               });
             }
+            // Re-inject voice clip for LTX-2.3 referenceAudioIdentity
+            if (persona.voiceClipData && persona.voiceClipMimeType) {
+              executionContext.uploadedFiles.push({
+                type: 'audio' as const,
+                data: persona.voiceClipData,
+                mimeType: persona.voiceClipMimeType,
+                filename: `persona-voiceclip-${persona.name.toLowerCase().replace(/\s+/g, '-')}`,
+                duration: persona.voiceClipDuration || undefined,
+              });
+            }
           }
-          console.log(`[CHAT HOOK] Re-injected ${personas.length} persona photos for retry`);
+          console.log(`[CHAT HOOK] Re-injected ${personas.length} persona photos/voice clips for retry`);
         } catch (err) {
           console.warn('[CHAT HOOK] Failed to re-inject persona photos for retry:', err);
         }

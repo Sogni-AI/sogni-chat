@@ -33,7 +33,7 @@ export const definition: ToolDefinition = {
         sourceImageIndex: {
           type: 'number',
           description:
-            'Which previously generated result image to use (0-based index). Use -1 for the original uploaded image. When multiple images are uploaded, all are used automatically for montage segments.',
+            'Which previously generated result image to use (0-based index). Use -1 for the original uploaded image. When omitted, all previously generated images are used automatically as alternating montage segments.',
         },
       },
       required: ['dance'],
