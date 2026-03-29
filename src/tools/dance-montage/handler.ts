@@ -584,9 +584,10 @@ export async function execute(
                   imageUrls: resultUrls || [],
                   videoUrls: videoResultUrls || [],
                 };
-                for (const url of (videoResultUrls || [])) {
-                  if (!ctx.videoResultUrls.includes(url)) ctx.videoResultUrls.push(url);
-                }
+                // Do NOT push intermediate clip URLs into ctx.videoResultUrls —
+                // only the final stitched montage should be in the session-wide
+                // video array. Leaking clips would pollute videoStartIndex and
+                // cause stitch_video to reference expired intermediate URLs.
               },
               onInsufficientCredits: stepCallbacks.onInsufficientCredits,
               onGallerySaved: undefined,
