@@ -10,7 +10,7 @@ export const definition: ToolDefinition = {
   function: {
     name: 'resolve_personas',
     description:
-      'Load persona reference photos for identity-preserving image generation. Call this BEFORE edit_image when the user references a person from My Personas (e.g. "make a picture of me", "draw Sarah and the kids"). Returns reference photos as numbered context images plus appearance descriptions. CRITICAL: After calling this, you MUST use edit_image (NOT generate_image). For video requests: edit_image first to generate the image, then animate_photo (never generate_video). Reference each person by picture number with explicit face preservation directives. Do NOT call this for fictional/non-persona subjects.',
+      'Load persona reference photos for identity-preserving image generation. Call this BEFORE edit_image when the user references a person from My Personas (e.g. "make a picture of me", "draw Sarah and the kids"). Returns reference photos as numbered context images plus appearance descriptions. CRITICAL: After calling this, you MUST use edit_image (NOT generate_image). For video requests: edit_image first to generate the image, then animate_photo (never generate_video). DIMENSION MATCHING: When generating a persona image for video, pass the SAME aspectRatio (or width/height) to edit_image that animate_photo will use — the generated image dimensions must match the target video dimensions. Default video aspect ratio is 16:9 landscape. Reference each person by picture number with explicit face preservation directives. Do NOT call this for fictional/non-persona subjects.',
     parameters: {
       type: 'object',
       properties: {
