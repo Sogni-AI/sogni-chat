@@ -14,6 +14,7 @@ import {
   discardPending,
   formatCredits,
   fetchImageAsUint8Array,
+  sanitizeBatchPrompt,
 } from '../shared';
 import type { TokenType } from '@/types/wallet';
 import { parseAspectRatio } from '@/utils/imageDimensions';
@@ -359,7 +360,7 @@ export async function execute(
   context: ToolExecutionContext,
   callbacks: ToolCallbacks,
 ): Promise<string> {
-  const prompt = args.prompt as string;
+  let prompt = args.prompt as string;
   const defaultModel = context.qualityTier === 'pro' ? 'flux2'
     : context.qualityTier === 'hq' ? 'z-image' : 'z-turbo';
   const explicitModel = args.model as string | undefined;
@@ -370,7 +371,19 @@ export async function execute(
     ? explicitModel
     : defaultModel;
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
-  const negativePrompt = args.negativePrompt as string | undefined;
+  let negativePrompt = args.negativePrompt as string | undefined;
+
+  // Strip grid/collage-causing language for batch variations
+  if (numberOfMedia > 1) {
+    const before = prompt;
+    prompt = sanitizeBatchPrompt(prompt);
+    if (prompt !== before) {
+      console.log('[GENERATE IMAGE] Sanitized batch prompt to prevent grid output');
+    }
+    // Auto-inject anti-grid terms into negative prompt
+    const antiGrid = 'grid, collage, montage, multiple panels, side by side, split screen, contact sheet, photo sheet, multiple copies, duplicates';
+    negativePrompt = negativePrompt ? `${negativePrompt}, ${antiGrid}` : antiGrid;
+  }
   const aspectRatio = args.aspectRatio as string | undefined;
   const startingImageStrength = args.starting_image_strength as number | undefined;
   const rawSourceIndex = args.sourceImageIndex as number | undefined;
