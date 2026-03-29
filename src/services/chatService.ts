@@ -465,19 +465,18 @@ PERSONA RULES:
 
       // Check for tool calls
       if (result.finishReason === 'tool_calls' && result.tool_calls?.length) {
-        // Safety: if the LLM's text ends with a confirmation question but also emits
+        // Safety: if the LLM's text ends with a question mark but also emits
         // tool calls, suppress the tool calls and treat as a text-only response.
-        // This prevents the "Shall I proceed?" + immediate execution bug.
-        // Only match question patterns near the END of the response (last 500 chars)
-        // to avoid false positives from phrases like "this should improve quality".
+        // The system prompt says "If asking a question, do NOT call tools — wait
+        // for reply." so any trailing question means the model should be waiting
+        // for user input, not executing tools simultaneously.
+        // Strip quoted speech first to avoid matching questions inside dialogue
+        // prompts (e.g. dialogue the model intends the tool to speak).
         if (result.content) {
-          const tail = result.content.slice(-500).toLowerCase();
-          // Don't match inside quoted speech (common in dialogue-heavy prompts)
+          const tail = result.content.slice(-500);
           const unquotedTail = tail.replace(/"[^"]*"/g, '').replace(/'[^']*'/g, '');
-          const confirmPattern = /\b(shall i|should i|do you want|would you like|want me to|ready to proceed|like me to)\b/;
-          if (confirmPattern.test(unquotedTail) && /\?\s*$/.test(unquotedTail)) {
-            const match = unquotedTail.match(confirmPattern);
-            console.log(`[CHAT SERVICE] Suppressed tool calls — matched: "${match?.[0]}" in last 500 chars`);
+          if (/\?\s*$/.test(unquotedTail)) {
+            console.log(`[CHAT SERVICE] Suppressed tool calls — response ends with a question`);
             updatedMessages.push({ role: 'assistant', content: result.content });
             callbacks.onConversationUpdate?.(updatedMessages);
             callbacks.onComplete(result.content);
