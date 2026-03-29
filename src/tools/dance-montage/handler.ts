@@ -107,18 +107,52 @@ export async function execute(
   console.log(`[DANCE MONTAGE] Dance: ${preset.title} (${preset.id}), requested duration: ${duration}s`);
 
   // 2. Resolve source images
-  // Exclude persona reference photos (injected by resolve_personas with a
-  // "persona-" filename prefix). When personas are involved, the LLM first
-  // calls generate_image to create stylised variants (e.g. bobbleheads) which
-  // land in context.resultUrls. Using the raw persona photos here would bypass
-  // those generated images entirely.
-  const imageFiles = context.uploadedFiles.filter(
-    (f: UploadedFile) => f.type === 'image' && !f.filename?.startsWith('persona-'),
-  );
+  const imageFiles = context.uploadedFiles.filter((f: UploadedFile) => f.type === 'image');
+  const hasPersonaPhotos = imageFiles.some(f => f.filename?.startsWith('persona-'));
   const resolvedImages: ResolvedImage[] = [];
 
-  if (imageFiles.length > 1) {
-    // Multi-image upload: use ALL uploaded image files
+  // When persona photos are present, check for generated results FIRST.
+  // Generated results (e.g. bobbleheads from edit_image) should take priority
+  // over raw persona reference photos. But if no generated results exist,
+  // persona photos are still valid source images for direct use.
+  if (hasPersonaPhotos && rawSourceIndex === undefined && context.resultUrls.length > 0) {
+    console.log(`[DANCE MONTAGE] Personas detected — preferring ${context.resultUrls.length} generated result(s) over raw persona photos`);
+    const fetchResults = await Promise.allSettled(
+      context.resultUrls.map((url, i) =>
+        fetchImageAsUint8Array(url).then(fetched => ({
+          index: i,
+          data: fetched.data,
+          width: fetched.width,
+          height: fetched.height,
+          mimeType: fetched.mimeType,
+        })),
+      ),
+    );
+    for (const result of fetchResults) {
+      if (result.status === 'fulfilled') {
+        resolvedImages.push({
+          data: result.value.data,
+          width: result.value.width,
+          height: result.value.height,
+          mimeType: result.value.mimeType,
+        });
+      } else {
+        console.warn('[DANCE MONTAGE] Skipping unfetchable result image:', result.reason);
+      }
+    }
+    if (resolvedImages.length > 0) {
+      console.log(`[DANCE MONTAGE] Using ${resolvedImages.length} generated result image(s) for montage`);
+    }
+    // If all fetches failed, fall through to remaining resolution paths
+  }
+
+  if (resolvedImages.length > 0) {
+    // Already resolved above (persona + generated results path)
+  } else if (imageFiles.length > 1 && !(hasPersonaPhotos && imagePrompt)) {
+    // Multi-image upload: use ALL uploaded image files (including persona photos
+    // if that's all that's available — the user may want raw photos for dancing).
+    // Skip this path when imagePrompt is provided with personas — that signals the
+    // LLM wants auto-generated styled images, not raw reference photos.
     for (const imgFile of imageFiles) {
       resolvedImages.push({
         data: imgFile.data,
