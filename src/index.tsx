@@ -9,13 +9,30 @@ window.addEventListener('vite:preloadError', (event) => {
   window.location.reload();
 });
 
-// Unregister stale service workers from previous deployments (e.g. "Sogni 360")
+// Service Worker Registration
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then((registrations) => {
-    for (const registration of registrations) {
-      registration.unregister();
-    }
-  });
+  const isLocalDev = location.hostname === 'localhost' ||
+                     location.hostname === '127.0.0.1' ||
+                     location.hostname.includes('local');
+
+  if (!isLocalDev) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then((registration) => {
+          console.log('[APP] Service Worker registered:', registration.scope);
+        })
+        .catch((error) => {
+          console.warn('[APP] Service Worker registration failed:', error);
+        });
+    });
+  } else {
+    // Unregister stale service workers in local development
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const registration of registrations) {
+        registration.unregister();
+      }
+    });
+  }
 }
 
 // Update viewport height for mobile
