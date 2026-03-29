@@ -48,9 +48,13 @@ export function checkPersonaPolicy(
     hasUploadedImages: boolean;
   },
 ): PolicyCheckResult {
-  const prompt = String(args.prompt || args.imagePrompt || '').toLowerCase();
+  // Check both prompt and imagePrompt — tools may use either field name.
+  // Concatenate (don't short-circuit) so persona names in either field are caught.
+  const promptText = [String(args.prompt || ''), String(args.imagePrompt || '')].join(' ').toLowerCase();
 
-  // If persona photos are loaded and user is trying generate_image, redirect to edit_image
+  // If persona photos are loaded and user is trying generate_image, redirect to edit_image.
+  // This fires for ALL generate_image calls when photos are loaded — by design, personas
+  // must always use edit_image for identity preservation, regardless of prompt content.
   if (toolName === 'generate_image' && state.hasPersonaPhotos) {
     return {
       allowed: true,
@@ -64,12 +68,12 @@ export function checkPersonaPolicy(
     toolName !== 'resolve_personas' &&
     state.personaNames.length > 0 &&
     !state.hasPersonaPhotos &&
-    state.personaNames.some(name => prompt.includes(name.toLowerCase()))
+    state.personaNames.some(name => promptText.includes(name.toLowerCase()))
   ) {
     return {
       allowed: false,
       reason: 'precondition_failed',
-      explanation: `Prompt mentions personas (${state.personaNames.filter(n => prompt.includes(n.toLowerCase())).join(', ')}) but they haven't been resolved — resolve_personas must run first`,
+      explanation: `Prompt mentions personas (${state.personaNames.filter(n => promptText.includes(n.toLowerCase())).join(', ')}) but they haven't been resolved — resolve_personas must run first`,
     };
   }
 
