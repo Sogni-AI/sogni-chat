@@ -7,7 +7,7 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { ToolExecutionProgress } from '@/tools/types';
 import { formatCredits } from '@/services/creditsService';
 import { useTokenPrice } from '@/hooks/useTokenPrice';
-import { activeVideos, pauseOtherVideos, isFullscreenOpen, markAutoPlay, consumeAutoPlay } from './videoCoordination';
+import { activeVideos, pauseOtherVideos, isFullscreenOpen, markAutoPlay, consumeAutoPlay, formatETA } from './videoCoordination';
 import { PersonaReferenceIndicator } from '@/components/personas/PersonaReferenceIndicator';
 
 /** Shared style for progress video control buttons */
@@ -381,7 +381,7 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
 
   // Progress display: prefer ETA when available, otherwise show percentage
   const progressText = hasETA
-    ? `~${Math.ceil(progress.etaSeconds!)}s remaining`
+    ? formatETA(progress.etaSeconds!)
     : hasProgress
       ? `${percentage}%`
       : null;
@@ -426,7 +426,7 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
             const jobETA = jobData?.etaSeconds ?? (totalCount <= 1 ? progress.etaSeconds : undefined);
             const jobHasETA = jobETA !== undefined && jobETA > 0;
             const jobProgressText = jobHasETA
-              ? `~${Math.ceil(jobETA!)}s remaining`
+              ? formatETA(jobETA!)
               : jobHasProgress
                 ? `${jobPct}%`
                 : null;

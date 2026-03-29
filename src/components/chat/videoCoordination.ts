@@ -45,6 +45,15 @@ export function pauseOtherVideos(current: HTMLVideoElement) {
   });
 }
 
+/** Format an ETA in seconds to a human-readable string (e.g. "~12s", "~2m30s") */
+export function formatETA(seconds: number): string {
+  const s = Math.ceil(seconds);
+  if (s < 60) return `~${s}s remaining`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return rem > 0 ? `~${m}m${rem}s remaining` : `~${m}m remaining`;
+}
+
 /** Pause ALL registered inline chat videos (e.g. when fullscreen viewer opens) */
 export function pauseAllVideos() {
   activeVideos.forEach((v) => {

@@ -381,7 +381,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
       {/* Video results — always rendered during video progress to prevent re-render on batch completion.
            Placeholder slots are pre-allocated based on totalCount so the DOM is stable from first frame. */}
       {(hasVideos || isVideoToolProgress) && (
-        <div style={{ maxWidth: '85%', width: '100%' }}>
+        <div style={{ maxWidth: '85%', width: '100%', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <ChatVideoResults
             urls={message.videoResults || []}
             galleryVideoIds={message.galleryVideoIds}

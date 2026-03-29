@@ -137,8 +137,9 @@ export async function executePipeline(
               completedCount,
               // Strip intermediate result URLs — pipeline manages its own result
               // collection via onToolComplete. Leaking these would cause useChat to
-              // accumulate intermediate artifacts (e.g. transition clips) in the
-              // final message's videoResults, breaking gallery ID index alignment.
+              // store image URLs in perJobProgress, which ChatVideoResults then tries
+              // to render as <video> elements (causing "Video expired" errors).
+              resultUrls: undefined,
               videoResultUrls: undefined,
               // Strip sub-tool sourceImageUrl — each concurrent sub-tool has its own
               // source image (e.g. orbit transitions use different angle views).
@@ -228,7 +229,8 @@ export async function executePipeline(
             callbacks.onToolProgress({
               ...progress,
               stepLabel,
-              // Strip intermediate video result URLs (see concurrent path comment)
+              // Strip intermediate result URLs (see concurrent path comment)
+              resultUrls: undefined,
               videoResultUrls: undefined,
             });
           },

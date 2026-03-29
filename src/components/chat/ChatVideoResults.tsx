@@ -15,7 +15,7 @@
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useGalleryBlobUrls } from '@/hooks/useGalleryBlobUrls';
-import { activeVideos, pauseOtherVideos, isFullscreenOpen, markAutoPlay, consumeAutoPlay } from './videoCoordination';
+import { activeVideos, pauseOtherVideos, isFullscreenOpen, markAutoPlay, consumeAutoPlay, formatETA } from './videoCoordination';
 import { triggerRetry } from '@/services/retryBus';
 
 /** Shared style for custom video control buttons */
@@ -637,7 +637,7 @@ export const ChatVideoResults = memo(function ChatVideoResults({
         const jobPct = jobProg !== undefined ? Math.round(jobProg * 100) : 0;
         const jobETA = jobData?.etaSeconds;
         const jobProgressText = jobETA !== undefined && jobETA > 0
-          ? `~${Math.ceil(jobETA)}s remaining`
+          ? formatETA(jobETA)
           : jobProg !== undefined
             ? `${jobPct}%`
             : null;
