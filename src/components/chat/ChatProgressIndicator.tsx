@@ -425,13 +425,15 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
             const jobHasProgress = jobProg !== undefined;
             const jobETA = jobData?.etaSeconds ?? (totalCount <= 1 ? progress.etaSeconds : undefined);
             const jobHasETA = jobETA !== undefined && jobETA > 0;
-            const jobProgressText = jobHasETA
-              ? formatETA(jobETA!)
-              : jobHasProgress
-                ? `${jobPct}%`
-                : null;
             const isCompletedVideo = !!resultUrl && (jobData?.isVideo ?? isVideoTool);
             const jobError = jobData?.error;
+            // Suppress ETA/progress text for completed or failed slots
+            const jobProgressText = (!!resultUrl || !!jobError) ? null
+              : jobHasETA
+                ? formatETA(jobETA!)
+                : jobHasProgress
+                  ? `${jobPct}%`
+                  : null;
 
             const isCompleted = !!resultUrl;
 

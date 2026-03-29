@@ -424,6 +424,11 @@ export async function execute(
         if (progress.jobIndex !== undefined && progress.progress !== undefined) {
           perJobProgress.set(progress.jobIndex, progress.progress);
         }
+        // Clear stale ETA when a job completes — prevents "~1s remaining" lingering
+        const isJobDone = progress.type === 'completed' || progress.progress === 1;
+        if (isJobDone && progress.jobIndex !== undefined) {
+          perJobEta.delete(progress.jobIndex);
+        }
         callbacks.onToolProgress({
           type: progress.completedCount !== undefined && progress.completedCount >= numberOfMedia ? 'completed' : 'progress',
           toolName: 'animate_photo',
@@ -443,6 +448,11 @@ export async function execute(
         }
       }
       if (progress.type === 'jobETA') {
+        // Skip ETA updates for jobs that already completed — prevents stale
+        // "~1s remaining" from overwriting the completed state.
+        if (progress.jobIndex !== undefined && perJobProgress.get(progress.jobIndex) === 1) {
+          return;
+        }
         if (progress.jobIndex !== undefined && progress.etaSeconds !== undefined) {
           perJobEta.set(progress.jobIndex, progress.etaSeconds);
         }

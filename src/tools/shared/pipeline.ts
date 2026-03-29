@@ -135,12 +135,14 @@ export async function executePipeline(
               jobIndex: i,
               totalCount: step.count,
               completedCount,
-              // Strip intermediate result URLs — pipeline manages its own result
-              // collection via onToolComplete. Leaking these would cause useChat to
-              // store image URLs in perJobProgress, which ChatVideoResults then tries
+              // Strip intermediate image result URLs — pipeline manages its own result
+              // collection via onToolComplete. Leaking image URLs would cause useChat to
+              // store them in perJobProgress, which ChatVideoResults then tries
               // to render as <video> elements (causing "Video expired" errors).
+              // VIDEO result URLs are forwarded so completed clips render immediately
+              // in the UI instead of staying as spinners until the entire batch finishes.
               resultUrls: undefined,
-              videoResultUrls: undefined,
+              videoResultUrls: progress.videoResultUrls,
               // Strip sub-tool sourceImageUrl — each concurrent sub-tool has its own
               // source image (e.g. orbit transitions use different angle views).
               // Forwarding these would cause the top-level placeholder to rapidly

@@ -561,7 +561,7 @@ export async function execute(
                   completedCount,
                   estimatedCost: estimatedCost > 0 ? estimatedCost : undefined,
                   videoAspectRatio,
-                  videoResultUrls: undefined,
+                  videoResultUrls: progress.videoResultUrls,
                   sourceImageUrl: undefined,
                 });
               },

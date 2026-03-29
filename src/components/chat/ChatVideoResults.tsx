@@ -636,11 +636,14 @@ export const ChatVideoResults = memo(function ChatVideoResults({
         const jobProg = jobData?.progress;
         const jobPct = jobProg !== undefined ? Math.round(jobProg * 100) : 0;
         const jobETA = jobData?.etaSeconds;
-        const jobProgressText = jobETA !== undefined && jobETA > 0
-          ? formatETA(jobETA)
-          : jobProg !== undefined
-            ? `${jobPct}%`
-            : null;
+        // Suppress ETA/progress text for completed or failed slots
+        const hasResult = !!rawUrl;
+        const jobProgressText = hasResult || isFailed ? null
+          : jobETA !== undefined && jobETA > 0
+            ? formatETA(jobETA)
+            : jobProg !== undefined
+              ? `${jobPct}%`
+              : null;
 
         return (
         <div

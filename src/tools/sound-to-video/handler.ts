@@ -333,7 +333,7 @@ export async function execute(
         },
         (progress) => {
           callbacks.onToolProgress({
-            type: progress.completed ? 'completed' : 'progress',
+            type: progress.error ? 'progress' : progress.completed ? 'completed' : 'progress',
             toolName: 'sound_to_video',
             progress: progress.progress,
             completedCount: progress.completedCount,
@@ -341,6 +341,7 @@ export async function execute(
             jobIndex: progress.jobIndex,
             etaSeconds: progress.etaSeconds,
             videoResultUrls: progress.resultUrl ? [progress.resultUrl] : undefined,
+            error: progress.error,
             estimatedCost,
             videoAspectRatio,
           });
@@ -407,6 +408,7 @@ interface S2VProgress {
   etaSeconds?: number;
   resultUrl?: string;
   completed?: boolean;
+  error?: string;
 }
 
 async function runS2VGeneration(
@@ -549,7 +551,10 @@ async function runS2VGeneration(
             onProgress({ completed: completedCount >= totalJobs, completedCount, jobIndex: jobIdToIndex.get(event.jobId as string), resultUrl, progress: 1 });
           } else {
             failedCount++;
+            const jobIndex = event.jobId ? jobIdToIndex.get(event.jobId as string) : undefined;
+            const errorMsg = typeof event.error === 'string' ? event.error : ((event.error as { message?: string })?.message || 'Video generation failed');
             console.error('[SOUND TO VIDEO] Job completed with error:', event.error);
+            onProgress({ error: errorMsg, jobIndex, completedCount, progress: undefined });
           }
           checkDone();
           break;
@@ -557,7 +562,10 @@ async function runS2VGeneration(
         case 'error':
         case 'failed': {
           failedCount++;
+          const jobIndex = event.jobId ? jobIdToIndex.get(event.jobId as string) : undefined;
+          const errorMsg = typeof event.error === 'string' ? event.error : ((event.error as { message?: string })?.message || 'Video generation failed');
           console.error('[SOUND TO VIDEO] Job failed:', event.error);
+          onProgress({ error: errorMsg, jobIndex, completedCount, progress: undefined });
           checkDone();
           break;
         }
