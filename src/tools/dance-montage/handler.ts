@@ -106,7 +106,14 @@ export async function execute(
   console.log(`[DANCE MONTAGE] Dance: ${preset.title} (${preset.id}), requested duration: ${duration}s`);
 
   // 2. Resolve source images
-  const imageFiles = context.uploadedFiles.filter((f: UploadedFile) => f.type === 'image');
+  // Exclude persona reference photos (injected by resolve_personas with a
+  // "persona-" filename prefix). When personas are involved, the LLM first
+  // calls generate_image to create stylised variants (e.g. bobbleheads) which
+  // land in context.resultUrls. Using the raw persona photos here would bypass
+  // those generated images entirely.
+  const imageFiles = context.uploadedFiles.filter(
+    (f: UploadedFile) => f.type === 'image' && !f.filename?.startsWith('persona-'),
+  );
   const resolvedImages: ResolvedImage[] = [];
 
   if (imageFiles.length > 1) {
