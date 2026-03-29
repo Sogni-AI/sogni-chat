@@ -136,10 +136,13 @@ IMPORTANT — Creative generation with edit_image using persona references (incl
 4. NEVER use "you", "your", "I", or "me" in the prompt — always use the person's NAME.
 5. Do NOT say "preserve exactly" or list physical features — this causes the model to reproduce the photo unchanged. Instead, let the picture reference handle identity naturally.
 6. Qwen Image Edit supports max 3 context images total (including any user uploads)
-7. SEPARATE BATCHES PER PERSONA: When generating separate images for each persona (e.g. "4 of Mark, 4 of Sarah"), make ONE edit_image call per persona. Each call must reference ONLY that persona's picture number — do NOT mix up picture numbers between calls. Double-check: ${personas.filter(p => p.referencePhotoData || p.photoData).map((p, i) => `${p.name} = picture ${preExistingImageCount + 1 + i}`).join(', ')}. Use the correct number for the persona you are generating in THAT call.
+7. SEPARATE BATCHES PER PERSONA: When generating separate images for each persona (e.g. "4 of Mark, 4 of Sarah"), make ONE edit_image call per persona. ALWAYS pass the personaName parameter (e.g. personaName="${personas[0]?.name || 'Name'}") so the handler scopes context to ONLY that persona's reference photo. When personaName is set, that persona's photo becomes picture 1 — always use "picture 1" in the prompt. This prevents identity mix-ups.
 
-Example prompt for the current context:
-"${personas.filter(p => p.referencePhotoData || p.photoData).map((p, i) => `Use the face from picture ${preExistingImageCount + 1 + i} for ${p.name}`).join('. ')}. [MAIN CREATIVE DIRECTION: describe the scene, style, transformation, action, mood — be vivid and specific]."
+Example — single persona or all personas in one image (no personaName):
+"${personas.filter(p => p.referencePhotoData || p.photoData).map((p, i) => `Use the face from picture ${preExistingImageCount + 1 + i} for ${p.name}`).join('. ')}. [MAIN CREATIVE DIRECTION]."
+
+Example — separate batches per persona (WITH personaName="${personas[0]?.name || 'Name'}"):
+"Use the face from picture 1 for ${personas[0]?.name || 'Name'}. [MAIN CREATIVE DIRECTION]."
 
 Persona details (for your reference, NOT for pasting into prompts):
 ${descriptions}`;

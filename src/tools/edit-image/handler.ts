@@ -138,15 +138,38 @@ export async function execute(
   const numberOfMedia = Math.max(1, Math.min(16, (args.numberOfVariations as number) || 1));
   const sourceImageIndex = args.sourceImageIndex as number | undefined;
   const aspectRatio = args.aspectRatio as string | undefined;
+  const personaName = args.personaName as string | undefined;
+
+  // When personaName is specified, scope context to ONLY that persona's reference
+  // photo (+ any non-persona user uploads). This prevents Qwen from confusing
+  // faces when multiple persona photos are in context.
+  let effectiveContext = context;
+  if (personaName) {
+    const nameLower = personaName.toLowerCase().replace(/\s+/g, '-');
+    const scopedFiles = context.uploadedFiles.filter(
+      (f: UploadedFile) =>
+        !(f.filename?.startsWith('persona-')) ||
+        f.filename === `persona-${nameLower}.jpg`,
+    );
+    const targetPhoto = scopedFiles.find(
+      (f: UploadedFile) => f.filename === `persona-${nameLower}.jpg`,
+    );
+    effectiveContext = Object.create(context) as ToolExecutionContext;
+    effectiveContext.uploadedFiles = scopedFiles;
+    if (targetPhoto) {
+      effectiveContext.imageData = targetPhoto.data;
+    }
+    console.log(`[EDIT IMAGE] Scoped context to persona "${personaName}" (${scopedFiles.filter(f => f.type === 'image').length} image(s))`);
+  }
 
   // Gather context images from uploads
-  const contextImages = gatherContextImages(context, sourceImageIndex);
+  const contextImages = gatherContextImages(effectiveContext, sourceImageIndex);
   if (contextImages.length === 0) {
     return JSON.stringify({ error: 'no_images', message: 'Please upload at least one image to use as a reference.' });
   }
 
-  // Detect persona reference photos in context (injected by resolve_personas)
-  const personaFiles = context.uploadedFiles.filter(
+  // Detect persona reference photos in the (possibly scoped) context
+  const personaFiles = effectiveContext.uploadedFiles.filter(
     f => f.type === 'image' && f.filename?.startsWith('persona-'),
   );
   const hasPersonaPhotos = personaFiles.length > 0;

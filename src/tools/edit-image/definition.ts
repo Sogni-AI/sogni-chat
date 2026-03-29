@@ -66,6 +66,11 @@ BATCH VARIATIONS: When numberOfVariations > 1, the prompt must describe ONE subj
           type: 'string',
           description: ASPECT_RATIO_DESCRIPTION,
         },
+        personaName: {
+          type: 'string',
+          description:
+            'When generating images for a SPECIFIC persona from a multi-persona context, pass that persona\'s name here. The handler will scope context to ONLY that persona\'s reference photo, preventing identity mix-ups. REQUIRED when multiple personas are loaded and you are making separate edit_image calls per persona.',
+        },
       },
       required: ['prompt'],
     },
