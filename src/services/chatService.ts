@@ -334,7 +334,11 @@ PERSONA RULES:
       // Annotate the latest user message with non-image file info so the LLM
       // knows audio/video files are attached (they can't be sent as multimodal content).
       // Only enhances the API copy; stored history stays unchanged.
-      const nonImageFiles = context.uploadedFiles.filter(f => f.type !== 'image');
+      // Exclude persona voice clips — they are consumed automatically as
+      // referenceAudioIdentity by video tools, not user-facing audio attachments.
+      const nonImageFiles = context.uploadedFiles.filter(
+        f => f.type !== 'image' && !f.filename?.startsWith('persona-voiceclip-'),
+      );
       if (nonImageFiles.length > 0) {
         let lastUserIdx = -1;
         for (let i = allMessages.length - 1; i >= 0; i--) {
