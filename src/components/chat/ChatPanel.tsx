@@ -232,6 +232,7 @@ export function ChatPanel({
   const prevResultCountRef = useRef(0);
   const prevMessageCountRef = useRef(messages.length);
   const isUserNearBottomRef = useRef(true);
+  const isUserDraggingRef = useRef(false);
   const [fullscreenState, setFullscreenState] = useState<{ items: MediaItem[]; index: number } | null>(null);
   // Track blob URLs created for the fullscreen viewer so we can revoke them on close
   const fullscreenBlobUrlsRef = useRef<string[]>([]);
@@ -279,12 +280,39 @@ export function ChatPanel({
     [messages, isLoading, analysisSuggestions, imageData, uploadIntent, hasPersonas, hasAudio],
   );
 
+  // Track whether the user is actively touching/dragging the scroll area.
+  // While dragging, all programmatic scroll-to-bottom is suppressed so progress
+  // events (video rendering, etc.) don't yank the viewport away from the user.
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const onPointerDown = () => { isUserDraggingRef.current = true; };
+    const onPointerUp = () => {
+      isUserDraggingRef.current = false;
+      // Sync near-bottom state immediately so the stale value from before
+      // the drag doesn't let a queued auto-scroll fire before the next
+      // scroll event naturally updates it.
+      isUserNearBottomRef.current =
+        container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+    };
+    container.addEventListener('pointerdown', onPointerDown);
+    container.addEventListener('pointerup', onPointerUp);
+    container.addEventListener('pointercancel', onPointerUp);
+    return () => {
+      container.removeEventListener('pointerdown', onPointerDown);
+      container.removeEventListener('pointerup', onPointerUp);
+      container.removeEventListener('pointercancel', onPointerUp);
+    };
+  }, []);
+
+  const shouldAutoScroll = () => isUserNearBottomRef.current && !isUserDraggingRef.current;
+
   // Smart auto-scroll — only for new messages or active LLM text streaming,
   // NOT for tool progress updates (which would rubber-band when user scrolls up).
   const messageCount = messages.length;
   const hasStreamingMessage = messages.some((m) => m.isStreaming);
   useEffect(() => {
-    if (!isUserNearBottomRef.current) return;
+    if (!shouldAutoScroll()) return;
     const isNewMessage = messageCount !== prevMessageCountRef.current;
     if (isNewMessage || hasStreamingMessage) {
       prevMessageCountRef.current = messageCount;
@@ -301,7 +329,7 @@ export function ChatPanel({
     let prevHeight = container.scrollHeight;
     const observer = new ResizeObserver(() => {
       const newHeight = container.scrollHeight;
-      if (newHeight > prevHeight && isUserNearBottomRef.current && !isLoading) {
+      if (newHeight > prevHeight && shouldAutoScroll() && !isLoading) {
         messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
       }
       prevHeight = newHeight;
@@ -313,6 +341,8 @@ export function ChatPanel({
   const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
+    // Don't update near-bottom state from programmatic scrolls while user is dragging
+    if (isUserDraggingRef.current) return;
     isUserNearBottomRef.current =
       container.scrollHeight - container.scrollTop - container.clientHeight < 150;
   }, []);
