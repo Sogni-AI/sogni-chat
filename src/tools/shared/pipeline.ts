@@ -231,9 +231,10 @@ export async function executePipeline(
             callbacks.onToolProgress({
               ...progress,
               stepLabel,
-              // Strip intermediate result URLs (see concurrent path comment)
+              // Strip intermediate image result URLs (see concurrent path comment).
+              // Video result URLs are forwarded so completed clips render immediately.
               resultUrls: undefined,
-              videoResultUrls: undefined,
+              videoResultUrls: progress.videoResultUrls,
             });
           },
           onToolComplete: (_toolName, resultUrls, videoResultUrls) => {

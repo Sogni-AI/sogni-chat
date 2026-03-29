@@ -258,11 +258,11 @@ export async function execute(
     }
   }
 
-  // Quality-based resolution: Standard (fast) -> 720p (768), High (hq) -> 1080p (1088)
+  // Quality-based resolution: Standard (fast) -> 720p (768), High/Pro (hq/pro) -> 1080p (1088)
   const isLTX = modelKey.startsWith('ltx');
   const qualityTier = context.qualityTier || 'fast';
   const targetResolution = isLTX
-    ? (qualityTier === 'hq' ? 1088 : 768)
+    ? (qualityTier !== 'fast' ? 1088 : 768)
     : undefined;
 
   const { width, height } = computeDimensions(

@@ -172,7 +172,7 @@ export async function execute(
 
   const config = T2V_MODELS[modelKey];
 
-  // Quality-based resolution: Standard (fast) -> 720p (768), High (hq) -> 1080p (1088)
+  // Quality-based resolution: Standard (fast) -> 720p (768), High/Pro (hq/pro) -> 1080p (1088)
   // Skip quality tier scaling when user explicitly requested dimensions — their
   // request should always trump the default media quality setting.
   const isLTX = modelKey.startsWith('ltx');
@@ -180,7 +180,7 @@ export async function execute(
     || parseAspectRatio(aspectRatio)?.type === 'exact';
   const qualityTier = context.qualityTier || 'fast';
   const targetResolution = isLTX && !hasExplicitDimensions
-    ? (qualityTier === 'hq' ? 1088 : 768)
+    ? (qualityTier !== 'fast' ? 1088 : 768)
     : undefined;
 
   const { width, height } = computeDimensions(
