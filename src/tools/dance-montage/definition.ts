@@ -38,7 +38,7 @@ export const definition: ToolDefinition = {
         imagePrompt: {
           type: 'string',
           description:
-            'Creative style/look for auto-generated persona images (e.g. "cute 3D bobblehead cartoon character with oversized head", "anime chibi character"). Used ONLY when personas are loaded — dance_montage generates one image per persona internally to guarantee each contains exactly one person. If omitted, uses a default full-body portrait style.',
+            'Creative style/look for auto-generated images when no pre-generated images are available and no personas are loaded (e.g. "cute 3D bobblehead cartoon character"). For persona requests, always generate images via edit_image first — it preserves identity far better. This is a fallback only. If omitted, uses a default full-body portrait style.',
         },
       },
       required: ['dance'],
