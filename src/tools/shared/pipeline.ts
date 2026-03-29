@@ -127,6 +127,11 @@ export async function executePipeline(
           onToolProgress: (progress) => {
             // Suppress sub-tool 'started' events — we already emitted one above
             if (progress.type === 'started') return;
+            // Extract video completion URL for per-slot display only —
+            // do NOT forward via videoResultUrls (that would contaminate
+            // message.videoResults with intermediate clip URLs, causing
+            // duplicates and "Video expired" errors).
+            const completedVideoUrl = progress.videoResultUrls?.[0];
             callbacks.onToolProgress({
               ...progress,
               toolName: config.parentToolName,
@@ -135,20 +140,25 @@ export async function executePipeline(
               jobIndex: i,
               totalCount: step.count,
               completedCount,
-              // Strip intermediate image result URLs — pipeline manages its own result
-              // collection via onToolComplete. Leaking image URLs would cause useChat to
-              // store them in perJobProgress, which ChatVideoResults then tries
-              // to render as <video> elements (causing "Video expired" errors).
-              // VIDEO result URLs are forwarded so completed clips render immediately
-              // in the UI instead of staying as spinners until the entire batch finishes.
+              // Strip intermediate result URLs — pipeline manages its own result
+              // collection via onToolComplete. Leaking URLs would cause useChat to
+              // accumulate them into message.videoResults / message.results,
+              // creating duplicates and "Video expired" errors.
               resultUrls: undefined,
-              videoResultUrls: progress.videoResultUrls,
+              videoResultUrls: undefined,
               // Strip sub-tool sourceImageUrl — each concurrent sub-tool has its own
               // source image (e.g. orbit transitions use different angle views).
               // Forwarding these would cause the top-level placeholder to rapidly
               // alternate between images on every progress event. The parent tool's
               // 'started' event sets the stable placeholder for all slots.
               sourceImageUrl: undefined,
+              // Inject completed clip URL into perJobProgress for UI display
+              // without leaking into message.videoResults accumulation.
+              ...(completedVideoUrl ? {
+                perJobProgress: {
+                  [i]: { resultUrl: completedVideoUrl, isVideo: true, progress: 1 },
+                },
+              } : {}),
             });
           },
           onToolComplete: (_toolName, resultUrls, videoResultUrls) => {
@@ -228,13 +238,24 @@ export async function executePipeline(
 
         const wrappedCallbacks: ToolCallbacks = {
           onToolProgress: (progress) => {
+            if (progress.type === 'started') return;
+            // Extract video completion URL for per-slot display only
+            // (see concurrent path comment for full rationale).
+            const completedVideoUrl = progress.videoResultUrls?.[0];
             callbacks.onToolProgress({
               ...progress,
               stepLabel,
-              // Strip intermediate image result URLs (see concurrent path comment).
-              // Video result URLs are forwarded so completed clips render immediately.
+              // Strip intermediate result URLs (see concurrent path comment).
               resultUrls: undefined,
-              videoResultUrls: progress.videoResultUrls,
+              videoResultUrls: undefined,
+              sourceImageUrl: undefined,
+              // Inject completed clip URL into perJobProgress for UI display
+              // without leaking into message.videoResults accumulation.
+              ...(completedVideoUrl ? {
+                perJobProgress: {
+                  [i]: { resultUrl: completedVideoUrl, isVideo: true, progress: 1 },
+                },
+              } : {}),
             });
           },
           onToolComplete: (_toolName, resultUrls, videoResultUrls) => {

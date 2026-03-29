@@ -551,6 +551,11 @@ export async function execute(
             const wrappedCallbacks: ToolCallbacks = {
               onToolProgress: (progress) => {
                 if (progress.type === 'started') return;
+                // Extract video completion URL for per-slot display only —
+                // do NOT forward via videoResultUrls (that would contaminate
+                // message.videoResults with intermediate clip URLs, causing
+                // duplicates and "Video expired" errors).
+                const completedVideoUrl = progress.videoResultUrls?.[0];
                 stepCallbacks.onToolProgress({
                   ...progress,
                   toolName: 'dance_montage',
@@ -561,8 +566,15 @@ export async function execute(
                   completedCount,
                   estimatedCost: estimatedCost > 0 ? estimatedCost : undefined,
                   videoAspectRatio,
-                  videoResultUrls: progress.videoResultUrls,
+                  videoResultUrls: undefined,
                   sourceImageUrl: undefined,
+                  // Inject completed clip URL into perJobProgress for UI display
+                  // without leaking into message.videoResults accumulation.
+                  ...(completedVideoUrl ? {
+                    perJobProgress: {
+                      [i]: { resultUrl: completedVideoUrl, isVideo: true, progress: 1 },
+                    },
+                  } : {}),
                 });
               },
               onToolComplete: (_toolName, resultUrls, videoResultUrls) => {

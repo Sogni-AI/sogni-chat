@@ -42,6 +42,8 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
   const containerRef = useRef<HTMLDivElement>(null);
   const onPlayRef = useRef(onPlay);
   onPlayRef.current = onPlay;
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
   const [ready, setReady] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
@@ -49,6 +51,7 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
   const [showControls, setShowControls] = useState(true);
   const [isFs, setIsFs] = useState(false);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Compute placeholder dimensions that fit within maxWidth × maxHeight
   // while maintaining the aspect ratio (CSS alone can't handle both constraints).
@@ -165,15 +168,31 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
   // Start auto-hide timer when playback begins
   useEffect(() => { if (playing) resetHideTimer(); }, [playing, resetHideTimer]);
 
-  // Reset ready state when src changes
+  // Reset ready state when src changes and start a loading timeout.
+  // Some browsers (Safari) don't load <video> elements with display:none,
+  // which means onError never fires for expired URLs. The timeout ensures
+  // the failed state is surfaced automatically.
   useEffect(() => {
     setReady(false);
+    if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+    if (src) {
+      loadTimeoutRef.current = setTimeout(() => {
+        // If the video still hasn't loaded after 15s, treat as failed
+        const el = videoRef.current;
+        if (el && el.readyState === 0) {
+          console.warn('[ChatVideoPlayer] Loading timeout — marking video as failed:', src.slice(0, 80));
+          onErrorRef.current();
+        }
+      }, 15_000);
+    }
+    return () => { if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current); };
   }, [src]);
 
   /** Programmatic auto-play: only plays if no fullscreen viewer is open
    *  and no other inline video is already playing. This prevents the
    *  chaotic multi-video-play when a batch of videos finish loading. */
   const handleLoadedData = useCallback(() => {
+    if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
     setReady(true);
     const el = videoRef.current;
     if (!el || !autoPlay) return;
@@ -300,7 +319,11 @@ function ChatVideoPlayer({ src, onError, onPlay, aspectRatio, fillWidth, autoPla
         onError={onError}
         onClick={togglePlay}
         style={{
-          display: ready ? 'block' : 'none',
+          // Use visibility instead of display:none so browsers still load (and fire
+          // onError for) the video even when the first frame isn't decoded yet.
+          ...(ready
+            ? { display: 'block' }
+            : { position: 'absolute' as const, width: 0, height: 0, overflow: 'hidden', opacity: 0 }),
           cursor: 'pointer',
           ...(isFs
             ? { maxWidth: '100%', maxHeight: '100%', width: '100%', height: '100%', objectFit: 'contain' as const }
@@ -441,10 +464,25 @@ function VideoThumbnailCard({ src, aspectRatio, onClick, onError }: {
 }) {
   const [ready, setReady] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const loadTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  // Reset ready state when src changes
+  // Reset ready state when src changes, with loading timeout for expired URLs
   useEffect(() => {
     setReady(false);
+    if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current);
+    if (src) {
+      loadTimeoutRef.current = setTimeout(() => {
+        const el = videoRef.current;
+        if (el && el.readyState === 0) {
+          console.warn('[VideoThumbnailCard] Loading timeout — marking video as failed:', src.slice(0, 80));
+          onErrorRef.current();
+        }
+      }, 15_000);
+    }
+    return () => { if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current); };
   }, [src]);
 
   return (
@@ -496,12 +534,13 @@ function VideoThumbnailCard({ src, aspectRatio, onClick, onError }: {
 
       {/* Silent, paused video element to capture the first frame as a poster */}
       <video
+        ref={videoRef}
         src={src}
         autoPlay
         muted
         playsInline
         preload="auto"
-        onLoadedData={() => setReady(true)}
+        onLoadedData={() => { if (loadTimeoutRef.current) clearTimeout(loadTimeoutRef.current); setReady(true); }}
         onError={onError}
         style={{
           position: 'absolute',
@@ -509,7 +548,9 @@ function VideoThumbnailCard({ src, aspectRatio, onClick, onError }: {
           width: '100%',
           height: '100%',
           objectFit: 'cover',
-          display: ready ? 'block' : 'none',
+          // Use opacity instead of display:none so browsers still load
+          // the video and fire onError for expired URLs (Safari quirk).
+          opacity: ready ? 1 : 0,
           pointerEvents: 'none',
         }}
       />
@@ -597,6 +638,19 @@ export const ChatVideoResults = memo(function ChatVideoResults({
   // Resolve gallery IDs to blob URLs — persistent local copies that never expire
   const galleryBlobUrls = useGalleryBlobUrls(galleryVideoIds);
   const [failedVideos, setFailedVideos] = useState<Set<number>>(new Set());
+
+  // Clear stale failures when new URLs or blob URLs arrive — an index
+  // that failed with an expired remote URL should not stay failed once
+  // a persistent gallery blob URL becomes available.
+  const urlsKey = urls.join('|');
+  const blobUrlsKey = [...galleryBlobUrls.values()].join('|');
+  useEffect(() => {
+    if (failedVideos.size > 0) {
+      setFailedVideos(new Set());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset on URL identity change only
+  }, [urlsKey, blobUrlsKey]);
+
   // Number of slots: use totalCount during progress, otherwise urls.length
   const slotCount = Math.max(totalCount || 0, urls.length);
   const isGrid = slotCount > 1;
