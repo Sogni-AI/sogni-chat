@@ -300,6 +300,7 @@ PERSONA RULES:
     ? [latestResultUri, ...uploadedImageUris]
     : uploadedImageUris;
 
+  // eslint-disable-next-line no-useless-catch -- try/finally ensures run summary is always logged
   try {
   while (toolRound < MAX_TOOL_ROUNDS) {
     toolRound++;
