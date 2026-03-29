@@ -151,7 +151,7 @@ function maskOldToolResults(
 // Phase 2: Enriched Trim Summary
 // ---------------------------------------------------------------------------
 
-const VIDEO_TOOLS = new Set(['animate_photo', 'generate_video', 'sound_to_video', 'video_to_video']);
+const VIDEO_TOOLS = new Set(['animate_photo', 'generate_video', 'sound_to_video', 'video_to_video', 'dance_montage', 'stitch_video', 'orbit_video']);
 const AUDIO_TOOLS = new Set(['generate_music']);
 
 /**
@@ -219,8 +219,8 @@ function buildEnrichedSummary(trimmedGroups: MessageGroup[]): ChatMessage | null
         const mediaType = VIDEO_TOOLS.has(name)
           ? 'video' : AUDIO_TOOLS.has(name) ? 'audio' : 'image';
         // Include index range when available (e.g., "2 images #0-1")
-        // For video tools, prefer videoStartIndex over startIndex
-        const effectiveStartIndex = VIDEO_TOOLS.has(name) ? videoStartIndex : startIndex;
+        // For video tools, prefer videoStartIndex; fall back to startIndex for legacy data
+        const effectiveStartIndex = VIDEO_TOOLS.has(name) ? (videoStartIndex ?? startIndex) : startIndex;
         const indexRange = effectiveStartIndex !== undefined
           ? (count > 1 ? ` #${effectiveStartIndex}-${effectiveStartIndex + count - 1}` : ` #${effectiveStartIndex}`)
           : '';
