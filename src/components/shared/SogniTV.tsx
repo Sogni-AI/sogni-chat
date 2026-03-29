@@ -283,18 +283,17 @@ function RenderProgressOverlay() {
 
         {/* Text */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <span style={{
-            fontSize: '0.8125rem',
-            fontWeight: 600,
-            color: '#fff',
-            lineHeight: 1.2,
-            fontFamily: 'Inter, sans-serif',
-          }}>
-            {hasEta
-              ? formatEta(progress.etaSeconds!)
-              : `${pct}%`
-            }
-          </span>
+          {hasEta && (
+            <span style={{
+              fontSize: '0.8125rem',
+              fontWeight: 600,
+              color: '#fff',
+              lineHeight: 1.2,
+              fontFamily: 'Inter, sans-serif',
+            }}>
+              {formatEta(progress.etaSeconds!)}
+            </span>
+          )}
           <span style={{
             fontSize: '0.6875rem',
             color: 'rgba(255,255,255,0.5)',
