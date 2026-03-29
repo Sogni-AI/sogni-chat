@@ -30,6 +30,7 @@ import {
   LLM_THINKING_TIMEOUT_MS,
   needsCreativeRefinement,
   refineVideoPrompt,
+  getPersonaVoiceClip,
 } from '../shared';
 import { generateVideo } from '@/services/sdk/videoGeneration';
 import { fetchVideoCostEstimate } from '@/services/creditsService';
@@ -392,6 +393,9 @@ export async function execute(
     });
   };
 
+  // Extract persona voice clip for LTX-2.3 referenceAudioIdentity (I2V only)
+  const personaVoiceClip = isLTX ? getPersonaVoiceClip(context.uploadedFiles) : null;
+
   // For "end" mode: don't send the image as start frame (referenceImage),
   // only as end frame (referenceImageEnd)
   const startImageData = frameRole === 'end' ? null : sourceImageData;
@@ -413,6 +417,7 @@ export async function execute(
       disableNSFWFilter: context.safeContentFilter === false,
       ...(endImageData ? { endImageData } : {}),
       ...(frameRole === 'end' ? { firstFrameStrength: 0, lastFrameStrength: 0.9 } : {}),
+      ...(personaVoiceClip ? { referenceAudioIdentity: personaVoiceClip } : {}),
     },
     (progress) => {
       if (progress.type === 'progress' || progress.type === 'completed') {

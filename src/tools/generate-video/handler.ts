@@ -22,6 +22,7 @@ import {
   LLM_THINKING_TIMEOUT_MS,
   needsCreativeRefinement,
   refineVideoPrompt,
+  getPersonaVoiceClip,
 } from '../shared';
 import type { TokenType } from '@/types/wallet';
 import { parseAspectRatio } from '@/utils/imageDimensions';
@@ -244,6 +245,9 @@ export async function execute(
     modelName: mediaLabel,
   });
 
+  // Extract persona voice clip for LTX-2.3 referenceAudioIdentity (T2V only)
+  const personaVoiceClip = isLTX ? getPersonaVoiceClip(context.uploadedFiles) : null;
+
   const billingId = estimatedCost > 0
     ? registerPendingCost('generate_video', estimatedCost, context.tokenType)
     : null;
@@ -267,6 +271,7 @@ export async function execute(
           sampler: config.sampler,
           scheduler: config.scheduler,
           disableNSFWFilter: context.safeContentFilter === false,
+          referenceAudioIdentity: personaVoiceClip,
         },
         (progress) => {
           callbacks.onToolProgress({
@@ -329,6 +334,8 @@ interface T2VParams {
   sampler: string;
   scheduler: string;
   disableNSFWFilter?: boolean;
+  /** Persona voice clip for LTX-2.3 audio identity */
+  referenceAudioIdentity?: Blob | null;
 }
 
 interface VideoProgress {
@@ -369,6 +376,10 @@ async function runT2VGeneration(
   }
   if (params.shift !== undefined) {
     projectParams.shift = params.shift;
+  }
+  if (params.referenceAudioIdentity) {
+    projectParams.referenceAudioIdentity = params.referenceAudioIdentity;
+    console.log('[GENERATE VIDEO] Injecting persona voice clip as referenceAudioIdentity');
   }
 
   const projects = (sogniClient as unknown as { projects: {

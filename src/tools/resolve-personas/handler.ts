@@ -67,6 +67,18 @@ export async function execute(
         };
         injectedCount++;
       }
+
+      // Inject voice clip as audio file for LTX-2.3 referenceAudioIdentity
+      if (persona.voiceClipData && persona.voiceClipMimeType) {
+        userFiles.push({
+          type: 'audio',
+          data: persona.voiceClipData,
+          mimeType: persona.voiceClipMimeType,
+          filename: `persona-voiceclip-${persona.name.toLowerCase().replace(/\s+/g, '-')}`,
+          duration: persona.voiceClipDuration || undefined,
+        });
+        console.log(`[RESOLVE PERSONAS] Injected voice clip for ${persona.name} (${(persona.voiceClipData.length / 1024).toFixed(1)}KB)`);
+      }
     }
 
     // Replace the context array (new array, not mutating the original React state)

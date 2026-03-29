@@ -9,7 +9,7 @@
 import type { Persona, PersonaSummary, PersonaThumbnail, Memory, PersonalityPreference } from '@/types/userData';
 
 const DB_NAME = 'sogni_user_data';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const PERSONAS_STORE = 'personas';
 const MEMORIES_STORE = 'memories';
 const THUMBNAILS_STORE = 'persona_thumbnails';
@@ -122,6 +122,7 @@ export async function getAllPersonas(): Promise<PersonaSummary[]> {
           tags: p.tags,
           hasPhoto: !!p.photoData,
           voice: p.voice || null,
+          hasVoiceClip: !!(p.voiceClipData && p.voiceClipData.length > 0),
           createdAt: p.createdAt,
           updatedAt: p.updatedAt,
         });

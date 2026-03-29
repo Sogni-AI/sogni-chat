@@ -2,6 +2,24 @@
  * Utilities for fetching source media (images, audio) for tool execution.
  */
 
+import type { UploadedFile } from '../types';
+
+/**
+ * Extract the first persona voice clip from uploaded files.
+ * Returns a Blob suitable for SDK's referenceAudioIdentity parameter,
+ * or null if no persona voice clip is present.
+ *
+ * Voice clips are injected by resolve_personas with filename prefix "persona-voiceclip-".
+ */
+export function getPersonaVoiceClip(uploadedFiles: UploadedFile[]): Blob | null {
+  const voiceClipFile = uploadedFiles.find(
+    f => f.type === 'audio' && f.filename?.startsWith('persona-voiceclip-'),
+  );
+  if (!voiceClipFile) return null;
+  console.log(`[VOICE] Found persona voice clip: ${voiceClipFile.filename} (${(voiceClipFile.data.length / 1024).toFixed(1)}KB)`);
+  return new Blob([voiceClipFile.data as BlobPart], { type: voiceClipFile.mimeType });
+}
+
 /**
  * Fetch an audio URL and return the raw bytes + detected MIME type.
  * Unlike the image variant this does a straightforward binary fetch

@@ -10,6 +10,7 @@ import type { TokenType } from '@/types/wallet';
 import { sendVisionAnalysis } from '@/services/chatService';
 import { resizeUint8ArrayForVision } from '@/utils/imageProcessing';
 import { PersonaAvatar } from './PersonaAvatar';
+import { VoiceClipManager } from './VoiceClipManager';
 
 const RELATIONSHIPS = ['self', 'partner', 'child', 'friend', 'pet', 'other'];
 
@@ -372,6 +373,9 @@ export function PersonaEditorPanel({
   const [visionDescription, setVisionDescription] = useState<string | null>(persona?.visionDescription || null);
   const [defaultAttire, setDefaultAttire] = useState<string | null>(persona?.defaultAttire ?? null);
   const [voice, setVoice] = useState<string | null>(persona?.voice ?? null);
+  const [voiceClipData, setVoiceClipData] = useState<Uint8Array | null>(persona?.voiceClipData || null);
+  const [voiceClipMimeType, setVoiceClipMimeType] = useState<string | null>(persona?.voiceClipMimeType || null);
+  const [voiceClipDuration, setVoiceClipDuration] = useState<number | null>(persona?.voiceClipDuration || null);
   const [saving, setSaving] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -620,6 +624,12 @@ export function PersonaEditorPanel({
     }
   }, [photoData, photoMimeType, sogniClient, tokenType]);
 
+  const handleVoiceClipChange = useCallback((data: Uint8Array | null, mimeType: string | null, duration: number | null) => {
+    setVoiceClipData(data);
+    setVoiceClipMimeType(mimeType);
+    setVoiceClipDuration(duration);
+  }, []);
+
   const handleSave = useCallback(async () => {
     if (!name.trim()) return;
     setSaving(true);
@@ -639,6 +649,9 @@ export function PersonaEditorPanel({
         referencePhotoData,
         defaultAttire: defaultAttire || null,
         voice: voice || null,
+        voiceClipData: voiceClipData || null,
+        voiceClipMimeType: voiceClipMimeType || null,
+        voiceClipDuration: voiceClipDuration || null,
         createdAt: persona?.createdAt || now,
         updatedAt: now,
       };
@@ -649,7 +662,7 @@ export function PersonaEditorPanel({
     } finally {
       setSaving(false);
     }
-  }, [name, relationship, description, tags, photoData, photoMimeType, photoWidth, photoHeight, visionDescription, referencePhotoData, defaultAttire, voice, persona, onSave, onClose, faceCropData]);
+  }, [name, relationship, description, tags, photoData, photoMimeType, photoWidth, photoHeight, visionDescription, referencePhotoData, defaultAttire, voice, voiceClipData, voiceClipMimeType, voiceClipDuration, persona, onSave, onClose, faceCropData]);
 
   const handleDelete = useCallback(async () => {
     if (!persona?.id || !onDelete) return;
@@ -1023,6 +1036,14 @@ export function PersonaEditorPanel({
                 border: '1px solid rgba(255,255,255,0.08)', borderRadius: 'var(--radius-md)',
                 fontSize: '0.75rem', color: '#b4b4b4', outline: 'none',
               }}
+            />
+
+            {/* Voice clip recorder/uploader */}
+            <VoiceClipManager
+              voiceClipData={voiceClipData}
+              voiceClipMimeType={voiceClipMimeType}
+              voiceClipDuration={voiceClipDuration}
+              onVoiceClipChange={handleVoiceClipChange}
             />
           </div>
 

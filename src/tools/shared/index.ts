@@ -6,7 +6,7 @@
  */
 
 export { ASPECT_RATIO_DESCRIPTION } from './aspectRatio';
-export { fetchImageAsUint8Array, fetchAudioAsUint8Array } from './sourceImage';
+export { fetchImageAsUint8Array, fetchAudioAsUint8Array, getPersonaVoiceClip } from './sourceImage';
 export {
   isInsufficientCreditsError,
   getAlternateToken,

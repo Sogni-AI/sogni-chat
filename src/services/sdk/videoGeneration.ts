@@ -42,6 +42,8 @@ export interface VideoGenerationParams {
   firstFrameStrength?: number;
   /** How strictly to match the last frame (0-1, default 0.6). */
   lastFrameStrength?: number;
+  /** Persona voice clip for LTX-2.3 referenceAudioIdentity */
+  referenceAudioIdentity?: Blob | null;
 }
 
 export interface VideoGenerationProgress {
@@ -133,6 +135,12 @@ export async function generateVideo(
   }
   if (params.lastFrameStrength !== undefined) {
     projectConfig.lastFrameStrength = params.lastFrameStrength;
+  }
+
+  // Persona voice clip for LTX-2.3 audio identity
+  if (params.referenceAudioIdentity) {
+    projectConfig.referenceAudioIdentity = params.referenceAudioIdentity;
+    console.log('[VIDEO SERVICE] Injecting persona voice clip as referenceAudioIdentity');
   }
 
   // Model-specific params

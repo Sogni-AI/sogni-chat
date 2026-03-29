@@ -27,6 +27,12 @@ export interface Persona {
   defaultAttire: string | null;
   /** Voice description for video/animation generation — accent, tone, pitch */
   voice: string | null;
+  /** Raw audio bytes of a ~5s voice clip for LTX-2.3 referenceAudioIdentity */
+  voiceClipData: Uint8Array | null;
+  /** MIME type of the voice clip (e.g. 'audio/webm', 'audio/mp4') */
+  voiceClipMimeType: string | null;
+  /** Duration of the voice clip in seconds */
+  voiceClipDuration: number | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -41,6 +47,8 @@ export interface PersonaSummary {
   hasPhoto: boolean;
   /** Voice description — included in summary for system prompt injection */
   voice: string | null;
+  /** Whether this persona has a recorded/uploaded voice clip */
+  hasVoiceClip: boolean;
   createdAt: number;
   updatedAt: number;
 }
