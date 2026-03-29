@@ -124,8 +124,9 @@ function maskOldToolResults(
         const compact: Record<string, unknown> = parsed.error
           ? { ok: false, error: parsed.error }
           : { ok: true, n: parsed.resultCount || 1 };
-        // Preserve startIndex so the enriched summary can include index offsets
+        // Preserve startIndex / videoStartIndex so the enriched summary can include index offsets
         if (parsed.startIndex !== undefined) compact.i = parsed.startIndex;
+        if (parsed.videoStartIndex !== undefined) compact.vi = parsed.videoStartIndex;
         const maskedMsg: ChatMessage = { ...msg, content: JSON.stringify(compact) };
         const saved = originalTokens - estimateMessageTokens(maskedMsg);
         groupTokensSaved += saved;
@@ -188,15 +189,17 @@ function buildEnrichedSummary(trimmedGroups: MessageGroup[]): ChatMessage | null
         const result = toolResultMap.get(tc.id);
         const name: string = tc.function.name;
 
-        // Extract result count and startIndex (handles both full and masked formats)
+        // Extract result count and startIndex/videoStartIndex (handles both full and masked formats)
         let count = 1;
         let startIndex: number | undefined;
+        let videoStartIndex: number | undefined;
         if (result) {
           try {
             const parsed = JSON.parse(typeof result.content === 'string' ? result.content : '');
             if (parsed.error || parsed.ok === false) continue; // Skip failed tools
             count = parsed.n ?? parsed.resultCount ?? 1;
             startIndex = parsed.i ?? parsed.startIndex;
+            videoStartIndex = parsed.vi ?? parsed.videoStartIndex;
           } catch { /* use default */ }
         }
 
@@ -216,8 +219,10 @@ function buildEnrichedSummary(trimmedGroups: MessageGroup[]): ChatMessage | null
         const mediaType = VIDEO_TOOLS.has(name)
           ? 'video' : AUDIO_TOOLS.has(name) ? 'audio' : 'image';
         // Include index range when available (e.g., "2 images #0-1")
-        const indexRange = startIndex !== undefined
-          ? (count > 1 ? ` #${startIndex}-${startIndex + count - 1}` : ` #${startIndex}`)
+        // For video tools, prefer videoStartIndex over startIndex
+        const effectiveStartIndex = VIDEO_TOOLS.has(name) ? videoStartIndex : startIndex;
+        const indexRange = effectiveStartIndex !== undefined
+          ? (count > 1 ? ` #${effectiveStartIndex}-${effectiveStartIndex + count - 1}` : ` #${effectiveStartIndex}`)
           : '';
         const label = `${count} ${mediaType}${count > 1 ? 's' : ''}${indexRange}`;
         const entry = promptExcerpt

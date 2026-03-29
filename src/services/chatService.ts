@@ -592,21 +592,24 @@ PERSONA RULES:
           callbacks.onToolCall(toolName, args);
 
           try {
-            // Capture result count before execution so we can inject the
-            // starting index into the tool result for context window awareness.
+            // Capture result counts before execution so we can inject the
+            // starting indices into the tool result for context window awareness.
             const resultCountBefore = context.resultUrls.length;
+            const videoResultCountBefore = context.videoResultUrls.length;
 
             let toolResult = await toolRegistry.execute(toolName, args, context, toolCallbacks);
 
-            // Inject startIndex into tool result so the context window's
-            // observation masking and enriched summary can preserve index
-            // offsets. This lets the LLM reference old results by index
-            // even after context trimming.
+            // Inject startIndex / videoStartIndex into tool result so the
+            // context window's observation masking and enriched summary can
+            // preserve index offsets. This lets the LLM reference old results
+            // by index even after context trimming.
             const newResults = context.resultUrls.length - resultCountBefore;
-            if (newResults > 0) {
+            const newVideoResults = context.videoResultUrls.length - videoResultCountBefore;
+            if (newResults > 0 || newVideoResults > 0) {
               try {
                 const resultObj = JSON.parse(toolResult);
-                resultObj.startIndex = resultCountBefore;
+                if (newResults > 0) resultObj.startIndex = resultCountBefore;
+                if (newVideoResults > 0) resultObj.videoStartIndex = videoResultCountBefore;
                 toolResult = JSON.stringify(resultObj);
               } catch { /* leave as-is if not JSON */ }
             }

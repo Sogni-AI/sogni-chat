@@ -5,9 +5,11 @@ export const definition: ToolDefinition = {
   function: {
     name: 'stitch_video',
     description:
-      'Combine multiple video results into a single continuous video. ' +
-      'Use when the user wants to join, merge, or concatenate previously ' +
-      'generated video clips into one video. Requires at least 2 video results to exist.',
+      'Combine multiple previously generated videos into a single continuous video. ' +
+      'Every video tool (animate_photo, generate_video, sound_to_video, video_to_video, dance_montage) ' +
+      'adds results to a session-wide video array — use videoStartIndex from their results to find the indices. ' +
+      'Use when the user wants to join, merge, concatenate, or combine their generated video clips. ' +
+      'Requires at least 2 video results to exist. Never ask the user to upload videos that were already generated.',
     parameters: {
       type: 'object',
       properties: {
