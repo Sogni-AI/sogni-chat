@@ -13,4 +13,6 @@ toolRegistry.register({
   suggestions: [
     { label: 'Stitch my videos', prompt: 'Stitch all my video clips together into one video' },
   ],
+  sideEffectLevel: 'write',
+  timeoutMs: 600_000,
 });

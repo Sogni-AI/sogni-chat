@@ -34,3 +34,12 @@ export { getModelOptions, getAlternativeModels, getModelArgKey, isQualityTierToo
 export type { ModelOption } from './modelRegistry';
 export { executePipeline } from './pipeline';
 export type { PipelineConfig, PipelineStep, PipelineState, StepResult } from './pipeline';
+export { classifyError, parseResultForError } from './errorClassification';
+export {
+  checkPersonaPolicy,
+  checkQuestionSuppression,
+  checkPrerequisites,
+  runPolicyChecks,
+  type PolicyCheckResult,
+  type ToolCallState,
+} from './policyChecks';

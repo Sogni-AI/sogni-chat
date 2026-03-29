@@ -14,4 +14,4 @@ const suggestions: ToolSuggestion[] = [
   { label: 'Refine the result', prompt: 'Refine the result' },
 ];
 
-toolRegistry.register({ definition, execute, suggestions });
+toolRegistry.register({ definition, execute, suggestions, sideEffectLevel: 'write' });

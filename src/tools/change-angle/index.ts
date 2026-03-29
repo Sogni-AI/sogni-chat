@@ -14,4 +14,4 @@ const suggestions: ToolSuggestion[] = [
   { label: 'Apply a style', prompt: 'Apply a style' },
 ];
 
-toolRegistry.register({ definition, execute, suggestions });
+toolRegistry.register({ definition, execute, suggestions, sideEffectLevel: 'write' });

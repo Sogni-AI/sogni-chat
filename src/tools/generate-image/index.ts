@@ -14,4 +14,4 @@ const suggestions: ToolSuggestion[] = [
   { label: 'Generate more variations', prompt: 'Generate 4 more variations' },
 ];
 
-toolRegistry.register({ definition, execute, suggestions });
+toolRegistry.register({ definition, execute, suggestions, sideEffectLevel: 'write' });

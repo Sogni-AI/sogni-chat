@@ -10,4 +10,7 @@ toolRegistry.register({
     { label: 'Different prompt, same settings', prompt: 'Use these generation settings but with a different prompt' },
     { label: 'What model was used?', prompt: 'What model was used to generate this?' },
   ],
+  sideEffectLevel: 'read',
+  timeoutMs: 60_000,
+  canRunInParallel: true,
 });

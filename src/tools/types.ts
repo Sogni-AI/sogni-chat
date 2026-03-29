@@ -175,4 +175,72 @@ export interface ToolHandler {
   ): Promise<string>;
   /** Optional suggestion chips to show after this tool completes */
   suggestions?: ToolSuggestion[];
+  /** Side-effect level for policy enforcement */
+  sideEffectLevel?: 'read' | 'write' | 'destructive';
+  /** Per-tool timeout override in ms (default: 300_000) */
+  timeoutMs?: number;
+  /** Retry policy for transient failures */
+  retryPolicy?: {
+    maxAttempts: number;
+    backoffMs: number;
+    retryOn: ('transient' | 'timeout' | 'credits')[];
+  };
+  /** Whether this tool can safely run in parallel with other tools */
+  canRunInParallel?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Error categories
+// ---------------------------------------------------------------------------
+
+/** Typed error categories for structured error handling */
+export type ToolErrorCategory =
+  | 'schema_validation'    // Malformed or missing arguments
+  | 'business_rule'        // Valid args but violates business logic
+  | 'precondition_failed'  // Dependency or prerequisite not met
+  | 'transient_failure'    // Temporary failure, safe to retry
+  | 'permanent_failure'    // Unrecoverable tool error
+  | 'insufficient_credits' // Balance too low
+  | 'timeout'              // Tool execution timed out
+  | 'cancelled'            // User or system aborted
+  | 'content_refused';     // Model refused due to content policy
+
+// ---------------------------------------------------------------------------
+// Result envelope
+// ---------------------------------------------------------------------------
+
+/** Structured result envelope wrapping every tool execution outcome */
+export interface ToolResultEnvelope {
+  success: boolean;
+  toolName: ToolName;
+  /** Validated arguments that were passed to the executor */
+  args: Record<string, unknown>;
+  /** Duration of execution in milliseconds */
+  durationMs: number;
+
+  // --- Success fields ---
+  /** Raw JSON string result from the tool handler */
+  rawResult?: string;
+  /** Image URLs produced */
+  resultUrls?: string[];
+  /** Video URLs produced */
+  videoResultUrls?: string[];
+  /** Audio URLs produced */
+  audioResultUrls?: string[];
+
+  // --- Error fields ---
+  error?: string;
+  errorCategory?: ToolErrorCategory;
+  /** Whether this error is safe to retry */
+  retryable?: boolean;
+  /** Number of retry attempts made */
+  retryCount?: number;
+
+  // --- Metadata ---
+  /** Estimated credit cost */
+  estimatedCost?: number;
+  /** Model used for generation */
+  model?: string;
+  /** Trace ID for correlation */
+  traceId?: string;
 }

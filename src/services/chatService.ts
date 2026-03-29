@@ -21,6 +21,7 @@ import type { ToolName, ToolExecutionContext, ToolExecutionProgress, ToolCallbac
 import { stripThinkBlocks } from '@/tools/shared/llmHelpers';
 import { isInsufficientCreditsError, getAlternateToken, hasBalance } from '@/tools/shared/creditCheck';
 import { trimConversation, getInputBudget } from '@/services/contextWindow';
+import { RunTracker } from '@/services/tracing';
 import { resizeImageForVision } from '@/utils/imageProcessing';
 import type { TokenType } from '@/types/wallet';
 import { getAllPersonas, getAllMemories, getPersonality } from '@/utils/userDataDB';
@@ -285,6 +286,10 @@ PERSONA RULES:
     ? toolRegistry.getDefinitions().filter(d => d.function.name !== 'resolve_personas')
     : toolRegistry.getDefinitions();
 
+  // --- Observability: run tracker ---
+  const runTracker = new RunTracker();
+  console.log(`[CHAT SERVICE] Run started: ${runTracker.traceId}`);
+
   // Cache uploaded image URIs — refreshed if tools modify context.uploadedFiles
   // (e.g. resolve_personas injects persona photos).
   let uploadedImageUris = await prepareUploadedImageUris(context);
@@ -295,6 +300,7 @@ PERSONA RULES:
     ? [latestResultUri, ...uploadedImageUris]
     : uploadedImageUris;
 
+  try {
   while (toolRound < MAX_TOOL_ROUNDS) {
     toolRound++;
     let insideThink = false;
@@ -440,6 +446,7 @@ PERSONA RULES:
       for await (const chunk of stream) {
         if (context.signal?.aborted) {
           console.log('[CHAT SERVICE] Request aborted during streaming — breaking');
+          runTracker.setStatus('cancelled');
           break;
         }
         if (chunk.content) {
@@ -591,6 +598,7 @@ PERSONA RULES:
 
           callbacks.onToolCall(toolName, args);
 
+          const toolIndex = runTracker.toolStarted(toolName, args);
           try {
             // Capture result counts before execution so we can inject the
             // starting indices into the tool result for context window awareness.
@@ -613,6 +621,8 @@ PERSONA RULES:
                 toolResult = JSON.stringify(resultObj);
               } catch { /* leave as-is if not JSON */ }
             }
+
+            runTracker.toolCompleted(toolIndex, toolResult);
 
             // Add tool result to conversation
             updatedMessages.push({
@@ -646,6 +656,7 @@ PERSONA RULES:
             }
           } catch (err: any) {
             const errorMsg = err.message || 'Tool execution failed';
+            runTracker.toolErrored(toolIndex, errorMsg);
             console.warn(`[CHAT SERVICE] Tool "${toolName}" threw: ${errorMsg}`);
             updatedMessages.push({
               role: 'tool',
@@ -698,13 +709,29 @@ PERSONA RULES:
           continue;    // Retry the loop with new tokenType
         }
         // Both exhausted
+        runTracker.setStatus('insufficient_credits');
         context.onInsufficientCredits?.();
         callbacks.onError('You don\'t have enough credits. Please top up to continue.');
         break;
       }
+      runTracker.setStatus('error');
       console.error('[CHAT SERVICE] Error:', err);
       callbacks.onError(err.message || 'Failed to get a response. Please try again.');
       break;
+    }
+  }
+
+  } finally {
+    // --- Observability: run summary (always logged, even on unexpected throw) ---
+    if (toolRound >= MAX_TOOL_ROUNDS) {
+      runTracker.setStatus('max_steps_reached');
+    }
+    const runSummary = runTracker.getSummary();
+    console.log(`[CHAT SERVICE] Run complete: ${runSummary.traceId} | status=${runSummary.status} | steps=${runSummary.stepCount} | duration=${runSummary.totalDurationMs}ms`);
+    if (runSummary.toolTimeline.length > 0) {
+      console.log(`[CHAT SERVICE] Tool timeline:\n` + runSummary.toolTimeline.map(t =>
+        `  ${t.stepNumber}. ${t.toolName} (${t.durationMs ?? '?'}ms) -> ${t.status}${t.error ? `: ${t.error}` : ''}`
+      ).join('\n'));
     }
   }
 

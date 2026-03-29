@@ -14,4 +14,6 @@ toolRegistry.register({
     { label: '360\u00B0 orbit', prompt: 'Create a 360 degree orbit around this image' },
     { label: 'Turntable view', prompt: 'Make a turntable spin video of this' },
   ],
+  sideEffectLevel: 'write',
+  timeoutMs: 1_800_000,
 });

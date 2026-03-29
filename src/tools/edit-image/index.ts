@@ -14,4 +14,4 @@ const suggestions: ToolSuggestion[] = [
   { label: 'Adjust the style', prompt: 'Make it more artistic and painterly' },
 ];
 
-toolRegistry.register({ definition, execute, suggestions });
+toolRegistry.register({ definition, execute, suggestions, sideEffectLevel: 'write' });

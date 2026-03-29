@@ -13,4 +13,6 @@ toolRegistry.register({
     { label: 'Edit this image', prompt: 'Edit this image based on the analysis' },
     { label: 'Generate a similar image', prompt: 'Generate a new image inspired by this one' },
   ],
+  sideEffectLevel: 'read',
+  canRunInParallel: true,
 });

@@ -14,4 +14,4 @@ const suggestions: ToolSuggestion[] = [
   { label: 'Enhance quality', prompt: 'Use the detailer mode to enhance the video quality' },
 ];
 
-toolRegistry.register({ definition, execute, suggestions });
+toolRegistry.register({ definition, execute, suggestions, sideEffectLevel: 'write', timeoutMs: 660_000 });

@@ -7,7 +7,8 @@
  */
 
 import type { ToolDefinition } from '@sogni-ai/sogni-client';
-import type { ToolHandler, ToolExecutionContext, ToolCallbacks, ToolSuggestion } from './types';
+import type { ToolHandler, ToolExecutionContext, ToolCallbacks, ToolSuggestion, ToolResultEnvelope, ToolName } from './types';
+import { classifyError } from './shared/errorClassification';
 
 class ToolRegistry {
   private handlers = new Map<string, ToolHandler>();
@@ -124,7 +125,9 @@ class ToolRegistry {
       effectiveArgs = validation.cleaned;
     }
 
-    const timeoutMs = ToolRegistry.TIMEOUT_OVERRIDES[name] ?? ToolRegistry.DEFAULT_TIMEOUT_MS;
+    const startTime = performance.now();
+
+    const timeoutMs = handler.timeoutMs ?? ToolRegistry.TIMEOUT_OVERRIDES[name] ?? ToolRegistry.DEFAULT_TIMEOUT_MS;
 
     // Wrap caller's signal with timeout-aware AbortController
     const timeoutController = new AbortController();
@@ -168,20 +171,73 @@ class ToolRegistry {
     try {
       const result = await handler.execute(effectiveArgs, context, activityCallbacks);
       clearTimeout(timeoutId);
+
+      const durationMs = Math.round(performance.now() - startTime);
+      const envelope: ToolResultEnvelope = {
+        success: true,
+        toolName: name as ToolName,
+        args: effectiveArgs,
+        durationMs,
+        rawResult: result,
+      };
+
+      // Check if the result JSON contains an error
+      try {
+        const parsed = JSON.parse(result);
+        if (parsed.error) {
+          envelope.success = false;
+          envelope.error = parsed.message || parsed.error;
+          const classified = classifyError(new Error(envelope.error));
+          envelope.errorCategory = classified.category;
+          envelope.retryable = classified.retryable;
+        }
+        if (parsed.resultUrls) envelope.resultUrls = parsed.resultUrls;
+        if (parsed.videoResultUrls) envelope.videoResultUrls = parsed.videoResultUrls;
+      } catch {
+        // Non-JSON result — that's fine
+      }
+
+      if (envelope.success) {
+        console.log(`[TOOL REGISTRY] \u2713 ${name} completed in ${durationMs}ms`);
+      } else {
+        console.log(`[TOOL REGISTRY] \u2717 ${name} failed after ${durationMs}ms: ${envelope.error}`);
+      }
+
       return result;
     } catch (err) {
       clearTimeout(timeoutId);
+      const durationMs = Math.round(performance.now() - startTime);
       const message = err instanceof Error ? err.message : String(err);
 
       if (timeoutController.signal.aborted && !originalSignal?.aborted) {
-        console.error(`[TOOL REGISTRY] "${name}" timed out after ${timeoutMs / 1000}s`);
-        return JSON.stringify({
+        const classified = classifyError(new Error('timed out'));
+        const envelope: ToolResultEnvelope = {
+          success: false,
+          toolName: name as ToolName,
+          args: effectiveArgs,
+          durationMs,
           error: `${name} timed out. The operation took too long — try a simpler prompt or smaller output.`,
+          errorCategory: classified.category,
+          retryable: classified.retryable,
+        };
+        console.log(`[TOOL REGISTRY] \u2717 ${name} failed after ${durationMs}ms: timed out (limit: ${timeoutMs / 1000}s)`);
+        return JSON.stringify({
+          error: envelope.error,
         });
       }
 
-      console.error(`[TOOL REGISTRY] Error executing "${name}":`, message);
-      return JSON.stringify({ error: `Unexpected error executing ${name}: ${message}` });
+      const classified = classifyError(err);
+      const envelope: ToolResultEnvelope = {
+        success: false,
+        toolName: name as ToolName,
+        args: effectiveArgs,
+        durationMs,
+        error: `Unexpected error executing ${name}: ${message}`,
+        errorCategory: classified.category,
+        retryable: classified.retryable,
+      };
+      console.log(`[TOOL REGISTRY] \u2717 ${name} failed after ${durationMs}ms: ${message}`);
+      return JSON.stringify({ error: envelope.error });
     } finally {
       context.signal = originalSignal;
     }

@@ -15,4 +15,6 @@ toolRegistry.register({
     { label: 'Make it longer', prompt: 'Make the dance video longer' },
     { label: 'Try with another photo', prompt: 'Try with a different photo' },
   ],
+  sideEffectLevel: 'write',
+  timeoutMs: 600_000,
 });

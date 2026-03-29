@@ -14,4 +14,4 @@ const suggestions: ToolSuggestion[] = [
   { label: 'Add dialogue', prompt: 'Generate a similar video but with spoken dialogue' },
 ];
 
-toolRegistry.register({ definition, execute, suggestions });
+toolRegistry.register({ definition, execute, suggestions, sideEffectLevel: 'write', timeoutMs: 600_000 });

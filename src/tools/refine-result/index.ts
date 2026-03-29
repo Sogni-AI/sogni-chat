@@ -14,4 +14,4 @@ const suggestions: ToolSuggestion[] = [
   { label: 'Animate this', prompt: 'Animate this' },
 ];
 
-toolRegistry.register({ definition, execute, suggestions });
+toolRegistry.register({ definition, execute, suggestions, sideEffectLevel: 'write' });

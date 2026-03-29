@@ -14,4 +14,4 @@ const suggestions: ToolSuggestion[] = [
   { label: 'Generate another video', prompt: 'Generate another video' },
 ];
 
-toolRegistry.register({ definition, execute, suggestions });
+toolRegistry.register({ definition, execute, suggestions, sideEffectLevel: 'write', timeoutMs: 600_000 });

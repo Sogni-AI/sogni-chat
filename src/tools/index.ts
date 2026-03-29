@@ -48,4 +48,13 @@ export type {
   ToolName,
   ToolSuggestion,
   UploadedFile,
+  ToolErrorCategory,
+  ToolResultEnvelope,
 } from './types';
+export {
+  checkPersonaPolicy,
+  checkQuestionSuppression,
+  checkPrerequisites,
+  runPolicyChecks,
+} from './shared/policyChecks';
+export type { PolicyCheckResult, ToolCallState } from './shared/policyChecks';

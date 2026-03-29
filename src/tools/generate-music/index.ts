@@ -14,4 +14,4 @@ const suggestions: ToolSuggestion[] = [
   { label: 'Make it longer', prompt: 'Generate a longer version of this track' },
 ];
 
-toolRegistry.register({ definition, execute, suggestions });
+toolRegistry.register({ definition, execute, suggestions, sideEffectLevel: 'write', timeoutMs: 660_000 });
