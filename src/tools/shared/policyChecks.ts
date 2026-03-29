@@ -97,8 +97,11 @@ export function checkQuestionSuppression(
 ): PolicyCheckResult {
   if (!hasToolCalls) return { allowed: true };
 
-  const trimmed = responseText.trim();
-  if (trimmed.endsWith('?')) {
+  // Check only the tail of the response (matching chatService behavior)
+  const tail = responseText.trim().slice(-500);
+  // Strip quoted speech so dialogue like `She said "ready?"` doesn't suppress tool calls
+  const unquoted = tail.replace(/"[^"]*"/g, '').replace(/'[^']*'/g, '');
+  if (unquoted.trimEnd().endsWith('?')) {
     return {
       allowed: false,
       reason: 'business_rule',

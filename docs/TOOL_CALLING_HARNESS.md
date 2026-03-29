@@ -310,39 +310,42 @@ interface ApprovalRequest {
 
 ## 9. Observability
 
-### Current State
+### Current Implementation
 
 - Console logging with prefix tags: `[CHAT SERVICE]`, `[TOOL REGISTRY]`, `[AUTH]`, etc.
-- Tool execution timing via progress callbacks
-- Error classification in result JSON
+- `RunTracker` generates trace IDs per orchestration run (`src/services/tracing.ts`)
+- Tool execution timeline captured with start/end/duration per tool
+- Structured run summary logged on every run completion
+- `ToolErrorCategory` classifies errors into 9 typed categories
+- `ToolResultEnvelope` built internally in registry with timing metadata
 
-### Target State
-
-| Layer | Implementation |
-|-------|---------------|
-| Structured logging | Replace console.log with leveled, structured logger |
-| Trace IDs | Generate per-run trace ID, propagate through tool calls |
-| Tool timeline | Capture start/end/duration per tool execution |
-| Step summaries | Log each orchestration loop iteration |
-| Error classification | Typed error categories with context |
-| Debug mode | Toggle verbose logging without code changes |
-
-### Run Summary Object
+### Current Run Summary (as implemented)
 
 ```typescript
 interface RunSummary {
   traceId: string;
-  runStatus: 'completed' | 'approval_needed' | 'error' | 'cancelled' | 'max_steps';
+  status: RunStatus; // 'completed' | 'max_steps_reached' | 'error' | 'cancelled' | 'insufficient_credits'
   stepCount: number;
   toolTimeline: ToolTimelineEntry[];
-  completedActions: string[];
-  pendingActions: string[];
-  approvalsNeeded: ApprovalRequest[];
-  errorSummary: string | null;
-  totalDuration: number;
-  tokenUsage: { input: number; output: number };
+  completedTools: string[];
+  totalDurationMs: number;
+  startTime: number;
+  endTime: number;
 }
 ```
+
+### Remaining Observability Work
+
+| Layer | Status |
+|-------|--------|
+| Structured logging with consistent format | Done |
+| Per-run trace IDs | Done |
+| Tool execution timeline | Done |
+| Run summary generation | Done |
+| Leveled logger (debug/info/warn/error filtering) | TODO |
+| Debug mode toggle | TODO |
+| `pendingActions`, `approvalsNeeded` in RunSummary | TODO (requires approval pattern) |
+| Token usage tracking | TODO |
 
 ---
 
@@ -514,6 +517,8 @@ The model must understand:
 | `extract_metadata` | read | 1min | No |
 | `resolve_personas` | read | 5min | No |
 | `manage_memory` | write | 5min | No |
-| `stitch_video` | write | 10min | Yes |
+| `stitch_video` | write | 10min | No* |
 | `orbit_video` | write | 30min | Yes |
 | `dance_montage` | write | 10min | Yes |
+
+\* `stitch_video` does not use `executePipeline` itself but is called as a sub-tool by pipeline tools (`orbit_video`, `dance_montage`).
