@@ -119,6 +119,13 @@
   }
 }
 
+/* Redo buttons: always visible on touch devices (no hover available) */
+@media (hover: none) {
+  [data-redo-btn] {
+    opacity: 0.7 !important;
+  }
+}
+
 /* Background job spinner for sidebar session items */
 .chat-session-spinner {
   border: 2px solid rgba(255, 255, 255, 0.1);

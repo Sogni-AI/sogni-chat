@@ -2045,6 +2045,12 @@ export function useChat(): UseChatResult {
         onInsufficientCredits?: () => void;
       },
     ) => {
+      // Concurrency guard: block item retry if already loading (matches sendMessage pattern)
+      if (activeRequestCountRef.current >= MAX_CONCURRENT_REQUESTS) {
+        console.log('[CHAT HOOK] Item retry blocked — max concurrent requests reached');
+        return;
+      }
+
       // Find the target message
       let targetMessage: UIChatMessage | undefined;
       setUIMessages(prev => {
@@ -2065,6 +2071,10 @@ export function useChat(): UseChatResult {
 
       // Force single variation
       const modifiedArgs = { ...toolArgs, numberOfVariations: 1 };
+
+      // Track loading state so UI shows spinner and sendMessage is blocked
+      activeRequestCountRef.current++;
+      setIsLoading(true);
 
       // Set up per-slot retry progress (does NOT set toolProgress, so results stay visible)
       setUIMessages(prev => prev.map(msg => {
@@ -2238,7 +2248,18 @@ export function useChat(): UseChatResult {
       };
 
       try {
-        await toolRegistry.execute(effectiveToolName, modifiedArgs, executionContext, callbacks, { skipValidation: true });
+        const result = await toolRegistry.execute(effectiveToolName, modifiedArgs, executionContext, callbacks, { skipValidation: true });
+
+        // Handle non-throwing error returns (tool returned JSON with error field)
+        try {
+          const parsed = JSON.parse(result);
+          if (parsed.error) {
+            // Clear retry progress on error return
+            setUIMessages(prev => prev.map(msg =>
+              msg.id === messageId ? { ...msg, itemRetryProgress: null } : msg
+            ));
+          }
+        } catch { /* not JSON, ignore */ }
       } catch (err: any) {
         console.error('[CHAT HOOK] handleItemRetry failed:', err);
         // Clear progress on error
@@ -2248,6 +2269,11 @@ export function useChat(): UseChatResult {
         }));
       } finally {
         controllersSet.delete(itemAbortController);
+        activeRequestCountRef.current--;
+        if (activeRequestCountRef.current <= 0) {
+          activeRequestCountRef.current = 0;
+          setIsLoading(false);
+        }
       }
     },
     [], // No dependencies needed - all mutable state accessed via refs/stable setters
