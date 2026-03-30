@@ -388,6 +388,9 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
 
   // Use the source image being processed (if available), otherwise fall back to original
   const placeholderUrl = progress.sourceImageUrl || imageUrl;
+  const contextImageUrls = progress.contextImageUrls;
+  const endFrameImageUrl = progress.endFrameImageUrl;
+  const hasDualPlaceholder = (contextImageUrls && contextImageUrls.length >= 2) || !!endFrameImageUrl;
 
   // Show the visual grid when we have a placeholder image, multiple results, or a video tool
   if (placeholderUrl || isBatch || isVideoTool) {
@@ -461,18 +464,70 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
                 {/* Completed video result — render inline player */}
                 {isCompletedVideo ? (
                   <ProgressVideo src={resultUrl!} aspectRatio={progress.videoAspectRatio} />
-                ) : resultUrl || placeholderUrl ? (
+                ) : resultUrl ? (
                   <img
-                    src={resultUrl || placeholderUrl!}
-                    alt={resultUrl ? `Result #${i + 1}` : 'Processing...'}
+                    src={resultUrl}
+                    alt={`Result #${i + 1}`}
                     style={{
                       width: '100%',
                       display: 'block',
-                      filter: resultUrl ? 'none' : 'blur(8px) brightness(0.7)',
-                      transform: resultUrl ? 'none' : 'scale(1.05)',
+                      height: 'auto',
+                    }}
+                  />
+                ) : hasDualPlaceholder ? (
+                  /* Split-screen blurred placeholder — two context images side by side */
+                  <div style={{
+                    position: 'relative',
+                    width: '100%',
+                    aspectRatio: progress.videoAspectRatio || (isVideoTool ? '16 / 9' : undefined),
+                    display: 'flex',
+                    overflow: 'hidden',
+                  }}>
+                    <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+                      <img
+                        src={endFrameImageUrl ? placeholderUrl! : contextImageUrls![0]}
+                        alt="" aria-hidden="true"
+                        style={{
+                          width: '100%', height: '100%', objectFit: 'cover',
+                          filter: 'blur(8px) brightness(0.7)', transform: 'scale(1.1)',
+                        }}
+                      />
+                    </div>
+                    {/* Center divider with arrow */}
+                    <div style={{
+                      position: 'absolute', left: '50%', top: '50%',
+                      transform: 'translate(-50%, -50%)', zIndex: 2,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: '1.5rem', height: '1.5rem', borderRadius: '50%',
+                      background: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(4px)',
+                    }}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 12h14M12 5l7 7-7 7" />
+                      </svg>
+                    </div>
+                    <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+                      <img
+                        src={endFrameImageUrl || contextImageUrls![1]}
+                        alt="" aria-hidden="true"
+                        style={{
+                          width: '100%', height: '100%', objectFit: 'cover',
+                          filter: 'blur(8px) brightness(0.7)', transform: 'scale(1.1)',
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : placeholderUrl ? (
+                  <img
+                    src={placeholderUrl}
+                    alt="Processing..."
+                    style={{
+                      width: '100%',
+                      display: 'block',
+                      filter: 'blur(8px) brightness(0.7)',
+                      transform: 'scale(1.05)',
                       transition: 'filter 0.5s ease, transform 0.5s ease',
                       // For video jobs, constrain placeholder to video aspect ratio
-                      ...(isVideoTool && !resultUrl && progress.videoAspectRatio
+                      ...(isVideoTool && progress.videoAspectRatio
                         ? { aspectRatio: progress.videoAspectRatio, height: 'auto', objectFit: 'cover' as const }
                         : { height: 'auto' }),
                     }}
