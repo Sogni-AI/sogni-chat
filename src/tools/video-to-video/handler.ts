@@ -120,6 +120,7 @@ export async function execute(
   callbacks: ToolCallbacks,
 ): Promise<string> {
   const prompt = args.prompt as string;
+  const negativePrompt = (args.negativePrompt as string) || '';
   const controlMode: ControlMode = (args.controlMode as ControlMode) || 'animate-move';
   // WAN Animate Move/Replace support up to 20s; LTX-2 modes cap at 10s
   const isWanAnimate = controlMode === 'animate-move' || controlMode === 'animate-replace';
@@ -224,6 +225,7 @@ export async function execute(
         {
           modelId: config.id,
           prompt,
+          negativePrompt,
           controlMode,
           sourceVideo: videoFile.data,
           sourceVideoMime: videoFile.mimeType,
@@ -295,6 +297,7 @@ export async function execute(
 interface V2VParams {
   modelId: string;
   prompt: string;
+  negativePrompt: string;
   controlMode: ControlMode;
   sourceVideo: Uint8Array;
   sourceVideoMime: string;
@@ -340,7 +343,7 @@ async function runV2VGeneration(
     type: 'video',
     modelId: params.modelId,
     positivePrompt: params.prompt,
-    negativePrompt: '',
+    negativePrompt: params.negativePrompt,
     stylePrompt: '',
     numberOfMedia: params.numberOfMedia,
     sizePreset: 'custom',

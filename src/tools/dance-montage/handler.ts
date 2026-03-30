@@ -597,6 +597,7 @@ export async function execute(
               'video_to_video',
               {
                 prompt: '',
+                negativePrompt: 'talking, lip sync, mouth movement, lip movement, open mouth, speaking',
                 controlMode: 'animate-move',
                 duration: segmentDuration,
                 videoStartOffset: videoStartOffsets[i],
