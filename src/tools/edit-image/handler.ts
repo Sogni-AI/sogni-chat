@@ -16,6 +16,7 @@ import {
   discardPending,
   formatCredits,
   sanitizeBatchPrompt,
+  uint8ArrayToDataUri,
 } from '../shared';
 import type { TokenType } from '@/types/wallet';
 import { parseAspectRatio } from '@/utils/imageDimensions';
@@ -216,12 +217,21 @@ export async function execute(
     estimatedCost = await fetchImageCostEstimate(context.sogniClient, context.tokenType, modelConfig.id, numberOfMedia, steps, modelConfig.defaultGuidance, modelConfig.sampler, cappedContextImages.length);
   }
 
+  const sourceImageUrl = cappedContextImages.length > 0
+    ? uint8ArrayToDataUri(cappedContextImages[0].data, cappedContextImages[0].mimeType)
+    : undefined;
+  const contextImageUrls = cappedContextImages.length > 1
+    ? cappedContextImages.slice(0, 3).map(img => uint8ArrayToDataUri(img.data, img.mimeType))
+    : undefined;
+
   callbacks.onToolProgress({
     type: 'started',
     toolName: 'edit_image',
     totalCount: numberOfMedia,
     estimatedCost,
     modelName: `${modelConfig.name} — ${outputWidth}x${outputHeight}`,
+    sourceImageUrl,
+    contextImageUrls,
   });
 
   const billingId = estimatedCost > 0
@@ -291,6 +301,7 @@ export async function execute(
             etaSeconds: progress.etaSeconds,
             resultUrls: progress.resultUrl ? [progress.resultUrl] : undefined,
             estimatedCost,
+            sourceImageUrl,
           });
         },
         context.signal,

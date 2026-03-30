@@ -12,6 +12,7 @@ import {
   recordCompletion,
   discardPending,
   formatCredits,
+  uint8ArrayToDataUri,
 } from '../shared';
 import { restorePhoto } from '@/services/sdk/imageGeneration';
 import type { ModelOverride } from '@/services/sdk/imageGeneration';
@@ -59,12 +60,17 @@ export async function execute(
     estimatedCost = await fetchRestorationCostEstimate(context.sogniClient, context.tokenType, numberOfMedia, qualityTier);
   }
 
+  const sourceImageUrl = context.imageData
+    ? uint8ArrayToDataUri(context.imageData, 'image/jpeg')
+    : undefined;
+
   callbacks.onToolProgress({
     type: 'started',
     toolName: 'restore_photo',
     totalCount: numberOfMedia,
     estimatedCost,
     modelName: `${modelOverride?.name ?? `Qwen Image Edit 2511${qualityTier === 'fast' ? ' Lightning' : ''}`} — ${outputWidth}x${outputHeight}`,
+    sourceImageUrl,
   });
 
   const billingId = estimatedCost > 0
@@ -97,6 +103,7 @@ export async function execute(
               etaSeconds: progress.etaSeconds,
               resultUrls: progress.resultUrl ? [progress.resultUrl] : undefined,
               estimatedCost,
+              sourceImageUrl,
             });
           }
         },
