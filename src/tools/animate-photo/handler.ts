@@ -354,12 +354,24 @@ export async function execute(
 
   const sourceImageUrl = (effectiveSourceIndex !== undefined && context.resultUrls[effectiveSourceIndex]) || undefined;
 
+  // Resolve end frame URL for dual-frame placeholder (when frameRole is "both")
+  let endFrameImageUrl: string | undefined;
+  if (frameRole === 'both' && endImageData) {
+    if (rawEndImageIndex !== undefined && rawEndImageIndex >= 0 && context.resultUrls[rawEndImageIndex]) {
+      endFrameImageUrl = context.resultUrls[rawEndImageIndex];
+    } else if (rawEndImageIndex === -1 && sourceImageUrl) {
+      // Original uploaded image used as end frame — source URL is the placeholder
+      endFrameImageUrl = sourceImageUrl;
+    }
+  }
+
   callbacks.onToolProgress({
     type: 'started',
     toolName: 'animate_photo',
     totalCount: numberOfMedia,
     estimatedCost,
     sourceImageUrl,
+    endFrameImageUrl,
     stepLabel: 'Generating video',
     videoAspectRatio,
     modelName: mediaLabel,
@@ -440,6 +452,7 @@ export async function execute(
           etaSeconds: progress.jobIndex !== undefined ? perJobEta.get(progress.jobIndex) : undefined,
           estimatedCost,
           sourceImageUrl,
+          endFrameImageUrl,
           videoAspectRatio,
         });
         // Save completed video to gallery immediately (don't wait for batch to finish)
@@ -466,6 +479,7 @@ export async function execute(
           etaSeconds: progress.etaSeconds,
           estimatedCost,
           sourceImageUrl,
+          endFrameImageUrl,
           videoAspectRatio,
         });
       }
@@ -482,6 +496,7 @@ export async function execute(
           error: progress.error,
           estimatedCost,
           sourceImageUrl,
+          endFrameImageUrl,
           videoAspectRatio,
         });
       }
@@ -515,6 +530,7 @@ export async function execute(
         totalCount: numberOfMedia,
         estimatedCost,
         sourceImageUrl,
+        endFrameImageUrl,
         stepLabel: 'Retrying generation',
         modelName: mediaLabel,
       });
