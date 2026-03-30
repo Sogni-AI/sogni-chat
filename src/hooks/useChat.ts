@@ -2066,19 +2066,12 @@ export function useChat(): UseChatResult {
       // Force single variation
       const modifiedArgs = { ...toolArgs, numberOfVariations: 1 };
 
-      // Set up progress on JUST the target slot
+      // Set up per-slot retry progress (does NOT set toolProgress, so results stay visible)
       setUIMessages(prev => prev.map(msg => {
         if (msg.id !== messageId) return msg;
         return {
           ...msg,
-          toolProgress: {
-            type: 'progress' as const,
-            toolName: effectiveToolName,
-            totalCount: msg.imageResults?.length || msg.videoResults?.length || 1,
-            perJobProgress: {
-              [jobIndex]: { progress: 0, label: 'Retrying...' },
-            },
-          },
+          itemRetryProgress: { jobIndex, progress: 0, label: 'Retrying...' },
         };
       }));
 
@@ -2151,20 +2144,12 @@ export function useChat(): UseChatResult {
           if (itemAbortController.signal.aborted) return;
           setUIMessages(prev => prev.map(msg => {
             if (msg.id !== messageId) return msg;
-            const prevPerJob = msg.toolProgress?.perJobProgress || {};
             return {
               ...msg,
-              toolProgress: {
-                ...msg.toolProgress!,
-                perJobProgress: {
-                  ...prevPerJob,
-                  [jobIndex]: {
-                    ...prevPerJob[jobIndex],
-                    progress: progress.progress ?? prevPerJob[jobIndex]?.progress,
-                    etaSeconds: progress.etaSeconds ?? prevPerJob[jobIndex]?.etaSeconds,
-                    label: progress.jobLabel ?? prevPerJob[jobIndex]?.label,
-                  },
-                },
+              itemRetryProgress: {
+                jobIndex,
+                progress: progress.progress ?? msg.itemRetryProgress?.progress,
+                label: progress.jobLabel ?? msg.itemRetryProgress?.label ?? 'Retrying...',
               },
             };
           }));
@@ -2174,6 +2159,10 @@ export function useChat(): UseChatResult {
           const isVideoTool = !!videoResultUrls && videoResultUrls.length > 0;
           const newUrl = isVideoTool ? videoResultUrls[0] : resultUrls[0];
 
+          // Capture old URL inside the state updater (runs synchronously),
+          // then use it below to swap in global refs.
+          let oldUrl: string | undefined;
+
           setUIMessages(prev => prev.map(msg => {
             if (msg.id !== messageId) return msg;
             // Replace the result at jobIndex
@@ -2181,8 +2170,10 @@ export function useChat(): UseChatResult {
             const updatedVideoResults = msg.videoResults ? [...msg.videoResults] : undefined;
 
             if (isVideoTool && updatedVideoResults) {
+              oldUrl = updatedVideoResults[jobIndex]; // capture before replacing
               updatedVideoResults[jobIndex] = newUrl;
             } else if (!isVideoTool && updatedImageResults) {
+              oldUrl = updatedImageResults[jobIndex]; // capture before replacing
               updatedImageResults[jobIndex] = newUrl;
             }
 
@@ -2190,16 +2181,33 @@ export function useChat(): UseChatResult {
               ...msg,
               imageResults: updatedImageResults,
               videoResults: updatedVideoResults,
-              toolProgress: null,
+              itemRetryProgress: null,
             };
           }));
 
-          // Update global result URL refs
-          if (newUrl) {
+          // Swap old URL with new URL at the same index in global refs
+          // (prevents LLM sourceImageIndex drift from stale appended URLs)
+          if (newUrl && oldUrl) {
             if (isVideoTool) {
-              allVideoUrlsRef.current = [...new Set([...allVideoUrlsRef.current, newUrl])];
+              const idx = allVideoUrlsRef.current.indexOf(oldUrl);
+              const updated = [...allVideoUrlsRef.current];
+              if (idx >= 0) updated[idx] = newUrl;
+              else updated.push(newUrl);
+              allVideoUrlsRef.current = updated;
             } else {
-              const combined = [...new Set([...allResultUrlsRef.current, newUrl])];
+              const idx = allResultUrlsRef.current.indexOf(oldUrl);
+              const updated = [...allResultUrlsRef.current];
+              if (idx >= 0) updated[idx] = newUrl;
+              else updated.push(newUrl);
+              allResultUrlsRef.current = updated;
+              setAllResultUrls(updated);
+            }
+          } else if (newUrl) {
+            // No old URL to swap (shouldn't happen, but fallback to append)
+            if (isVideoTool) {
+              allVideoUrlsRef.current = [...allVideoUrlsRef.current, newUrl];
+            } else {
+              const combined = [...allResultUrlsRef.current, newUrl];
               allResultUrlsRef.current = combined;
               setAllResultUrls(combined);
             }
@@ -2236,7 +2244,7 @@ export function useChat(): UseChatResult {
         // Clear progress on error
         setUIMessages(prev => prev.map(msg => {
           if (msg.id !== messageId) return msg;
-          return { ...msg, toolProgress: null };
+          return { ...msg, itemRetryProgress: null };
         }));
       } finally {
         controllersSet.delete(itemAbortController);

@@ -360,6 +360,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
               onImageClick={onImageClick}
               galleryImageIds={message.galleryImageIds}
               onItemRetry={onItemRetry ? (index) => onItemRetry(message.id, index) : undefined}
+              itemRetryProgress={message.itemRetryProgress}
             />
           </LazyMedia>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.25rem' }}>
@@ -396,6 +397,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
             sourceImageUrl={message.toolProgress?.sourceImageUrl || message.sourceImageUrl || undefined}
             endFrameImageUrl={message.toolProgress?.endFrameImageUrl}
             onItemRetry={onItemRetry ? (index) => onItemRetry(message.id, index) : undefined}
+            itemRetryProgress={message.itemRetryProgress}
           />
           {/* During video progress: show summary bar (cost, cancel, completion count) */}
           {isVideoToolProgress && (

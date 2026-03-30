@@ -18,6 +18,8 @@ interface ChatImageResultsProps {
   galleryImageIds?: string[];
   /** Called when user clicks the redo button on a specific result */
   onItemRetry?: (index: number) => void;
+  /** Per-slot retry progress — shows spinner overlay on the retrying slot */
+  itemRetryProgress?: { jobIndex: number; progress?: number; label?: string } | null;
 }
 
 export const ChatImageResults = memo(function ChatImageResults({
@@ -26,6 +28,7 @@ export const ChatImageResults = memo(function ChatImageResults({
   onImageClick,
   galleryImageIds,
   onItemRetry,
+  itemRetryProgress,
 }: ChatImageResultsProps) {
   // Resolve gallery IDs to blob URLs — persistent local copies that never expire
   const galleryBlobUrls = useGalleryBlobUrls(galleryImageIds);
@@ -63,11 +66,12 @@ export const ChatImageResults = memo(function ChatImageResults({
         const isFailed = failedImages.has(index);
         // Prefer gallery blob URL (persistent) over remote URL (may expire)
         const displayUrl = galleryBlobUrls.get(index) || url;
+        const isRetrying = itemRetryProgress?.jobIndex === index;
 
         return (
           <button
             key={`${url}-${index}`}
-            onClick={() => !isFailed && onImageClick?.(displayUrl, index)}
+            onClick={() => !isFailed && !isRetrying && onImageClick?.(displayUrl, index)}
             style={{
               position: 'relative',
               borderRadius: 'var(--radius-md)',
@@ -230,8 +234,42 @@ export const ChatImageResults = memo(function ChatImageResults({
               </div>
             )}
 
+            {/* Retry spinner overlay — shown on the specific slot being regenerated */}
+            {isRetrying && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.375rem',
+                  background: 'rgba(0, 0, 0, 0.55)',
+                  backdropFilter: 'blur(4px)',
+                  WebkitBackdropFilter: 'blur(4px)',
+                  zIndex: 4,
+                  borderRadius: 'var(--radius-md)',
+                }}
+              >
+                <div
+                  className="animate-spin"
+                  style={{
+                    width: '1.5rem',
+                    height: '1.5rem',
+                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                    borderTopColor: 'white',
+                    borderRadius: '50%',
+                  }}
+                />
+                <span style={{ fontSize: '0.6875rem', color: 'white', fontWeight: 500 }}>
+                  {itemRetryProgress.label || 'Retrying...'}
+                </span>
+              </div>
+            )}
+
             {/* Redo button — top-right, visible on hover */}
-            {onItemRetry && !isFailed && isLoaded && (
+            {onItemRetry && !isFailed && isLoaded && !isRetrying && (
               <button
                 data-redo-btn
                 onClick={(e) => { e.stopPropagation(); onItemRetry(index); }}

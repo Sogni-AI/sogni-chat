@@ -629,6 +629,8 @@ interface ChatVideoResultsProps {
   endFrameImageUrl?: string;
   /** Called when user clicks the redo button on a specific video slot */
   onItemRetry?: (index: number) => void;
+  /** Per-slot retry progress — shows spinner overlay on the retrying slot */
+  itemRetryProgress?: { jobIndex: number; progress?: number; label?: string } | null;
 }
 
 export const ChatVideoResults = memo(function ChatVideoResults({
@@ -643,6 +645,7 @@ export const ChatVideoResults = memo(function ChatVideoResults({
   sourceImageUrl,
   endFrameImageUrl,
   onItemRetry,
+  itemRetryProgress,
 }: ChatVideoResultsProps) {
   // Resolve gallery IDs to blob URLs — persistent local copies that never expire
   const galleryBlobUrls = useGalleryBlobUrls(galleryVideoIds);
@@ -693,6 +696,7 @@ export const ChatVideoResults = memo(function ChatVideoResults({
         const jobError = perJobProgress?.[index]?.error;
         const isFailed = failedVideos.has(index) || !!jobError;
         const isPending = !rawUrl && !isFailed;
+        const isRetrying = itemRetryProgress?.jobIndex === index;
 
         // Per-job progress info for pending slot overlays
         const jobData = perJobProgress?.[index];
@@ -876,7 +880,7 @@ export const ChatVideoResults = memo(function ChatVideoResults({
                 onError={() => handleError(index)}
               />
               {/* Redo button on completed video thumbnails */}
-              {onItemRetry && (
+              {onItemRetry && !isRetrying && (
                 <button
                   data-redo-btn
                   onClick={(e) => { e.stopPropagation(); onItemRetry(index); }}
@@ -920,6 +924,40 @@ export const ChatVideoResults = memo(function ChatVideoResults({
               fillWidth={false}
               autoPlay={autoPlay}
             />
+          )}
+
+          {/* Retry spinner overlay — shown on the specific slot being regenerated */}
+          {isRetrying && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.375rem',
+                background: 'rgba(0, 0, 0, 0.55)',
+                backdropFilter: 'blur(4px)',
+                WebkitBackdropFilter: 'blur(4px)',
+                zIndex: 5,
+                borderRadius: 'var(--radius-md)',
+              }}
+            >
+              <div
+                className="animate-spin"
+                style={{
+                  width: '1.5rem',
+                  height: '1.5rem',
+                  border: '2px solid rgba(255, 255, 255, 0.3)',
+                  borderTopColor: 'white',
+                  borderRadius: '50%',
+                }}
+              />
+              <span style={{ fontSize: '0.6875rem', color: 'white', fontWeight: 500 }}>
+                {itemRetryProgress.label || 'Retrying...'}
+              </span>
+            </div>
           )}
 
           {/* Index badge (hidden for single results) */}

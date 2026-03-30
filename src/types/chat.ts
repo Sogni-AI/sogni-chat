@@ -16,6 +16,8 @@ export interface UIChatMessage {
   videoResults?: string[];
   audioResults?: string[];
   toolProgress?: ToolExecutionProgress | null;
+  /** Per-slot retry progress — does NOT hide main results (unlike toolProgress) */
+  itemRetryProgress?: { jobIndex: number; progress?: number; label?: string } | null;
   isStreaming?: boolean;
   /** Streaming status text (e.g. "Thinking...") — transient, cleared after streaming */
   streamingStatus?: string;
