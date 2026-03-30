@@ -16,6 +16,8 @@ interface ChatImageResultsProps {
   onImageClick?: (url: string, index: number) => void;
   /** Gallery image IDs for persistent blob-based rendering (parallel to urls) */
   galleryImageIds?: string[];
+  /** Called when user clicks the redo button on a specific result */
+  onItemRetry?: (index: number) => void;
 }
 
 export const ChatImageResults = memo(function ChatImageResults({
@@ -23,6 +25,7 @@ export const ChatImageResults = memo(function ChatImageResults({
   sourceImageUrl,
   onImageClick,
   galleryImageIds,
+  onItemRetry,
 }: ChatImageResultsProps) {
   // Resolve gallery IDs to blob URLs — persistent local copies that never expire
   const galleryBlobUrls = useGalleryBlobUrls(galleryImageIds);
@@ -80,11 +83,15 @@ export const ChatImageResults = memo(function ChatImageResults({
               if (!isFailed) {
                 e.currentTarget.style.borderColor = 'var(--color-accent)';
                 e.currentTarget.style.transform = 'scale(1.02)';
+                const redoBtn = e.currentTarget.querySelector('[data-redo-btn]') as HTMLElement;
+                if (redoBtn) redoBtn.style.opacity = '1';
               }
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.borderColor = 'transparent';
               e.currentTarget.style.transform = 'scale(1)';
+              const redoBtn = e.currentTarget.querySelector('[data-redo-btn]') as HTMLElement;
+              if (redoBtn) redoBtn.style.opacity = '0';
             }}
             title={isFailed ? 'Image no longer available' : urls.length > 1 ? `Result #${index + 1} — click to view` : 'Click to view'}
           >
@@ -133,6 +140,19 @@ export const ChatImageResults = memo(function ChatImageResults({
                 <span style={{ fontSize: '0.75rem', fontWeight: 500, opacity: 0.7 }}>
                   Image expired
                 </span>
+                {onItemRetry && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onItemRetry(index); }}
+                    style={{
+                      fontSize: '0.6875rem', fontWeight: 600,
+                      padding: '0.25rem 0.75rem', borderRadius: '12px',
+                      background: 'var(--color-accent)', color: 'white',
+                      border: 'none', cursor: 'pointer', marginTop: '0.25rem',
+                    }}
+                  >
+                    Retry
+                  </button>
+                )}
               </div>
             )}
 
@@ -208,6 +228,41 @@ export const ChatImageResults = memo(function ChatImageResults({
               >
                 #{index + 1}
               </div>
+            )}
+
+            {/* Redo button — top-right, visible on hover */}
+            {onItemRetry && !isFailed && isLoaded && (
+              <button
+                data-redo-btn
+                onClick={(e) => { e.stopPropagation(); onItemRetry(index); }}
+                title="Regenerate this image"
+                style={{
+                  position: 'absolute',
+                  top: '0.375rem',
+                  right: '0.375rem',
+                  zIndex: 3,
+                  background: 'rgba(0, 0, 0, 0.55)',
+                  backdropFilter: 'blur(4px)',
+                  WebkitBackdropFilter: 'blur(4px)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '1.75rem',
+                  height: '1.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  opacity: 0,
+                  transition: 'opacity 0.2s, transform 0.2s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'scale(1.1)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = '0'; e.currentTarget.style.transform = 'scale(1)'; }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M1 4v6h6" />
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                </svg>
+              </button>
             )}
 
           </button>
