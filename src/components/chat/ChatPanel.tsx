@@ -10,7 +10,7 @@ import type { UseChatResult } from '@/hooks/useChat';
 import type { UIChatMessage } from '@/types/chat';
 import type { UploadedFile } from '@/tools/types';
 import { QUALITY_PRESETS, type QualityTier } from '@/config/qualityPresets';
-import { generateSuggestions, EDIT_INTENT_SUGGESTIONS } from '@/utils/chatSuggestions';
+import { generateSuggestions, EDIT_INTENT_SUGGESTIONS, type Suggestion } from '@/utils/chatSuggestions';
 import { FullscreenMediaViewer, type MediaItem } from '@/components/FullscreenMediaViewer';
 import { getImage } from '@/utils/galleryDB';
 import { useLayout } from '@/layouts/AppLayout';
@@ -26,6 +26,9 @@ import { IntentCaptureCard } from './IntentCaptureCard';
 
 /** Number of messages to show per pagination page */
 const PAGE_SIZE = 40;
+
+/** Stable empty array — avoids creating new [] references that break useEffect dep comparison */
+const EMPTY_SUGGESTIONS: Suggestion[] = [];
 
 interface ChatPanelProps {
   sogniClient: SogniClient | null;
@@ -264,13 +267,16 @@ export function ChatPanel({
 
   const suggestions = useMemo(
     () => {
-      if (isLoading) return [];
+      // Return a stable reference during loading — returning a new [] on every
+      // recomputation caused the auto-scroll useEffect to fire on every single
+      // tool progress update (Object.is([], []) === false), rubber-banding the user.
+      if (isLoading) return EMPTY_SUGGESTIONS;
 
       // Upload-intent overrides only apply before any tool has completed.
       // Once a tool runs, defer to generateSuggestions() for tool-contextual chips.
       const hasCompletedTool = messages.some(m => m.role === 'assistant' && m.lastCompletedTool);
       if (!hasCompletedTool) {
-        if (uploadIntent === 'restore' && imageData) return [];
+        if (uploadIntent === 'restore' && imageData) return EMPTY_SUGGESTIONS;
         if (uploadIntent === 'edit' && imageData) return EDIT_INTENT_SUGGESTIONS;
         // For video intent, use analysis suggestions directly (skip restoration preset chips)
         if (uploadIntent === 'video' && imageData && analysisSuggestions && analysisSuggestions.length > 0) {
@@ -283,20 +289,40 @@ export function ChatPanel({
     [messages, isLoading, analysisSuggestions, imageData, uploadIntent, hasPersonas, hasAudio],
   );
 
+  // ── Scroll management ──────────────────────────────────────────────
+  // Three-layer defense against rubber-banding during batch tool progress:
+  //
+  // Layer 1 (above): suggestions useMemo returns EMPTY_SUGGESTIONS during
+  //   loading, so the auto-scroll useEffect's dep doesn't change on every
+  //   progress update.
+  //
+  // Layer 2: userScrolledAwayRef — a latch that blocks ALL auto-scroll the
+  //   moment the user scrolls upward. Only resets when they voluntarily
+  //   return to within 10px of the bottom.
+  //
+  // Layer 3: isToolExecuting guard in the auto-scroll effect — even if an
+  //   effect fires, it won't scroll during active tool execution.
+
+  const userScrolledAwayRef = useRef(false);
+  const lastProgrammaticScrollTimeRef = useRef(0);
+  const lastScrollTopRef = useRef(0);
+
+  // Wrapper for all programmatic scroll-to-bottom calls. Marks the scroll
+  // as programmatic so the scroll handler doesn't misinterpret it as user intent.
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'instant') => {
+    lastProgrammaticScrollTimeRef.current = Date.now();
+    messagesEndRef.current?.scrollIntoView({ behavior });
+  }, []);
+
   // Track whether the user is actively touching/dragging the scroll area.
-  // While dragging, all programmatic scroll-to-bottom is suppressed so progress
-  // events (video rendering, etc.) don't yank the viewport away from the user.
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
     const onPointerDown = () => { isUserDraggingRef.current = true; };
     const onPointerUp = () => {
       isUserDraggingRef.current = false;
-      // Sync near-bottom state immediately so the stale value from before
-      // the drag doesn't let a queued auto-scroll fire before the next
-      // scroll event naturally updates it.
-      isUserNearBottomRef.current =
-        container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+      const distFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+      isUserNearBottomRef.current = distFromBottom < 150;
     };
     container.addEventListener('pointerdown', onPointerDown);
     container.addEventListener('pointerup', onPointerUp);
@@ -308,24 +334,61 @@ export function ChatPanel({
     };
   }, []);
 
-  const shouldAutoScroll = () => isUserNearBottomRef.current && !isUserDraggingRef.current;
+  const shouldAutoScroll = () =>
+    isUserNearBottomRef.current && !isUserDraggingRef.current && !userScrolledAwayRef.current;
 
-  // Smart auto-scroll — only for new messages or active LLM text streaming,
-  // NOT for tool progress updates (which would rubber-band when user scrolls up).
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const currentTop = container.scrollTop;
+    const distFromBottom = container.scrollHeight - currentTop - container.clientHeight;
+
+    // Ignore scroll events caused by our own scrollIntoView calls
+    const isProgrammatic = Date.now() - lastProgrammaticScrollTimeRef.current < 150;
+
+    if (!isProgrammatic) {
+      // Detect user scrolling up (5px hysteresis to ignore sub-pixel noise)
+      if (currentTop < lastScrollTopRef.current - 5) {
+        userScrolledAwayRef.current = true;
+      }
+      // Reset only when user voluntarily returns to the very bottom
+      if (distFromBottom < 10) {
+        userScrolledAwayRef.current = false;
+      }
+    }
+
+    lastScrollTopRef.current = currentTop;
+    // Update near-bottom state (skip during active drag — pointerup handler syncs it)
+    if (!isUserDraggingRef.current) {
+      isUserNearBottomRef.current = distFromBottom < 150;
+    }
+  }, []);
+
+  // Auto-scroll for new messages (message count changes)
   const messageCount = messages.length;
   const hasStreamingMessage = messages.some((m) => m.isStreaming);
+  const isToolExecuting = messages.some((m) => m.isStreaming && m.toolProgress != null);
   useEffect(() => {
+    if (messageCount === prevMessageCountRef.current) return;
+    prevMessageCountRef.current = messageCount;
     if (!shouldAutoScroll()) return;
-    const isNewMessage = messageCount !== prevMessageCountRef.current;
-    if (isNewMessage || hasStreamingMessage) {
-      prevMessageCountRef.current = messageCount;
-      messagesEndRef.current?.scrollIntoView({ behavior: isNewMessage ? 'smooth' : 'instant' });
-    }
-  }, [messageCount, hasStreamingMessage, suggestions]);
+    scrollToBottom('smooth');
+  }, [messageCount, scrollToBottom]);
+
+  // Auto-scroll during LLM text streaming. Runs after every render while
+  // the model is actively generating text (NOT during tool execution).
+  // Uses useLayoutEffect to scroll before paint, avoiding visual jank.
+  useLayoutEffect(() => {
+    if (!hasStreamingMessage) return;
+    if (isToolExecuting) return;
+    if (!shouldAutoScroll()) return;
+    scrollToBottom('instant');
+  });
 
   // ResizeObserver-based auto-scroll — maintain scroll position when content
-  // grows (e.g. new messages, images loading). Skipped during tool execution
-  // to prevent rubber-banding when the user scrolls up during rendering.
+  // grows (e.g. images loading, suggestions appearing). Skipped during tool
+  // execution to prevent rubber-banding.
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -333,22 +396,13 @@ export function ChatPanel({
     const observer = new ResizeObserver(() => {
       const newHeight = container.scrollHeight;
       if (newHeight > prevHeight && shouldAutoScroll() && !isLoading) {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+        scrollToBottom('instant');
       }
       prevHeight = newHeight;
     });
     observer.observe(container);
     return () => observer.disconnect();
-  }, [isLoading]);
-
-  const handleScroll = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    // Don't update near-bottom state from programmatic scrolls while user is dragging
-    if (isUserDraggingRef.current) return;
-    isUserNearBottomRef.current =
-      container.scrollHeight - container.scrollTop - container.clientHeight < 150;
-  }, []);
+  }, [isLoading, scrollToBottom]);
 
   useEffect(() => {
     onLoadingChange?.(isLoading);

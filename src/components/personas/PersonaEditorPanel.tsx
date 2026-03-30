@@ -8,7 +8,7 @@ import type { SogniClient } from '@sogni-ai/sogni-client';
 import type { Persona } from '@/types/userData';
 import type { TokenType } from '@/types/wallet';
 import { sendVisionAnalysis } from '@/services/chatService';
-import { resizeUint8ArrayForVision } from '@/utils/imageProcessing';
+import { resizeUint8ArrayForVision, needsTranscoding, transcodeIfNeeded } from '@/utils/imageProcessing';
 import { PersonaAvatar } from './PersonaAvatar';
 import { VoiceClipManager } from './VoiceClipManager';
 
@@ -501,17 +501,42 @@ export function PersonaEditorPanel({
 
   const handlePhotoSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith('image/')) return;
+    if (!file) return;
+
+    // Check MIME type with extension fallback (browsers often report empty MIME for HEIC)
+    const ext = file.name?.toLowerCase().split('.').pop();
+    const isImage = file.type.startsWith('image/') ||
+      ['jpg', 'jpeg', 'png', 'webp', 'heif', 'heic', 'avif'].includes(ext || '');
+    if (!isImage) return;
+
+    // Reset input so same file can be selected again
+    e.target.value = '';
+
+    // Transcode HEIC/HEIF/AVIF/WebP server-side (browsers can't decode most of these)
+    let imageFile = file;
+    let knownWidth: number | undefined;
+    let knownHeight: number | undefined;
+    if (needsTranscoding(file)) {
+      try {
+        const result = await transcodeIfNeeded(file);
+        imageFile = result.file;
+        knownWidth = result.width;
+        knownHeight = result.height;
+      } catch (err) {
+        console.error('[PERSONA EDITOR] Failed to transcode image:', err);
+        return;
+      }
+    }
 
     // Read and resize to max 1024px
     const img = new Image();
-    const url = URL.createObjectURL(file);
+    const url = URL.createObjectURL(imageFile);
 
     img.onload = () => {
       URL.revokeObjectURL(url);
       const maxDim = 1024;
-      let w = img.width;
-      let h = img.height;
+      let w = knownWidth || img.width;
+      let h = knownHeight || img.height;
       if (w > maxDim || h > maxDim) {
         const scale = maxDim / Math.max(w, h);
         w = Math.round(w * scale);
@@ -555,8 +580,6 @@ export function PersonaEditorPanel({
     };
 
     img.src = url;
-    // Reset input so same file can be selected again
-    e.target.value = '';
   }, []);
 
   const handleAddTag = useCallback(() => {

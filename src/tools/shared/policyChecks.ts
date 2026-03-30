@@ -48,9 +48,10 @@ export function checkPersonaPolicy(
     hasUploadedImages: boolean;
   },
 ): PolicyCheckResult {
-  // Check both prompt and imagePrompt — tools may use either field name.
-  // Concatenate (don't short-circuit) so persona names in either field are caught.
-  const promptText = [String(args.prompt || ''), String(args.imagePrompt || '')].join(' ').toLowerCase();
+  // Only check args.prompt — this is the field all image/video tools use for creative prompts.
+  // (dance_montage has a separate imagePrompt field but it's a style fallback, not user-facing
+  // persona input, and the chatService guardrail only inspects args.prompt.)
+  const promptText = String(args.prompt || '').toLowerCase();
 
   // If persona photos are loaded and user is trying generate_image, redirect to edit_image.
   // This fires for ALL generate_image calls when photos are loaded — by design, personas
