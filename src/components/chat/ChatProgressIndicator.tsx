@@ -308,6 +308,8 @@ interface ChatProgressIndicatorProps {
   onMediaClick?: (index: number, mediaType: 'image' | 'video' | 'audio') => void;
   /** When true, skip the visual grid (videos are rendered by ChatVideoResults) */
   hideVideoGrid?: boolean;
+  /** Called when user clicks the redo button on a specific slot */
+  onItemRetry?: (jobIndex: number) => void;
 }
 
 const TOOL_LABELS: Record<string, string> = {
@@ -332,6 +334,7 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
   onCancel,
   onMediaClick,
   hideVideoGrid,
+  onItemRetry,
 }: ChatProgressIndicatorProps) {
   const label = progress.stepLabel || TOOL_LABELS[progress.toolName] || 'Processing';
   const percentage = progress.progress ? Math.round(progress.progress * 100) : 0;
@@ -455,10 +458,14 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
                 onMouseEnter={isCompleted && onMediaClick ? (e) => {
                   e.currentTarget.style.borderColor = 'var(--color-accent)';
                   e.currentTarget.style.transform = 'scale(1.02)';
+                  const redoBtn = e.currentTarget.querySelector('[data-redo-btn]') as HTMLElement | null;
+                  if (redoBtn) redoBtn.style.opacity = '1';
                 } : undefined}
                 onMouseLeave={isCompleted && onMediaClick ? (e) => {
                   e.currentTarget.style.borderColor = 'var(--color-border)';
                   e.currentTarget.style.transform = 'scale(1)';
+                  const redoBtn = e.currentTarget.querySelector('[data-redo-btn]') as HTMLElement | null;
+                  if (redoBtn) redoBtn.style.opacity = '0';
                 } : undefined}
               >
                 {/* Completed video result — render inline player */}
@@ -543,6 +550,41 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
                   />
                 )}
 
+                {/* Redo button on completed results */}
+                {resultUrl && !isCompletedVideo && onItemRetry && (
+                  <button
+                    data-redo-btn
+                    onClick={(e) => { e.stopPropagation(); onItemRetry(i); }}
+                    title="Regenerate this result"
+                    style={{
+                      position: 'absolute',
+                      top: '0.375rem',
+                      right: '0.375rem',
+                      zIndex: 3,
+                      background: 'rgba(0, 0, 0, 0.55)',
+                      backdropFilter: 'blur(4px)',
+                      WebkitBackdropFilter: 'blur(4px)',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '1.75rem',
+                      height: '1.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      opacity: 0,
+                      transition: 'opacity 0.2s, transform 0.2s',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'scale(1.1)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '0'; e.currentTarget.style.transform = 'scale(1)'; }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 4v6h6" />
+                      <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                    </svg>
+                  </button>
+                )}
+
                 {/* Overlay for failed jobs */}
                 {!resultUrl && jobError && (
                   <div
@@ -573,6 +615,26 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
                     >
                       Failed
                     </span>
+                    {onItemRetry && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onItemRetry(i); }}
+                        style={{
+                          fontSize: '0.6875rem',
+                          fontWeight: 600,
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '12px',
+                          background: 'rgba(255, 255, 255, 0.15)',
+                          border: '1px solid rgba(255, 255, 255, 0.3)',
+                          color: '#fff',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'; }}
+                      >
+                        Retry
+                      </button>
+                    )}
                   </div>
                 )}
 
