@@ -2177,8 +2177,8 @@ export function useChat(): UseChatResult {
           setUIMessages(prev => prev.map(msg => {
             if (msg.id !== messageId) return msg;
             // Replace the result at jobIndex
-            let updatedImageResults = msg.imageResults ? [...msg.imageResults] : undefined;
-            let updatedVideoResults = msg.videoResults ? [...msg.videoResults] : undefined;
+            const updatedImageResults = msg.imageResults ? [...msg.imageResults] : undefined;
+            const updatedVideoResults = msg.videoResults ? [...msg.videoResults] : undefined;
 
             if (isVideoTool && updatedVideoResults) {
               updatedVideoResults[jobIndex] = newUrl;
@@ -2209,8 +2209,8 @@ export function useChat(): UseChatResult {
           // Update gallery IDs at the correct index on the existing message
           setUIMessages(prev => prev.map(msg => {
             if (msg.id !== messageId) return msg;
-            let updatedGalleryImageIds = msg.galleryImageIds ? [...msg.galleryImageIds] : undefined;
-            let updatedGalleryVideoIds = msg.galleryVideoIds ? [...msg.galleryVideoIds] : undefined;
+            const updatedGalleryImageIds = msg.galleryImageIds ? [...msg.galleryImageIds] : undefined;
+            const updatedGalleryVideoIds = msg.galleryVideoIds ? [...msg.galleryVideoIds] : undefined;
 
             if (galleryImageIds.length > 0 && updatedGalleryImageIds) {
               updatedGalleryImageIds[jobIndex] = galleryImageIds[0];
