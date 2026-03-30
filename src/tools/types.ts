@@ -116,6 +116,10 @@ export interface ToolExecutionProgress {
   estimatedCost?: number;
   /** URL of the source image being processed (for placeholder display) */
   sourceImageUrl?: string;
+  /** URLs of additional context images used (for multi-image placeholder display, e.g. persona + source) */
+  contextImageUrls?: string[];
+  /** URL of the end-frame image when frameRole is "both" (for dual-frame video placeholder) */
+  endFrameImageUrl?: string;
   /** Sub-step label shown during multi-phase operations (e.g. "Analyzing image...") */
   stepLabel?: string;
   /** Per-job label for concurrent operations (stored into perJobProgress[i].label) */
