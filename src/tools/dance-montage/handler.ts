@@ -503,6 +503,14 @@ export async function execute(
           // the tool registry, because we need to inject per-invocation context
           // (different source images and the dance reference video into uploadedFiles).
 
+          // Create blob URLs for each segment's source image (for blurred preloader backgrounds)
+          const segmentImageUrls: string[] = [];
+          for (let j = 0; j < segmentCount; j++) {
+            const img = imageForSegment[j];
+            const blob = new Blob([img.data.buffer as ArrayBuffer], { type: img.mimeType });
+            segmentImageUrls.push(URL.createObjectURL(blob));
+          }
+
           stepCallbacks.onToolProgress({
             type: 'started',
             toolName: 'dance_montage',
@@ -522,6 +530,9 @@ export async function execute(
               totalCount: segmentCount,
               completedCount: 0,
               videoAspectRatio,
+              perJobProgress: {
+                [j]: { sourceImageUrl: segmentImageUrls[j] },
+              },
             });
           }
 

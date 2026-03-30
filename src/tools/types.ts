@@ -148,6 +148,8 @@ export interface ToolExecutionProgress {
     label?: string;
     /** When set, the UI should show a retry button that calls triggerRetry(retryKey) */
     retryKey?: string;
+    /** Per-job source image URL for blurred placeholder background */
+    sourceImageUrl?: string;
   }>;
 }
 
