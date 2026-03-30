@@ -130,6 +130,12 @@ export interface ToolExecutionProgress {
   modelName?: string;
   /** Persona names referenced during this tool execution (for UI indicator) */
   referencedPersonas?: string[];
+  /** When set, show a confirm/proceed button. UI calls triggerRetry(confirmKey) on click. */
+  confirmKey?: string;
+  /** Label for the confirm button (e.g. "Stitch Montage"). Defaults to "Confirm". */
+  confirmLabel?: string;
+  /** Descriptive text shown alongside the confirm button (e.g. "Redo clips you want to change.") */
+  confirmDescription?: string;
   /** Accumulated per-job progress for multi-job operations (keyed by jobIndex) */
   perJobProgress?: Record<number, {
     progress?: number;

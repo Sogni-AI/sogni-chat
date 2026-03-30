@@ -879,11 +879,17 @@ export const ChatVideoResults = memo(function ChatVideoResults({
                 }}
                 onError={() => handleError(index)}
               />
-              {/* Redo button on completed video thumbnails */}
-              {onItemRetry && !isRetrying && (
+              {/* Redo button on completed video thumbnails.
+                  During review (retryKey present): use retryBus so the live handler regenerates.
+                  After completion (no retryKey): use onItemRetry for post-completion redo. */}
+              {(jobData?.retryKey || onItemRetry) && !isRetrying && (
                 <button
                   data-redo-btn
-                  onClick={(e) => { e.stopPropagation(); onItemRetry(index); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (jobData?.retryKey) triggerRetry(jobData.retryKey);
+                    else onItemRetry?.(index);
+                  }}
                   title="Regenerate this video"
                   style={{
                     position: 'absolute',

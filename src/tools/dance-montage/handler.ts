@@ -710,6 +710,132 @@ export async function execute(
             // If retry failed again, loop continues — shows retry button again
           }
 
+          // -----------------------------------------------------------------
+          // Review phase: let the user preview clips and redo any before stitching.
+          // Single-segment dances skip review — no stitching needed.
+          // -----------------------------------------------------------------
+          if (segmentCount > 1) {
+            console.log(`[DANCE MONTAGE] Entering review phase — ${segmentCount} clips ready`);
+
+            // Single abort promise shared across all review iterations to avoid
+            // accumulating orphaned abort listeners on ctx.signal.
+            const abortPromise = new Promise<never>((_, reject) => {
+              if (ctx.signal?.aborted) reject(new Error('Cancelled'));
+              else ctx.signal?.addEventListener('abort', () => reject(new Error('Cancelled')), { once: true });
+            });
+
+            let reviewing = true;
+            while (reviewing) {
+              if (ctx.signal?.aborted) throw new Error('Cancelled');
+
+              const ts = Date.now();
+              const confirmKey = `${ctx.sessionId}-dance-confirm-${ts}`;
+              const redoKeys = Array.from({ length: segmentCount }, (_, i) =>
+                `${ctx.sessionId}-dance-redo-${i}-${ts}`,
+              );
+
+              // Build per-job progress showing every completed clip with a redo key
+              const reviewPerJob: Record<number, {
+                resultUrl?: string;
+                isVideo?: boolean;
+                progress?: number;
+                retryKey?: string;
+                label?: string;
+              }> = {};
+              for (let i = 0; i < segmentCount; i++) {
+                reviewPerJob[i] = {
+                  resultUrl: slotResults[i].videoUrls[0],
+                  isVideo: true,
+                  progress: 1,
+                  retryKey: redoKeys[i],
+                  label: `Clip ${i + 1}`,
+                };
+              }
+
+              stepCallbacks.onToolProgress({
+                type: 'progress',
+                toolName: 'dance_montage',
+                stepLabel: 'Review clips',
+                totalCount: segmentCount,
+                completedCount: segmentCount,
+                videoAspectRatio,
+                confirmKey,
+                confirmLabel: 'Stitch Montage',
+                confirmDescription: 'Tap any clip to preview. Redo clips you want to change.',
+                perJobProgress: reviewPerJob,
+              });
+
+              // Wait for either confirm (stitch) or redo (regenerate a clip)
+              const action = await Promise.race([
+                onRetry(confirmKey).then(() => ({ type: 'confirm' as const, index: -1 })),
+                ...redoKeys.map((key, i) =>
+                  onRetry(key).then(() => ({ type: 'redo' as const, index: i })),
+                ),
+                abortPromise,
+              ]);
+
+              // Clean up all pending listeners
+              cancelRetry(confirmKey);
+              for (const key of redoKeys) cancelRetry(key);
+
+              if (action.type === 'confirm') {
+                console.log('[DANCE MONTAGE] User confirmed — proceeding to stitch');
+                reviewing = false;
+              } else {
+                const redoIdx = action.index;
+                console.log(`[DANCE MONTAGE] User requested redo for clip ${redoIdx + 1}`);
+
+                // Clear retryKeys on ALL slots and confirmKey to prevent non-functional
+                // buttons while the redo is in progress.
+                const redoPerJob: Record<number, {
+                  progress?: number;
+                  label?: string;
+                  retryKey?: string;
+                }> = {};
+                for (let i = 0; i < segmentCount; i++) {
+                  redoPerJob[i] = i === redoIdx
+                    ? { progress: 0, label: `Redoing clip ${redoIdx + 1}...`, retryKey: undefined }
+                    : { retryKey: undefined };
+                }
+
+                stepCallbacks.onToolProgress({
+                  type: 'progress',
+                  toolName: 'dance_montage',
+                  stepLabel: 'Regenerating clip',
+                  totalCount: segmentCount,
+                  completedCount: segmentCount - 1,
+                  videoAspectRatio,
+                  confirmKey: undefined,
+                  confirmLabel: undefined,
+                  perJobProgress: redoPerJob,
+                });
+
+                // Regenerate the single clip
+                const redoResult = await Promise.allSettled([generateClip(redoIdx)]);
+                if (redoResult[0].status === 'rejected') {
+                  console.warn(`[DANCE MONTAGE] Redo of clip ${redoIdx + 1} failed:`, redoResult[0].reason);
+                  // Keep the previous clip — loop back to review with it still shown
+                }
+                completedCount = segmentCount; // all slots filled again
+                // Loop back to review state
+              }
+            }
+
+            // Clear review UI state before proceeding to stitch. The stitch step's
+            // progress events don't include confirmKey, so without this explicit clear
+            // the "Stitch Montage" button would persist via the progress merge spread.
+            stepCallbacks.onToolProgress({
+              type: 'progress',
+              toolName: 'dance_montage',
+              stepLabel: 'Preparing to stitch...',
+              totalCount: segmentCount,
+              completedCount: segmentCount,
+              videoAspectRatio,
+              confirmKey: undefined,
+              confirmLabel: undefined,
+            });
+          }
+
           return slotResults;
         },
         collectResults: (state, results) => {

@@ -9,6 +9,7 @@ import { formatCredits } from '@/services/creditsService';
 import { useTokenPrice } from '@/hooks/useTokenPrice';
 import { activeVideos, pauseOtherVideos, isFullscreenOpen, markAutoPlay, consumeAutoPlay, formatETA } from './videoCoordination';
 import { PersonaReferenceIndicator } from '@/components/personas/PersonaReferenceIndicator';
+import { triggerRetry } from '@/services/retryBus';
 
 /** Shared style for progress video control buttons */
 const progressControlBtnStyle: React.CSSProperties = {
@@ -823,6 +824,49 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
         {/* Persona reference indicator */}
         {progress.referencedPersonas && progress.referencedPersonas.length > 0 && (
           <PersonaReferenceIndicator personaNames={progress.referencedPersonas} />
+        )}
+
+        {/* Confirm action bar — e.g. "Stitch Montage" during review phase */}
+        {progress.confirmKey && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.5rem 0.75rem',
+              background: 'var(--color-bg-elevated)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '0.75rem',
+            }}
+          >
+            <span style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>
+              {progress.confirmDescription || 'Review results, then confirm to proceed.'}
+            </span>
+            <button
+              onClick={() => triggerRetry(progress.confirmKey!)}
+              style={{
+                background: 'var(--color-accent)',
+                border: 'none',
+                color: 'white',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                padding: '0.375rem 1rem',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.filter = 'brightness(1.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.filter = 'none';
+              }}
+            >
+              {progress.confirmLabel || 'Confirm'}
+            </button>
+          </div>
         )}
 
         {/* Batch summary bar — project-level cost + cancel for multi-item jobs */}
