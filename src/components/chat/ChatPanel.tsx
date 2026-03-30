@@ -73,6 +73,8 @@ interface ChatPanelProps {
   onBranchChat?: (message: UIChatMessage) => void;
   /** Called when user clicks "Try again" or switches model in media actions menu */
   onRetry?: (message: UIChatMessage, modelKey?: string) => void;
+  /** Called when user clicks redo on a specific result slot */
+  onItemRetry?: (messageId: string, jobIndex: number) => void;
   /** Whether the user has any saved personas (for suggestion chip selection) */
   hasPersonas?: boolean;
   /** Personalized welcome heading (e.g. "Evening, Mark!") */
@@ -212,6 +214,7 @@ export function ChatPanel({
   getPreviewUrl,
   onBranchChat,
   onRetry,
+  onItemRetry,
   hasPersonas,
   welcomeGreeting,
   onAddPersona,
@@ -899,6 +902,7 @@ export function ChatPanel({
                 downloadSlug={downloadSlug}
                 onBranchChat={onBranchChat}
                 onRetry={onRetry}
+                onItemRetry={onItemRetry}
               />
             );
           })}

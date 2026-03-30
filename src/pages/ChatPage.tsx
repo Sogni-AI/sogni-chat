@@ -1094,6 +1094,27 @@ export default function ChatPage() {
     }, modelKey);
   }, [chat, getSogniClient, imageData, width, height, tokenType, balances, qualityTier, safeContentFilter, setSafeContentFilter, requestDisableContentFilter, uploadedFiles, handleTokenSwitch, handleInsufficientCredits, selectedModelVariant]);
 
+  /** Retry a single item (image/video slot) in an existing result message */
+  const handleItemRetry = useCallback(async (messageId: string, jobIndex: number) => {
+    const client = getSogniClient();
+    if (!client) return;
+    await chat.handleItemRetry(messageId, jobIndex, {
+      sogniClient: client,
+      imageData,
+      width,
+      height,
+      tokenType,
+      balances,
+      qualityTier,
+      safeContentFilter,
+      onContentFilterChange: setSafeContentFilter,
+      requestDisableContentFilter,
+      uploadedFiles,
+      onTokenSwitch: handleTokenSwitch,
+      onInsufficientCredits: handleInsufficientCredits,
+    });
+  }, [chat, getSogniClient, imageData, width, height, tokenType, balances, qualityTier, safeContentFilter, setSafeContentFilter, requestDisableContentFilter, uploadedFiles, handleTokenSwitch, handleInsufficientCredits]);
+
   const sogniClient = getSogniClient();
 
   const handleAddPersona = useCallback(() => {
@@ -1241,6 +1262,7 @@ export default function ChatPage() {
               getPreviewUrl={getPreviewUrl}
               onBranchChat={handleBranchChat}
               onRetry={handleRetry}
+              onItemRetry={handleItemRetry}
             />
           </div>
         </div>

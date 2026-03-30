@@ -88,6 +88,26 @@ export interface UseChatResult {
   pendingRefusal: boolean;
   /** Update the welcome message with personalized context (user name, personas) */
   updateWelcome: (ctx: { userName?: string | null; hasPersonas?: boolean; hasImage?: boolean }) => void;
+  /** Retry a single item (image/video slot) in an existing result message in-place */
+  handleItemRetry: (
+    messageId: string,
+    jobIndex: number,
+    context: {
+      sogniClient: SogniClient;
+      imageData: Uint8Array | null;
+      width: number;
+      height: number;
+      tokenType: TokenType;
+      balances: Balances | null;
+      qualityTier?: 'fast' | 'hq' | 'pro';
+      safeContentFilter?: boolean;
+      onContentFilterChange?: (enabled: boolean) => void;
+      requestDisableContentFilter?: () => Promise<boolean>;
+      uploadedFiles?: UploadedFile[];
+      onTokenSwitch?: (newType: TokenType) => void;
+      onInsufficientCredits?: () => void;
+    },
+  ) => Promise<void>;
   /** Retry a tool execution directly with optional model override */
   retryToolExecution: (
     message: UIChatMessage,
@@ -1999,6 +2019,232 @@ export function useChat(): UseChatResult {
     [], // No dependencies needed - all mutable state accessed via refs/stable setters
   );
 
+  /**
+   * Retry a SINGLE item (image/video slot) in an existing result message.
+   * Unlike retryToolExecution, this does NOT create new user/assistant messages —
+   * it modifies the existing message in-place, replacing the result at `jobIndex`.
+   * Empty deps array is intentional: all mutable state accessed via refs/stable setters.
+   */
+  const handleItemRetry = useCallback(
+    async (
+      messageId: string,
+      jobIndex: number,
+      context: {
+        sogniClient: SogniClient;
+        imageData: Uint8Array | null;
+        width: number;
+        height: number;
+        tokenType: TokenType;
+        balances: Balances | null;
+        qualityTier?: 'fast' | 'hq' | 'pro';
+        safeContentFilter?: boolean;
+        onContentFilterChange?: (enabled: boolean) => void;
+        requestDisableContentFilter?: () => Promise<boolean>;
+        uploadedFiles?: UploadedFile[];
+        onTokenSwitch?: (newType: TokenType) => void;
+        onInsufficientCredits?: () => void;
+      },
+    ) => {
+      // Find the target message
+      let targetMessage: UIChatMessage | undefined;
+      setUIMessages(prev => {
+        targetMessage = prev.find(m => m.id === messageId);
+        return prev; // no mutation — just reading
+      });
+      if (!targetMessage) {
+        console.warn('[CHAT HOOK] handleItemRetry: message not found', messageId);
+        return;
+      }
+
+      const effectiveToolName = targetMessage.lastCompletedTool as ToolName;
+      const toolArgs = targetMessage.toolArgs;
+      if (!effectiveToolName || !toolArgs) {
+        console.warn('[CHAT HOOK] handleItemRetry: no tool name or args on message', messageId);
+        return;
+      }
+
+      // Force single variation
+      const modifiedArgs = { ...toolArgs, numberOfVariations: 1 };
+
+      // Set up progress on JUST the target slot
+      setUIMessages(prev => prev.map(msg => {
+        if (msg.id !== messageId) return msg;
+        return {
+          ...msg,
+          toolProgress: {
+            type: 'progress' as const,
+            toolName: effectiveToolName,
+            totalCount: msg.imageResults?.length || msg.videoResults?.length || 1,
+            perJobProgress: {
+              [jobIndex]: { progress: 0, label: 'Retrying...' },
+            },
+          },
+        };
+      }));
+
+      const itemAbortController = new AbortController();
+      const controllersSet = toolAbortControllersRef.current;
+      controllersSet.add(itemAbortController);
+
+      const executionContext: ToolExecutionContext = {
+        sogniClient: context.sogniClient,
+        imageData: context.imageData,
+        width: context.width,
+        height: context.height,
+        tokenType: context.tokenType,
+        uploadedFiles: context.uploadedFiles || [],
+        get resultUrls() { return allResultUrlsRef.current; },
+        get audioResultUrls() { return audioResultUrlsRef.current; },
+        get videoResultUrls() { return allVideoUrlsRef.current; },
+        balances: context.balances,
+        qualityTier: context.qualityTier,
+        safeContentFilter: context.safeContentFilter,
+        onContentFilterChange: context.onContentFilterChange,
+        requestDisableContentFilter: context.requestDisableContentFilter,
+        onTokenSwitch: context.onTokenSwitch,
+        onInsufficientCredits: context.onInsufficientCredits,
+        signal: itemAbortController.signal,
+        model: sessionModelRef.current,
+        think: false,
+        sessionId: sessionIdRef.current || '',
+      };
+
+      // Re-inject persona reference photos if the original generation used them
+      const referencedPersonas = targetMessage.referencedPersonas;
+      if (referencedPersonas && referencedPersonas.length > 0) {
+        try {
+          const { getPersonasByNames } = await import('@/utils/userDataDB');
+          const personas = await getPersonasByNames(referencedPersonas);
+          executionContext.uploadedFiles = executionContext.uploadedFiles.filter(
+            f => !f.filename?.startsWith('persona-'),
+          );
+          for (const persona of personas) {
+            const photoToUse = persona.referencePhotoData || persona.photoData;
+            if (photoToUse) {
+              executionContext.uploadedFiles.push({
+                type: 'image' as const,
+                data: photoToUse,
+                width: persona.referencePhotoData ? undefined : (persona.photoWidth || undefined),
+                height: persona.referencePhotoData ? undefined : (persona.photoHeight || undefined),
+                mimeType: persona.photoMimeType || 'image/jpeg',
+                filename: `persona-${persona.name.toLowerCase().replace(/\s+/g, '-')}.jpg`,
+              });
+            }
+            if (persona.voiceClipData && persona.voiceClipMimeType) {
+              executionContext.uploadedFiles.push({
+                type: 'audio' as const,
+                data: persona.voiceClipData,
+                mimeType: persona.voiceClipMimeType,
+                filename: `persona-voiceclip-${persona.name.toLowerCase().replace(/\s+/g, '-')}`,
+                duration: persona.voiceClipDuration || undefined,
+              });
+            }
+          }
+          console.log(`[CHAT HOOK] Re-injected ${personas.length} persona photos/voice clips for item retry`);
+        } catch (err) {
+          console.warn('[CHAT HOOK] Failed to re-inject persona photos for item retry:', err);
+        }
+      }
+
+      const callbacks: ToolCallbacks = {
+        onToolProgress: (progress) => {
+          if (itemAbortController.signal.aborted) return;
+          setUIMessages(prev => prev.map(msg => {
+            if (msg.id !== messageId) return msg;
+            const prevPerJob = msg.toolProgress?.perJobProgress || {};
+            return {
+              ...msg,
+              toolProgress: {
+                ...msg.toolProgress!,
+                perJobProgress: {
+                  ...prevPerJob,
+                  [jobIndex]: {
+                    ...prevPerJob[jobIndex],
+                    progress: progress.progress ?? prevPerJob[jobIndex]?.progress,
+                    etaSeconds: progress.etaSeconds ?? prevPerJob[jobIndex]?.etaSeconds,
+                    label: progress.jobLabel ?? prevPerJob[jobIndex]?.label,
+                  },
+                },
+              },
+            };
+          }));
+        },
+        onToolComplete: (_completedToolName, resultUrls, videoResultUrls) => {
+          if (itemAbortController.signal.aborted) return;
+          const isVideoTool = !!videoResultUrls && videoResultUrls.length > 0;
+          const newUrl = isVideoTool ? videoResultUrls[0] : resultUrls[0];
+
+          setUIMessages(prev => prev.map(msg => {
+            if (msg.id !== messageId) return msg;
+            // Replace the result at jobIndex
+            let updatedImageResults = msg.imageResults ? [...msg.imageResults] : undefined;
+            let updatedVideoResults = msg.videoResults ? [...msg.videoResults] : undefined;
+
+            if (isVideoTool && updatedVideoResults) {
+              updatedVideoResults[jobIndex] = newUrl;
+            } else if (!isVideoTool && updatedImageResults) {
+              updatedImageResults[jobIndex] = newUrl;
+            }
+
+            return {
+              ...msg,
+              imageResults: updatedImageResults,
+              videoResults: updatedVideoResults,
+              toolProgress: null,
+            };
+          }));
+
+          // Update global result URL refs
+          if (newUrl) {
+            if (isVideoTool) {
+              allVideoUrlsRef.current = [...new Set([...allVideoUrlsRef.current, newUrl])];
+            } else {
+              const combined = [...new Set([...allResultUrlsRef.current, newUrl])];
+              allResultUrlsRef.current = combined;
+              setAllResultUrls(combined);
+            }
+          }
+        },
+        onGallerySaved: (galleryImageIds, galleryVideoIds, galleryAudioIds) => {
+          // Update gallery IDs at the correct index on the existing message
+          setUIMessages(prev => prev.map(msg => {
+            if (msg.id !== messageId) return msg;
+            let updatedGalleryImageIds = msg.galleryImageIds ? [...msg.galleryImageIds] : undefined;
+            let updatedGalleryVideoIds = msg.galleryVideoIds ? [...msg.galleryVideoIds] : undefined;
+
+            if (galleryImageIds.length > 0 && updatedGalleryImageIds) {
+              updatedGalleryImageIds[jobIndex] = galleryImageIds[0];
+            }
+            if (galleryVideoIds && galleryVideoIds.length > 0 && updatedGalleryVideoIds) {
+              updatedGalleryVideoIds[jobIndex] = galleryVideoIds[0];
+            }
+
+            return {
+              ...msg,
+              galleryImageIds: updatedGalleryImageIds,
+              galleryVideoIds: updatedGalleryVideoIds,
+              galleryAudioIds: galleryAudioIds && galleryAudioIds.length > 0 ? galleryAudioIds : msg.galleryAudioIds,
+            };
+          }));
+        },
+      };
+
+      try {
+        await toolRegistry.execute(effectiveToolName, modifiedArgs, executionContext, callbacks, { skipValidation: true });
+      } catch (err: any) {
+        console.error('[CHAT HOOK] handleItemRetry failed:', err);
+        // Clear progress on error
+        setUIMessages(prev => prev.map(msg => {
+          if (msg.id !== messageId) return msg;
+          return { ...msg, toolProgress: null };
+        }));
+      } finally {
+        controllersSet.delete(itemAbortController);
+      }
+    },
+    [], // No dependencies needed - all mutable state accessed via refs/stable setters
+  );
+
   // Inject a memory-saved chip into the chat when the manage_memory tool writes
   useEffect(() => {
     const handler = (e: Event) => {
@@ -2029,6 +2275,7 @@ export function useChat(): UseChatResult {
     reset,
     cancelToolExecution,
     retryToolExecution,
+    handleItemRetry,
     getSessionState,
     loadFromSession,
     acceptModelSwitch,

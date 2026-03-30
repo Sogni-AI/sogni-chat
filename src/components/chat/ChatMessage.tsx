@@ -51,9 +51,11 @@ interface ChatMessageProps {
   onBranchChat?: (message: UIChatMessage) => void;
   /** Called when user clicks "Try again" or selects a model from media actions menu */
   onRetry?: (message: UIChatMessage, modelKey?: string) => void;
+  /** Called when user clicks redo on a specific result slot */
+  onItemRetry?: (messageId: string, jobIndex: number) => void;
 }
 
-export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImageClick, onVideoClick, onAudioClick: _onAudioClick, onProgressMediaClick, onCancelTool, onAcceptModelSwitch, onDeclineModelSwitch, downloadSlug, onBranchChat, onRetry }: ChatMessageProps) {
+export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImageClick, onVideoClick, onAudioClick: _onAudioClick, onProgressMediaClick, onCancelTool, onAcceptModelSwitch, onDeclineModelSwitch, downloadSlug, onBranchChat, onRetry, onItemRetry }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
   const isSystem = message.role === 'system';
@@ -340,7 +342,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
       {/* Tool execution progress (non-video tools — video tools render progress inline with ChatVideoResults) */}
       {message.toolProgress && !isVideoToolProgress && (
         <div style={{ maxWidth: '85%', width: '100%' }}>
-          <ChatProgressIndicator progress={message.toolProgress} imageUrl={imageUrl} onCancel={onCancelTool} onMediaClick={onProgressMediaClick} />
+          <ChatProgressIndicator progress={message.toolProgress} imageUrl={imageUrl} onCancel={onCancelTool} onMediaClick={onProgressMediaClick} onItemRetry={onItemRetry ? (index) => onItemRetry(message.id, index) : undefined} />
           <SogniTVOffer executionId={message.id} etaSeconds={message.toolProgress?.etaSeconds} />
         </div>
       )}
@@ -357,6 +359,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
               sourceImageUrl={message.sourceImageUrl || imageUrl || undefined}
               onImageClick={onImageClick}
               galleryImageIds={message.galleryImageIds}
+              onItemRetry={onItemRetry ? (index) => onItemRetry(message.id, index) : undefined}
             />
           </LazyMedia>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.25rem' }}>
@@ -392,6 +395,7 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
             perJobProgress={message.toolProgress?.perJobProgress}
             sourceImageUrl={message.toolProgress?.sourceImageUrl || message.sourceImageUrl || undefined}
             endFrameImageUrl={message.toolProgress?.endFrameImageUrl}
+            onItemRetry={onItemRetry ? (index) => onItemRetry(message.id, index) : undefined}
           />
           {/* During video progress: show summary bar (cost, cancel, completion count) */}
           {isVideoToolProgress && (
