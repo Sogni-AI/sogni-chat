@@ -31,6 +31,7 @@ import {
   needsCreativeRefinement,
   refineVideoPrompt,
   getPersonaVoiceClip,
+  uint8ArrayToDataUri,
 } from '../shared';
 import { generateVideo } from '@/services/sdk/videoGeneration';
 import { fetchVideoCostEstimate } from '@/services/creditsService';
@@ -352,7 +353,8 @@ export async function execute(
     estimatedCost = singleVideoCost * numberOfMedia;
   }
 
-  const sourceImageUrl = (effectiveSourceIndex !== undefined && context.resultUrls[effectiveSourceIndex]) || undefined;
+  const sourceImageUrl = (effectiveSourceIndex !== undefined && context.resultUrls[effectiveSourceIndex])
+    || (sourceImageData ? uint8ArrayToDataUri(sourceImageData, sourceImageMime) : undefined);
 
   // Resolve end frame URL for dual-frame placeholder (when frameRole is "both")
   let endFrameImageUrl: string | undefined;

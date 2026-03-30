@@ -221,7 +221,7 @@ export async function execute(
     ? uint8ArrayToDataUri(cappedContextImages[0].data, cappedContextImages[0].mimeType)
     : undefined;
   const contextImageUrls = cappedContextImages.length > 1
-    ? cappedContextImages.slice(0, 3).map(img => uint8ArrayToDataUri(img.data, img.mimeType))
+    ? cappedContextImages.slice(1, 3).map(img => uint8ArrayToDataUri(img.data, img.mimeType))
     : undefined;
 
   callbacks.onToolProgress({

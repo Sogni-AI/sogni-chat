@@ -393,7 +393,7 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
   const placeholderUrl = progress.sourceImageUrl || imageUrl;
   const contextImageUrls = progress.contextImageUrls;
   const endFrameImageUrl = progress.endFrameImageUrl;
-  const hasDualPlaceholder = (contextImageUrls && contextImageUrls.length >= 2) || !!endFrameImageUrl;
+  const hasDualPlaceholder = (contextImageUrls && contextImageUrls.length >= 1) || !!endFrameImageUrl;
 
   // Show the visual grid when we have a placeholder image, multiple results, or a video tool
   if (placeholderUrl || isBatch || isVideoTool) {
@@ -492,7 +492,7 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
                   }}>
                     <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
                       <img
-                        src={endFrameImageUrl ? placeholderUrl! : contextImageUrls![0]}
+                        src={placeholderUrl!}
                         alt="" aria-hidden="true"
                         style={{
                           width: '100%', height: '100%', objectFit: 'cover',
@@ -514,7 +514,7 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
                     </div>
                     <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
                       <img
-                        src={endFrameImageUrl || contextImageUrls![1]}
+                        src={endFrameImageUrl || contextImageUrls![0]}
                         alt="" aria-hidden="true"
                         style={{
                           width: '100%', height: '100%', objectFit: 'cover',
