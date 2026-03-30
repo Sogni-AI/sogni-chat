@@ -622,6 +622,7 @@ interface ChatVideoResultsProps {
     error?: string;
     label?: string;
     retryKey?: string;
+    sourceImageUrl?: string;
   }>;
   /** Source image URL for blurred placeholder on pending video slots */
   sourceImageUrl?: string;
@@ -700,6 +701,8 @@ export const ChatVideoResults = memo(function ChatVideoResults({
 
         // Per-job progress info for pending slot overlays
         const jobData = perJobProgress?.[index];
+        // Per-job source image takes precedence over global sourceImageUrl
+        const slotSourceImage = jobData?.sourceImageUrl || sourceImageUrl;
         const jobProg = jobData?.progress;
         const jobPct = jobProg !== undefined ? Math.round(jobProg * 100) : 0;
         const jobETA = jobData?.etaSeconds;
@@ -799,16 +802,16 @@ export const ChatVideoResults = memo(function ChatVideoResults({
               }}
             >
               {/* Blurred source image background */}
-              {sourceImageUrl && (
+              {slotSourceImage && (
                 endFrameImageUrl ? (
                   <div style={{ position: 'absolute', inset: 0, display: 'flex' }}>
-                    <img src={sourceImageUrl} alt="" aria-hidden="true"
+                    <img src={slotSourceImage} alt="" aria-hidden="true"
                       style={{ flex: 1, objectFit: 'cover', filter: 'blur(8px) brightness(0.6)', transform: 'scale(1.1)' }} />
                     <img src={endFrameImageUrl} alt="" aria-hidden="true"
                       style={{ flex: 1, objectFit: 'cover', filter: 'blur(8px) brightness(0.6)', transform: 'scale(1.1)' }} />
                   </div>
                 ) : (
-                  <img src={sourceImageUrl} alt="" aria-hidden="true"
+                  <img src={slotSourceImage} alt="" aria-hidden="true"
                     style={{
                       position: 'absolute', inset: 0, width: '100%', height: '100%',
                       objectFit: 'cover', filter: 'blur(8px) brightness(0.6)', transform: 'scale(1.1)',
@@ -825,16 +828,16 @@ export const ChatVideoResults = memo(function ChatVideoResults({
                   style={{
                     width: '1.5rem',
                     height: '1.5rem',
-                    border: sourceImageUrl ? '2.5px solid rgba(255,255,255,0.3)' : '2.5px solid var(--color-border)',
-                    borderTopColor: sourceImageUrl ? '#fff' : 'var(--color-accent)',
+                    border: slotSourceImage ? '2.5px solid rgba(255,255,255,0.3)' : '2.5px solid var(--color-border)',
+                    borderTopColor: slotSourceImage ? '#fff' : 'var(--color-accent)',
                     borderRadius: '50%',
                   }}
                 />
                 {jobData?.label && (
                   <span style={{
                     fontSize: '0.75rem', fontWeight: 500,
-                    color: sourceImageUrl ? '#fff' : 'var(--color-text-secondary)',
-                    textShadow: sourceImageUrl ? '0 1px 4px rgba(0,0,0,0.6)' : 'none',
+                    color: slotSourceImage ? '#fff' : 'var(--color-text-secondary)',
+                    textShadow: slotSourceImage ? '0 1px 4px rgba(0,0,0,0.6)' : 'none',
                   }}>
                     {jobData.label}...
                   </span>
@@ -842,8 +845,8 @@ export const ChatVideoResults = memo(function ChatVideoResults({
                 {jobProgressText && (
                   <span style={{
                     fontSize: '0.6875rem',
-                    color: sourceImageUrl ? 'rgba(255,255,255,0.85)' : 'var(--color-text-tertiary)',
-                    textShadow: sourceImageUrl ? '0 1px 4px rgba(0,0,0,0.6)' : 'none',
+                    color: slotSourceImage ? 'rgba(255,255,255,0.85)' : 'var(--color-text-tertiary)',
+                    textShadow: slotSourceImage ? '0 1px 4px rgba(0,0,0,0.6)' : 'none',
                   }}>
                     {jobProgressText}
                   </span>
@@ -852,14 +855,14 @@ export const ChatVideoResults = memo(function ChatVideoResults({
                   <div style={{
                     width: '60%',
                     height: '3px',
-                    background: sourceImageUrl ? 'rgba(255,255,255,0.2)' : 'rgba(var(--rgb-primary), 0.1)',
+                    background: slotSourceImage ? 'rgba(255,255,255,0.2)' : 'rgba(var(--rgb-primary), 0.1)',
                     borderRadius: '2px',
                     overflow: 'hidden',
                   }}>
                     <div style={{
                       width: `${jobPct}%`,
                       height: '100%',
-                      background: sourceImageUrl ? '#fff' : 'var(--color-accent)',
+                      background: slotSourceImage ? '#fff' : 'var(--color-accent)',
                       borderRadius: '2px',
                       transition: 'width 0.3s ease',
                     }} />
@@ -880,8 +883,8 @@ export const ChatVideoResults = memo(function ChatVideoResults({
                 onError={() => handleError(index)}
               />
               {/* Redo button on completed video thumbnails.
-                  During review (retryKey present): use retryBus so the live handler regenerates.
-                  After completion (no retryKey): use onItemRetry for post-completion redo. */}
+                  During review (retryKey present): always visible so the user can redo clips.
+                  After completion (no retryKey): hover-only via onItemRetry. */}
               {(jobData?.retryKey || onItemRetry) && !isRetrying && (
                 <button
                   data-redo-btn
@@ -907,11 +910,12 @@ export const ChatVideoResults = memo(function ChatVideoResults({
                     alignItems: 'center',
                     justifyContent: 'center',
                     cursor: 'pointer',
-                    opacity: 0,
+                    // During review (retryKey): always visible. Otherwise: hover-only.
+                    opacity: jobData?.retryKey ? 0.85 : 0,
                     transition: 'opacity 0.2s, transform 0.2s',
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'scale(1.1)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.opacity = '0'; e.currentTarget.style.transform = 'scale(1)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = jobData?.retryKey ? '0.85' : '0'; e.currentTarget.style.transform = 'scale(1)'; }}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M1 4v6h6" />
