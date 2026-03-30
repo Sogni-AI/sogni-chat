@@ -63,6 +63,24 @@ interface StscEntry {
   sampleDescriptionIndex: number;
 }
 
+interface AudioTrackInfo {
+  stsdBox: Uint8Array | null;
+  sampleSizes: number[];
+  sampleDelta: number;
+  timescale: number;
+  duration: number;
+  mdatData: Uint8Array;
+}
+
+interface TrimmedAudio {
+  sampleSizes: number[];
+  mdatData: Uint8Array;
+  duration: number;
+  timescale: number;
+  sampleDelta: number;
+  stsdBox: Uint8Array | null;
+}
+
 /**
  * Extract an ArrayBuffer from a Uint8Array, handling the strict-mode
  * ArrayBufferLike -> ArrayBuffer cast that TypeScript requires.
@@ -650,7 +668,7 @@ function updateMdhdDuration(mdhdData: Uint8Array, newDuration: number): Uint8Arr
  * samples into a single mdat, rebuilds moov with combined sample tables,
  * and returns a complete MP4.
  */
-function concatenateMP4s_Base(buffers: ArrayBuffer[]): Uint8Array {
+function concatenateMP4s_Base(buffers: ArrayBuffer[], skipAudio = false): Uint8Array {
   if (!buffers || buffers.length === 0) {
     throw new Error('No video buffers provided');
   }
@@ -779,7 +797,7 @@ function concatenateMP4s_Base(buffers: ArrayBuffer[]): Uint8Array {
   // ========== Audio detection ==========
   // Check if ALL source files have audio tracks (handler type 'soun').
   // We only include audio in the output when every source has it.
-  const firstAudioTrak = findAudioTrak(file1MoovBuffer);
+  const firstAudioTrak = skipAudio ? null : findAudioTrak(file1MoovBuffer);
   let allFilesHaveAudio = !!firstAudioTrak;
   if (allFilesHaveAudio) {
     for (let fileIdx = 1; fileIdx < parsedFiles.length; fileIdx++) {
@@ -1111,6 +1129,399 @@ function concatenateMP4s_Base(buffers: ArrayBuffer[]): Uint8Array {
   return concatArrays([firstParsed.ftyp!, newMdat, newMoov]);
 }
 
+// ========== AUDIO MUXING ==========
+// Ported from sogni-photobooth. Extracts audio from an external MP4 source
+// (e.g. the original dance reference video) and muxes it onto a video-only
+// concatenated result — preventing ugly gaps/stutter between clips.
+
+function extractAudioSamplesFromMdat(
+  fileBuffer: ArrayBuffer,
+  chunkOffsets: number[],
+  stscEntries: { firstChunk: number; samplesPerChunk: number }[],
+  sampleSizes: number[],
+): Uint8Array | null {
+  if (chunkOffsets.length === 0 || sampleSizes.length === 0) return null;
+
+  let totalSize = 0;
+  for (const size of sampleSizes) totalSize += size;
+  if (totalSize === 0) return null;
+
+  const audioData = new Uint8Array(totalSize);
+  const fileBuf = new Uint8Array(fileBuffer);
+  let sampleIndex = 0;
+  let writeOffset = 0;
+
+  for (let chunkIdx = 0; chunkIdx < chunkOffsets.length; chunkIdx++) {
+    let samplesInChunk = 1;
+    for (let i = stscEntries.length - 1; i >= 0; i--) {
+      if (chunkIdx + 1 >= stscEntries[i].firstChunk) {
+        samplesInChunk = stscEntries[i].samplesPerChunk;
+        break;
+      }
+    }
+
+    let readOffset = chunkOffsets[chunkIdx];
+    for (let s = 0; s < samplesInChunk && sampleIndex < sampleSizes.length; s++) {
+      const sampleSize = sampleSizes[sampleIndex];
+      if (readOffset + sampleSize <= fileBuf.length) {
+        audioData.set(fileBuf.slice(readOffset, readOffset + sampleSize), writeOffset);
+        writeOffset += sampleSize;
+      }
+      readOffset += sampleSize;
+      sampleIndex++;
+    }
+  }
+
+  return writeOffset > 0 ? audioData.slice(0, writeOffset) : null;
+}
+
+function extractAudioTrackFromBuffer(buffer: ArrayBuffer): AudioTrackInfo | null {
+  const parsed = parseMP4(buffer);
+  if (!parsed.moov) return null;
+
+  const moovBuffer = toArrayBuffer(parsed.moov);
+  const trak = findAudioTrak(moovBuffer);
+  if (!trak) return null;
+
+  const stbl = findNestedBoxInRange(moovBuffer, trak.contentStart, trak.end, ['mdia', 'minf', 'stbl']);
+  if (!stbl) return null;
+
+  // Sample sizes
+  const stsz = findBox(moovBuffer, stbl.contentStart, stbl.end, 'stsz');
+  const sampleSizes: number[] = [];
+  if (stsz) {
+    const v = new DataView(moovBuffer, stsz.start, stsz.size);
+    const uniformSize = v.getUint32(12);
+    const count = v.getUint32(16);
+    if (uniformSize === 0) {
+      for (let i = 0; i < count; i++) sampleSizes.push(v.getUint32(20 + i * 4));
+    } else {
+      for (let i = 0; i < count; i++) sampleSizes.push(uniformSize);
+    }
+  }
+
+  // Chunk offsets
+  const stco = findBox(moovBuffer, stbl.contentStart, stbl.end, 'stco');
+  const chunkOffsets: number[] = [];
+  if (stco) {
+    const v = new DataView(moovBuffer, stco.start, stco.size);
+    const count = v.getUint32(12);
+    for (let i = 0; i < count; i++) chunkOffsets.push(v.getUint32(16 + i * 4));
+  }
+
+  // Sample-to-chunk mapping
+  const stsc = findBox(moovBuffer, stbl.contentStart, stbl.end, 'stsc');
+  const stscEntries: { firstChunk: number; samplesPerChunk: number }[] = [];
+  if (stsc) {
+    const v = new DataView(moovBuffer, stsc.start, stsc.size);
+    const count = v.getUint32(12);
+    for (let i = 0; i < count; i++) {
+      stscEntries.push({
+        firstChunk: v.getUint32(16 + i * 12),
+        samplesPerChunk: v.getUint32(20 + i * 12),
+      });
+    }
+  }
+
+  // Time-to-sample (for sample delta)
+  const stts = findBox(moovBuffer, stbl.contentStart, stbl.end, 'stts');
+  let sampleDelta = 1024; // AAC default
+  if (stts) {
+    const v = new DataView(moovBuffer, stts.start, stts.size);
+    if (v.getUint32(12) > 0) sampleDelta = v.getUint32(20);
+  }
+
+  // Audio format descriptor
+  const stsd = findBox(moovBuffer, stbl.contentStart, stbl.end, 'stsd');
+  const stsdBox = stsd ? new Uint8Array(moovBuffer, stsd.start, stsd.size) : null;
+
+  // Media header (timescale + duration)
+  const mdhd = findNestedBoxInRange(moovBuffer, trak.contentStart, trak.end, ['mdia', 'mdhd']);
+  let timescale = 44100;
+  let duration = 0;
+  if (mdhd) {
+    const v = new DataView(moovBuffer, mdhd.start, mdhd.size);
+    const version = v.getUint8(8);
+    if (version === 0) {
+      timescale = v.getUint32(20);
+      duration = v.getUint32(24);
+    } else {
+      timescale = v.getUint32(28);
+      duration = Number(v.getBigUint64(32));
+    }
+  }
+
+  if (sampleSizes.length === 0 || chunkOffsets.length === 0) return null;
+
+  const mdatData = extractAudioSamplesFromMdat(buffer, chunkOffsets, stscEntries, sampleSizes);
+  if (!mdatData || mdatData.byteLength === 0) return null;
+
+  return { stsdBox, sampleSizes, sampleDelta, timescale, duration, mdatData };
+}
+
+function trimAudioSamples(
+  audioTrack: AudioTrackInfo,
+  startOffsetUnits: number,
+  videoDurationSeconds: number,
+  audioTimescale: number,
+): TrimmedAudio {
+  const samplesNeeded = Math.ceil(videoDurationSeconds * audioTimescale / audioTrack.sampleDelta);
+  const startSample = Math.floor(startOffsetUnits / audioTrack.sampleDelta);
+
+  const totalSamples = audioTrack.sampleSizes.length;
+  const endSample = Math.min(startSample + samplesNeeded, totalSamples);
+  const actualStartSample = Math.min(startSample, Math.max(0, totalSamples - 1));
+
+  const trimmedSampleSizes = audioTrack.sampleSizes.slice(actualStartSample, endSample);
+
+  let byteStart = 0;
+  for (let i = 0; i < actualStartSample; i++) byteStart += audioTrack.sampleSizes[i];
+
+  let byteLength = 0;
+  for (let i = actualStartSample; i < endSample; i++) byteLength += audioTrack.sampleSizes[i];
+
+  const availableBytes = audioTrack.mdatData.byteLength - byteStart;
+  const actualByteLength = Math.min(byteLength, Math.max(0, availableBytes));
+  const trimmedMdatData = actualByteLength > 0
+    ? new Uint8Array(audioTrack.mdatData.buffer, audioTrack.mdatData.byteOffset + byteStart, actualByteLength)
+    : new Uint8Array(0);
+
+  return {
+    sampleSizes: trimmedSampleSizes,
+    mdatData: trimmedMdatData,
+    duration: trimmedSampleSizes.length * audioTrack.sampleDelta,
+    timescale: audioTrack.timescale,
+    sampleDelta: audioTrack.sampleDelta,
+    stsdBox: audioTrack.stsdBox,
+  };
+}
+
+function buildAudioTkhd(duration: number, trackId: number): Uint8Array {
+  const size = 92;
+  const result = new Uint8Array(size);
+  const view = new DataView(result.buffer);
+
+  view.setUint32(0, size);
+  result[4] = 0x74; result[5] = 0x6B; result[6] = 0x68; result[7] = 0x64; // tkhd
+  view.setUint32(8, 0x00000007); // flags: enabled, in movie, in preview
+  view.setUint32(12, 0); view.setUint32(16, 0); // creation/modification time
+  view.setUint32(20, trackId);
+  view.setUint32(24, 0); // reserved
+  view.setUint32(28, duration);
+  view.setUint32(32, 0); view.setUint32(36, 0); // reserved
+  view.setInt16(40, 0); view.setInt16(42, 0); // layer, alternate group
+  view.setInt16(44, 0x0100); // volume 1.0 (audio)
+  view.setInt16(46, 0); // reserved
+  const matrix = [0x00010000, 0, 0, 0, 0x00010000, 0, 0, 0, 0x40000000];
+  for (let i = 0; i < 9; i++) view.setInt32(48 + i * 4, matrix[i]);
+  view.setUint32(84, 0); view.setUint32(88, 0); // width/height (0 for audio)
+
+  return result;
+}
+
+function buildAudioMdhd(duration: number, timescale: number): Uint8Array {
+  const size = 32;
+  const result = new Uint8Array(size);
+  const view = new DataView(result.buffer);
+
+  view.setUint32(0, size);
+  result[4] = 0x6D; result[5] = 0x64; result[6] = 0x68; result[7] = 0x64; // mdhd
+  view.setUint32(8, 0); // version 0, flags 0
+  view.setUint32(12, 0); view.setUint32(16, 0); // creation/modification time
+  view.setUint32(20, timescale);
+  view.setUint32(24, duration);
+  view.setUint16(28, 0x55C4); // language 'und'
+  view.setUint16(30, 0);
+
+  return result;
+}
+
+function buildAudioHdlr(): Uint8Array {
+  const size = 37;
+  const result = new Uint8Array(size);
+  const view = new DataView(result.buffer);
+
+  view.setUint32(0, size);
+  result[4] = 0x68; result[5] = 0x64; result[6] = 0x6C; result[7] = 0x72; // hdlr
+  view.setUint32(8, 0); view.setUint32(12, 0); // version/flags, pre-defined
+  result[16] = 0x73; result[17] = 0x6F; result[18] = 0x75; result[19] = 0x6E; // 'soun'
+  view.setUint32(20, 0); view.setUint32(24, 0); view.setUint32(28, 0); // reserved
+  result[32] = 0x53; result[33] = 0x6F; result[34] = 0x75; result[35] = 0x6E; result[36] = 0x00; // "Soun\0"
+
+  return result;
+}
+
+function buildSmhd(): Uint8Array {
+  const size = 16;
+  const result = new Uint8Array(size);
+  const view = new DataView(result.buffer);
+
+  view.setUint32(0, size);
+  result[4] = 0x73; result[5] = 0x6D; result[6] = 0x68; result[7] = 0x64; // smhd
+  view.setUint32(8, 0); // version/flags
+  view.setInt16(12, 0); view.setInt16(14, 0); // balance, reserved
+
+  return result;
+}
+
+function buildDinf(): Uint8Array {
+  const url = new Uint8Array(12);
+  const urlView = new DataView(url.buffer);
+  urlView.setUint32(0, 12);
+  urlView.setUint32(4, 0x75726C20); // 'url '
+  urlView.setUint32(8, 1); // self-contained
+
+  const dref = new Uint8Array(16 + url.length);
+  const drefView = new DataView(dref.buffer);
+  drefView.setUint32(0, 16 + url.length);
+  drefView.setUint32(4, 0x64726566); // 'dref'
+  drefView.setUint32(8, 0);
+  drefView.setUint32(12, 1);
+  dref.set(url, 16);
+
+  const dinf = new Uint8Array(8 + dref.length);
+  const dinfView = new DataView(dinf.buffer);
+  dinfView.setUint32(0, 8 + dref.length);
+  dinfView.setUint32(4, 0x64696E66); // 'dinf'
+  dinf.set(dref, 8);
+
+  return dinf;
+}
+
+function buildBasicAudioStsd(sampleRate: number): Uint8Array {
+  const mp4aSize = 36;
+  const stsdSize = 16 + mp4aSize;
+  const result = new Uint8Array(stsdSize);
+  const view = new DataView(result.buffer);
+
+  view.setUint32(0, stsdSize);
+  result[4] = 0x73; result[5] = 0x74; result[6] = 0x73; result[7] = 0x64; // stsd
+  view.setUint32(8, 0);
+  view.setUint32(12, 1);
+
+  const o = 16;
+  view.setUint32(o, mp4aSize);
+  result[o + 4] = 0x6D; result[o + 5] = 0x70; result[o + 6] = 0x34; result[o + 7] = 0x61; // 'mp4a'
+  view.setUint16(o + 16, 2); // stereo
+  view.setUint16(o + 18, 16); // sample size
+  view.setUint32(o + 24, sampleRate << 16); // fixed-point sample rate
+
+  return result;
+}
+
+function buildAudioStbl(audioTrack: AudioTrackInfo, trimmed: TrimmedAudio, chunkOffset: number): Uint8Array {
+  const stsd = audioTrack.stsdBox || buildBasicAudioStsd(trimmed.timescale);
+  const stsz = buildStsz(trimmed.sampleSizes);
+  const stco = buildStco([chunkOffset]);
+  const stsc = buildStsc([{
+    firstChunk: 1,
+    samplesPerChunk: trimmed.sampleSizes.length,
+    sampleDescriptionIndex: 1,
+  }]);
+  const stts = buildStts(trimmed.sampleSizes.length, trimmed.sampleDelta);
+  return wrapBox('stbl', concatArrays([stsd, stsz, stco, stsc, stts]));
+}
+
+function buildAudioMinf(audioTrack: AudioTrackInfo, trimmed: TrimmedAudio, chunkOffset: number): Uint8Array {
+  return wrapBox('minf', concatArrays([buildSmhd(), buildDinf(), buildAudioStbl(audioTrack, trimmed, chunkOffset)]));
+}
+
+function buildAudioMdia(audioTrack: AudioTrackInfo, trimmed: TrimmedAudio, chunkOffset: number): Uint8Array {
+  return wrapBox('mdia', concatArrays([
+    buildAudioMdhd(trimmed.duration, trimmed.timescale),
+    buildAudioHdlr(),
+    buildAudioMinf(audioTrack, trimmed, chunkOffset),
+  ]));
+}
+
+function buildAudioTrakBox(
+  audioTrack: AudioTrackInfo,
+  trimmed: TrimmedAudio,
+  chunkOffset: number,
+  movieDuration: number,
+): Uint8Array {
+  return wrapBox('trak', concatArrays([
+    buildAudioTkhd(movieDuration, 2),
+    buildEdts(movieDuration, 0),
+    buildAudioMdia(audioTrack, trimmed, chunkOffset),
+  ]));
+}
+
+function rebuildMoovWithAudioTrak(videoMoov: Uint8Array, audioTrak: Uint8Array): Uint8Array {
+  const moovBuffer = toArrayBuffer(videoMoov);
+  const view = new DataView(moovBuffer);
+
+  // Find end of last trak in original moov
+  let lastTrakEnd = 8;
+  let offset = 8;
+  while (offset < moovBuffer.byteLength - 8) {
+    const size = view.getUint32(offset);
+    const type = getBoxType(view, offset + 4);
+    if (size === 0 || offset + size > moovBuffer.byteLength) break;
+    if (type === 'trak') lastTrakEnd = offset + size;
+    offset += size;
+  }
+
+  // Insert audio trak after last existing trak
+  const beforeAudio = new Uint8Array(moovBuffer, 8, lastTrakEnd - 8); // skip moov header
+  const afterLastTrak = new Uint8Array(moovBuffer, lastTrakEnd, moovBuffer.byteLength - lastTrakEnd);
+
+  return wrapBox('moov', concatArrays([beforeAudio, audioTrak, afterLastTrak]));
+}
+
+/**
+ * Mux audio from an external MP4 source onto a video-only MP4.
+ * Extracts the audio track from the source, trims it to match the video
+ * duration (with optional start offset), and rebuilds the container.
+ */
+function muxAudioOntoVideo(videoData: Uint8Array, audioSourceBuffer: ArrayBuffer, startOffset = 0): Uint8Array {
+  const audioTrack = extractAudioTrackFromBuffer(audioSourceBuffer);
+  if (!audioTrack) {
+    console.warn('[VIDEO CONCAT] No audio track found in source — returning video-only result');
+    return videoData;
+  }
+
+  const videoBuffer = toArrayBuffer(videoData);
+  const video = parseMP4(videoBuffer);
+  if (!video.ftyp || !video.moov || !video.mdatData) {
+    console.warn('[VIDEO CONCAT] Invalid video structure for audio muxing — returning as-is');
+    return videoData;
+  }
+
+  // Get video duration
+  const videoDurations = getOriginalDurations(video.moov);
+  const videoTimescale = getMovieTimescaleFromMoov(video.moov) || 1000;
+  const videoDurationSeconds = videoDurations.movieDuration / videoTimescale;
+
+  // Trim audio to match video duration with offset
+  const audioTimescale = audioTrack.timescale || 44100;
+  const startOffsetUnits = Math.floor(startOffset * audioTimescale);
+  const trimmed = trimAudioSamples(audioTrack, startOffsetUnits, videoDurationSeconds, audioTimescale);
+
+  if (trimmed.sampleSizes.length === 0 || trimmed.mdatData.byteLength === 0) {
+    console.warn('[VIDEO CONCAT] Audio trimming yielded no data — returning video-only result');
+    return videoData;
+  }
+
+  console.log(
+    `[VIDEO CONCAT] Muxing audio: video=${videoDurationSeconds.toFixed(1)}s, ` +
+    `audio=${(trimmed.duration / trimmed.timescale).toFixed(1)}s, offset=${startOffset}s`,
+  );
+
+  // Build combined mdat: video data + audio data
+  const combinedMdatData = concatArrays([video.mdatData, trimmed.mdatData]);
+  const newMdat = buildMdat(combinedMdatData);
+
+  // Audio chunk offset = ftyp + mdat header (8 bytes) + video data
+  const audioChunkOffset = video.ftyp.byteLength + 8 + video.mdatData.byteLength;
+
+  // Build audio trak and insert into moov
+  const newAudioTrak = buildAudioTrakBox(audioTrack, trimmed, audioChunkOffset, videoDurations.movieDuration);
+  const newMoov = rebuildMoovWithAudioTrak(video.moov, newAudioTrak);
+
+  return concatArrays([video.ftyp, newMdat, newMoov]);
+}
+
 // ========== PUBLIC API ==========
 
 const S3_DOWNLOAD_DELAY_MS = 150;
@@ -1130,19 +1541,34 @@ async function downloadVideos(
   return buffers;
 }
 
+export interface AudioSourceOptions {
+  /** Raw MP4 buffer containing the audio source (e.g. dance reference video) */
+  buffer: ArrayBuffer;
+  /** Start offset in seconds (default 0) */
+  startOffset?: number;
+}
+
 export async function concatenateVideos(
   videoUrls: string[],
   onProgress?: (progress: number) => void,
+  audioSource?: AudioSourceOptions,
 ): Promise<Blob> {
   if (videoUrls.length === 0) throw new Error('No videos to concatenate');
-  if (videoUrls.length === 1) {
+  if (videoUrls.length === 1 && !audioSource) {
     const response = await fetch(videoUrls[0]);
     if (!response.ok) throw new Error(`Failed to download video: ${response.status}`);
     return new Blob([await response.arrayBuffer()], { type: 'video/mp4' });
   }
   const buffers = await downloadVideos(videoUrls, onProgress);
   onProgress?.(0.6);
-  const result = concatenateMP4s_Base(buffers);
+  // When an external audio source is provided, strip individual clip audio
+  // and mux the source audio over the result (prevents gaps between clips).
+  const skipClipAudio = !!audioSource;
+  let result = concatenateMP4s_Base(buffers, skipClipAudio);
+  if (audioSource) {
+    onProgress?.(0.75);
+    result = muxAudioOntoVideo(result, audioSource.buffer, audioSource.startOffset ?? 0);
+  }
   onProgress?.(0.9);
   return new Blob([toArrayBuffer(result)], { type: 'video/mp4' });
 }

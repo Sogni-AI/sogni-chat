@@ -742,7 +742,17 @@ export async function execute(
             throw new Error(`Not enough clips to stitch (got ${clipUrls.length}, need at least 2)`);
           }
 
-          console.log(`[DANCE MONTAGE] Stitching ${clipUrls.length} clips`);
+          console.log(`[DANCE MONTAGE] Stitching ${clipUrls.length} clips with source audio overlay`);
+          // Pass the original dance reference video as audio source — its audio
+          // track is extracted and muxed over the concatenated result, preventing
+          // ugly gaps/stutter from stitching individual clip audio together.
+          const audioSource = {
+            buffer: danceVideoData.buffer.slice(
+              danceVideoData.byteOffset,
+              danceVideoData.byteOffset + danceVideoData.byteLength,
+            ) as ArrayBuffer,
+            startOffset: 0,
+          };
           const blob = await concatenateVideos(clipUrls, (progress) => {
             stepCallbacks.onToolProgress({
               type: 'progress',
@@ -750,7 +760,7 @@ export async function execute(
               progress,
               stepLabel: 'Stitching dance montage',
             });
-          });
+          }, audioSource);
 
           const blobUrl = URL.createObjectURL(blob);
 
