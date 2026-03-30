@@ -623,6 +623,10 @@ interface ChatVideoResultsProps {
     label?: string;
     retryKey?: string;
   }>;
+  /** Source image URL for blurred placeholder on pending video slots */
+  sourceImageUrl?: string;
+  /** End-frame image URL for dual-frame placeholder on pending video slots */
+  endFrameImageUrl?: string;
 }
 
 export const ChatVideoResults = memo(function ChatVideoResults({
@@ -634,6 +638,8 @@ export const ChatVideoResults = memo(function ChatVideoResults({
   onVideoClick,
   totalCount,
   perJobProgress,
+  sourceImageUrl,
+  endFrameImageUrl,
 }: ChatVideoResultsProps) {
   // Resolve gallery IDs to blob URLs — persistent local copies that never expire
   const galleryBlobUrls = useGalleryBlobUrls(galleryVideoIds);
@@ -760,55 +766,83 @@ export const ChatVideoResults = memo(function ChatVideoResults({
             /* Loading placeholder for pending video slot */
             <div
               style={{
+                position: 'relative',
                 width: '100%',
                 aspectRatio: videoAspectRatio || '16 / 9',
                 background: 'rgba(var(--rgb-primary), 0.06)',
                 border: '1px solid var(--color-border)',
                 borderRadius: 'var(--radius-md)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem',
+                overflow: 'hidden',
               }}
             >
-              <div
-                className="animate-spin"
-                style={{
-                  width: '1.5rem',
-                  height: '1.5rem',
-                  border: '2.5px solid var(--color-border)',
-                  borderTopColor: 'var(--color-accent)',
-                  borderRadius: '50%',
-                }}
-              />
-              {jobData?.label && (
-                <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--color-text-secondary)' }}>
-                  {jobData.label}...
-                </span>
+              {/* Blurred source image background */}
+              {sourceImageUrl && (
+                endFrameImageUrl ? (
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex' }}>
+                    <img src={sourceImageUrl} alt="" aria-hidden="true"
+                      style={{ flex: 1, objectFit: 'cover', filter: 'blur(8px) brightness(0.6)', transform: 'scale(1.1)' }} />
+                    <img src={endFrameImageUrl} alt="" aria-hidden="true"
+                      style={{ flex: 1, objectFit: 'cover', filter: 'blur(8px) brightness(0.6)', transform: 'scale(1.1)' }} />
+                  </div>
+                ) : (
+                  <img src={sourceImageUrl} alt="" aria-hidden="true"
+                    style={{
+                      position: 'absolute', inset: 0, width: '100%', height: '100%',
+                      objectFit: 'cover', filter: 'blur(8px) brightness(0.6)', transform: 'scale(1.1)',
+                    }} />
+                )
               )}
-              {jobProgressText && (
-                <span style={{ fontSize: '0.6875rem', color: 'var(--color-text-tertiary)' }}>
-                  {jobProgressText}
-                </span>
-              )}
-              {jobProg !== undefined && (
-                <div style={{
-                  width: '60%',
-                  height: '3px',
-                  background: 'rgba(var(--rgb-primary), 0.1)',
-                  borderRadius: '2px',
-                  overflow: 'hidden',
-                }}>
+              {/* Spinner + progress info overlaid */}
+              <div style={{
+                position: 'relative', zIndex: 1, width: '100%', height: '100%',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+              }}>
+                <div
+                  className="animate-spin"
+                  style={{
+                    width: '1.5rem',
+                    height: '1.5rem',
+                    border: sourceImageUrl ? '2.5px solid rgba(255,255,255,0.3)' : '2.5px solid var(--color-border)',
+                    borderTopColor: sourceImageUrl ? '#fff' : 'var(--color-accent)',
+                    borderRadius: '50%',
+                  }}
+                />
+                {jobData?.label && (
+                  <span style={{
+                    fontSize: '0.75rem', fontWeight: 500,
+                    color: sourceImageUrl ? '#fff' : 'var(--color-text-secondary)',
+                    textShadow: sourceImageUrl ? '0 1px 4px rgba(0,0,0,0.6)' : 'none',
+                  }}>
+                    {jobData.label}...
+                  </span>
+                )}
+                {jobProgressText && (
+                  <span style={{
+                    fontSize: '0.6875rem',
+                    color: sourceImageUrl ? 'rgba(255,255,255,0.85)' : 'var(--color-text-tertiary)',
+                    textShadow: sourceImageUrl ? '0 1px 4px rgba(0,0,0,0.6)' : 'none',
+                  }}>
+                    {jobProgressText}
+                  </span>
+                )}
+                {jobProg !== undefined && (
                   <div style={{
-                    width: `${jobPct}%`,
-                    height: '100%',
-                    background: 'var(--color-accent)',
+                    width: '60%',
+                    height: '3px',
+                    background: sourceImageUrl ? 'rgba(255,255,255,0.2)' : 'rgba(var(--rgb-primary), 0.1)',
                     borderRadius: '2px',
-                    transition: 'width 0.3s ease',
-                  }} />
-                </div>
-              )}
+                    overflow: 'hidden',
+                  }}>
+                    <div style={{
+                      width: `${jobPct}%`,
+                      height: '100%',
+                      background: sourceImageUrl ? '#fff' : 'var(--color-accent)',
+                      borderRadius: '2px',
+                      transition: 'width 0.3s ease',
+                    }} />
+                  </div>
+                )}
+              </div>
             </div>
           ) : isGrid ? (
             /* Grid mode — thumbnail card with play overlay, click opens fullscreen viewer */

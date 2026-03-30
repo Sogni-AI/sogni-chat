@@ -390,6 +390,8 @@ export const ChatMessage = memo(function ChatMessage({ message, imageUrl, onImag
             onVideoClick={onVideoClick}
             totalCount={message.toolProgress?.totalCount}
             perJobProgress={message.toolProgress?.perJobProgress}
+            sourceImageUrl={message.toolProgress?.sourceImageUrl || message.sourceImageUrl || undefined}
+            endFrameImageUrl={message.toolProgress?.endFrameImageUrl}
           />
           {/* During video progress: show summary bar (cost, cancel, completion count) */}
           {isVideoToolProgress && (
