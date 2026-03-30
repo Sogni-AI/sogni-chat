@@ -2072,6 +2072,16 @@ export function useChat(): UseChatResult {
       // Force single variation
       const modifiedArgs = { ...toolArgs, numberOfVariations: 1 };
 
+      // Capture the current URL at jobIndex BEFORE async execution starts.
+      // This is used later to swap (not append) in allResultUrlsRef.
+      // We must capture it here because reading it inside a setUIMessages updater
+      // is unreliable — React 18 batching may defer the updater, leaving the
+      // closure variable unset when the swap logic runs.
+      const isVideoToolForRetry = ['animate_photo', 'generate_video', 'sound_to_video', 'video_to_video', 'stitch_video', 'orbit_video', 'dance_montage'].includes(effectiveToolName);
+      const preCapturedOldUrl = isVideoToolForRetry
+        ? targetMessage.videoResults?.[jobIndex]
+        : targetMessage.imageResults?.[jobIndex];
+
       // Track loading state so UI shows spinner and sendMessage is blocked
       activeRequestCountRef.current++;
       setIsLoading(true);
@@ -2169,21 +2179,15 @@ export function useChat(): UseChatResult {
           const isVideoTool = !!videoResultUrls && videoResultUrls.length > 0;
           const newUrl = isVideoTool ? videoResultUrls[0] : resultUrls[0];
 
-          // Capture old URL inside the state updater (runs synchronously),
-          // then use it below to swap in global refs.
-          let oldUrl: string | undefined;
-
+          // Replace the result at jobIndex in the message
           setUIMessages(prev => prev.map(msg => {
             if (msg.id !== messageId) return msg;
-            // Replace the result at jobIndex
             const updatedImageResults = msg.imageResults ? [...msg.imageResults] : undefined;
             const updatedVideoResults = msg.videoResults ? [...msg.videoResults] : undefined;
 
             if (isVideoTool && updatedVideoResults) {
-              oldUrl = updatedVideoResults[jobIndex]; // capture before replacing
               updatedVideoResults[jobIndex] = newUrl;
             } else if (!isVideoTool && updatedImageResults) {
-              oldUrl = updatedImageResults[jobIndex]; // capture before replacing
               updatedImageResults[jobIndex] = newUrl;
             }
 
@@ -2195,8 +2199,11 @@ export function useChat(): UseChatResult {
             };
           }));
 
-          // Swap old URL with new URL at the same index in global refs
-          // (prevents LLM sourceImageIndex drift from stale appended URLs)
+          // Swap old URL with new URL at the same index in global refs.
+          // Uses preCapturedOldUrl (captured before async execution) instead of
+          // reading from a setUIMessages updater — React 18 batching can defer
+          // updaters, leaving closure variables unset when this code runs.
+          const oldUrl = preCapturedOldUrl;
           if (newUrl && oldUrl) {
             if (isVideoTool) {
               const idx = allVideoUrlsRef.current.indexOf(oldUrl);
