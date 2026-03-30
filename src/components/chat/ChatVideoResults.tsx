@@ -627,6 +627,8 @@ interface ChatVideoResultsProps {
   sourceImageUrl?: string;
   /** End-frame image URL for dual-frame placeholder on pending video slots */
   endFrameImageUrl?: string;
+  /** Called when user clicks the redo button on a specific video slot */
+  onItemRetry?: (index: number) => void;
 }
 
 export const ChatVideoResults = memo(function ChatVideoResults({
@@ -640,6 +642,7 @@ export const ChatVideoResults = memo(function ChatVideoResults({
   perJobProgress,
   sourceImageUrl,
   endFrameImageUrl,
+  onItemRetry,
 }: ChatVideoResultsProps) {
   // Resolve gallery IDs to blob URLs — persistent local copies that never expire
   const galleryBlobUrls = useGalleryBlobUrls(galleryVideoIds);
@@ -714,6 +717,14 @@ export const ChatVideoResults = memo(function ChatVideoResults({
             overflow: 'hidden',
             ...(isGrid ? {} : { display: 'inline-block', maxWidth: '360px' }),
           }}
+          onMouseEnter={(e) => {
+            const redoBtn = e.currentTarget.querySelector('[data-redo-btn]') as HTMLElement;
+            if (redoBtn) redoBtn.style.opacity = '1';
+          }}
+          onMouseLeave={(e) => {
+            const redoBtn = e.currentTarget.querySelector('[data-redo-btn]') as HTMLElement;
+            if (redoBtn) redoBtn.style.opacity = '0';
+          }}
         >
           {isFailed ? (
             /* Failed / expired state — with retry button when retryKey is available */
@@ -740,18 +751,26 @@ export const ChatVideoResults = memo(function ChatVideoResults({
                 <path d="M18 4v16" />
                 <line x1="2" y1="4" x2="22" y2="20" />
               </svg>
-              {jobData?.retryKey ? (
+              {onItemRetry ? (
+                <button
+                  onClick={() => onItemRetry(index)}
+                  style={{
+                    fontSize: '0.75rem', fontWeight: 600,
+                    padding: '0.25rem 0.75rem', borderRadius: 'var(--radius-sm)',
+                    background: 'var(--color-accent)', color: 'white',
+                    border: 'none', cursor: 'pointer',
+                  }}
+                >
+                  Retry clip
+                </button>
+              ) : jobData?.retryKey ? (
                 <button
                   onClick={() => triggerRetry(jobData.retryKey!)}
                   style={{
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    padding: '0.25rem 0.75rem',
-                    borderRadius: 'var(--radius-sm)',
-                    background: 'var(--color-accent)',
-                    color: 'white',
-                    border: 'none',
-                    cursor: 'pointer',
+                    fontSize: '0.75rem', fontWeight: 600,
+                    padding: '0.25rem 0.75rem', borderRadius: 'var(--radius-sm)',
+                    background: 'var(--color-accent)', color: 'white',
+                    border: 'none', cursor: 'pointer',
                   }}
                 >
                   Retry clip
@@ -846,15 +865,51 @@ export const ChatVideoResults = memo(function ChatVideoResults({
             </div>
           ) : isGrid ? (
             /* Grid mode — thumbnail card with play overlay, click opens fullscreen viewer */
-            <VideoThumbnailCard
-              src={displayUrl}
-              aspectRatio={videoAspectRatio}
-              onClick={() => {
-                onActiveIndexChange?.(index);
-                onVideoClick?.(displayUrl, index);
-              }}
-              onError={() => handleError(index)}
-            />
+            <>
+              <VideoThumbnailCard
+                src={displayUrl}
+                aspectRatio={videoAspectRatio}
+                onClick={() => {
+                  onActiveIndexChange?.(index);
+                  onVideoClick?.(displayUrl, index);
+                }}
+                onError={() => handleError(index)}
+              />
+              {/* Redo button on completed video thumbnails */}
+              {onItemRetry && (
+                <button
+                  data-redo-btn
+                  onClick={(e) => { e.stopPropagation(); onItemRetry(index); }}
+                  title="Regenerate this video"
+                  style={{
+                    position: 'absolute',
+                    top: '0.375rem',
+                    right: '0.375rem',
+                    zIndex: 4,
+                    background: 'rgba(0, 0, 0, 0.55)',
+                    backdropFilter: 'blur(4px)',
+                    WebkitBackdropFilter: 'blur(4px)',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '1.75rem',
+                    height: '1.75rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    opacity: 0,
+                    transition: 'opacity 0.2s, transform 0.2s',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'scale(1.1)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = '0'; e.currentTarget.style.transform = 'scale(1)'; }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 4v6h6" />
+                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                  </svg>
+                </button>
+              )}
+            </>
           ) : (
             /* Single video — full inline player */
             <ChatVideoPlayer
