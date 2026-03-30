@@ -846,9 +846,9 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
             <button
               onClick={() => triggerRetry(progress.confirmKey!)}
               style={{
-                background: 'var(--color-accent)',
+                background: '#ffffff',
                 border: 'none',
-                color: 'white',
+                color: '#000000',
                 fontSize: '0.75rem',
                 fontWeight: 600,
                 padding: '0.375rem 1rem',
@@ -858,10 +858,10 @@ export const ChatProgressIndicator = memo(function ChatProgressIndicator({
                 whiteSpace: 'nowrap',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.filter = 'brightness(1.1)';
+                e.currentTarget.style.opacity = '0.85';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.filter = 'none';
+                e.currentTarget.style.opacity = '1';
               }}
             >
               {progress.confirmLabel || 'Confirm'}
